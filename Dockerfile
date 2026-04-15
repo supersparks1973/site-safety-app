@@ -1,0 +1,9 @@
+FROM node:20
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN mkdir -p uploads
+EXPOSE 10000
+ENV PORT=10000
+CMD ["node", "server.js"]
