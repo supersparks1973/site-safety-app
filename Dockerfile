@@ -1,7 +1,7 @@
-FROM node:20-slim
+FROM node:20
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 COPY . .
 RUN mkdir -p uploads
 EXPOSE 3000
