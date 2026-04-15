@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1e293b">
+<title>Site Safety</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--primary:#2563eb;--primary-dark:#1d4ed8;--danger:#dc2626;--warning:#f59e0b;--success:#16a34a;--bg:#f1f5f9;--card:#fff;--text:#1e293b;--text-light:#64748b;--border:#e2e8f0;--radius:12px;--shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06)}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+.hidden{display:none!important}
+
+/* ── Login ── */
+.login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:linear-gradient(135deg,#1e293b 0%,#334155 100%)}
+.login-box{background:var(--card);border-radius:var(--radius);padding:40px 30px;width:100%;max-width:380px;box-shadow:0 25px 50px rgba(0,0,0,.25)}
+.login-box h1{text-align:center;margin-bottom:8px;font-size:24px}
+.login-box .subtitle{text-align:center;color:var(--text-light);margin-bottom:30px;font-size:14px}
+.login-box .logo{text-align:center;font-size:48px;margin-bottom:16px}
+
+/* ── Forms ── */
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-weight:600;margin-bottom:6px;font-size:14px;color:var(--text)}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:12px 14px;border:2px solid var(--border);border-radius:8px;font-size:16px;background:var(--card);color:var(--text);transition:border-color .2s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--primary)}
+.form-group textarea{resize:vertical;min-height:80px}
+.form-group .radio-group{display:flex;gap:8px;flex-wrap:wrap}
+.form-group .radio-group label{display:flex;align-items:center;gap:6px;font-weight:400;padding:8px 14px;border:2px solid var(--border);border-radius:8px;cursor:pointer;transition:all .2s;font-size:14px}
+.form-group .radio-group label:has(input:checked){border-color:var(--primary);background:#eff6ff}
+.form-group .radio-group input[type=radio]{width:auto;margin:0}
+.form-group .condition-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.form-group .condition-grid label{display:flex;align-items:center;gap:6px;font-weight:400;font-size:14px}
+.form-group .condition-grid select{width:100%;padding:8px;font-size:14px}
+
+.form-section{background:var(--card);border-radius:var(--radius);padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+.form-section h3{font-size:16px;margin-bottom:14px;color:var(--primary);display:flex;align-items:center;gap:8px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 24px;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;transition:all .2s;width:100%}
+.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-dark)}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-success{background:var(--success);color:#fff}
+.btn-warning{background:var(--warning);color:#fff}
+.btn-outline{background:transparent;border:2px solid var(--border);color:var(--text)}.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+.btn-sm{padding:8px 16px;font-size:14px;width:auto}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── App Layout ── */
+.app-header{background:#1e293b;color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.app-header h2{font-size:18px;font-weight:600}
+.app-header .user-info{display:flex;align-items:center;gap:10px;font-size:14px}
+.app-header .user-badge{background:rgba(255,255,255,.15);padding:4px 10px;border-radius:20px;font-size:12px;text-transform:uppercase}
+.header-btn{background:none;border:none;color:#fff;cursor:pointer;font-size:20px;padding:4px 8px}
+
+.app-content{padding:16px;max-width:800px;margin:0 auto;padding-bottom:90px}
+
+/* ── Bottom Nav ── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:8px 0;padding-bottom:max(8px,env(safe-area-inset-bottom));z-index:100;box-shadow:0 -2px 10px rgba(0,0,0,.05)}
+.bottom-nav button{background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 12px;color:var(--text-light);cursor:pointer;font-size:11px;transition:color .2s}
+.bottom-nav button.active{color:var(--primary)}
+.bottom-nav button .nav-icon{font-size:22px}
+
+/* ── Cards ── */
+.card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.card-header h3{font-size:16px}
+.card-meta{font-size:12px;color:var(--text-light)}
+.card-body p{font-size:14px;margin-bottom:6px;color:var(--text-light)}
+.card-body strong{color:var(--text)}
+
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;text-transform:uppercase}
+.badge-open{background:#fef3c7;color:#92400e}
+.badge-reviewed{background:#dbeafe;color:#1e40af}
+.badge-closed{background:#dcfce7;color:#166534}
+.badge-safe{background:#dcfce7;color:#166534}
+.badge-unsafe{background:#fee2e2;color:#991b1b}
+
+/* ── Stats Grid ── */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.stat-card{background:var(--card);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);text-align:center}
+.stat-card .stat-value{font-size:28px;font-weight:700;color:var(--primary)}
+.stat-card .stat-label{font-size:12px;color:var(--text-light);margin-top:4px}
+.stat-card.danger .stat-value{color:var(--danger)}
+.stat-card.warning .stat-value{color:var(--warning)}
+
+/* ── Tab bar ── */
+.tab-bar{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+.tab-bar button{flex-shrink:0;padding:8px 16px;border:2px solid var(--border);background:var(--card);border-radius:20px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text-light);white-space:nowrap;transition:all .2s}
+.tab-bar button.active{border-color:var(--primary);background:#eff6ff;color:var(--primary)}
+
+/* ── Photo upload ── */
+.photo-upload{border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s}
+.photo-upload:hover{border-color:var(--primary)}
+.photo-upload input{display:none}
+.photo-preview{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.photo-preview img{width:60px;height:60px;object-fit:cover;border-radius:6px;border:2px solid var(--border)}
+
+/* ── Modal ── */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--card);border-radius:var(--radius);padding:24px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto}
+.modal h3{margin-bottom:16px;font-size:18px}
+.modal-photos{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.modal-photos img{width:100%;max-width:200px;border-radius:8px}
+
+/* ── Offline Banner ── */
+.offline-banner{background:var(--warning);color:#000;text-align:center;padding:8px;font-size:13px;font-weight:600;display:none}
+.offline-banner.show{display:block}
+
+/* ── Toast ── */
+.toast{position:fixed;top:20px;right:20px;padding:14px 20px;border-radius:8px;color:#fff;font-size:14px;font-weight:500;z-index:300;transform:translateX(120%);transition:transform .3s ease;max-width:90vw}
+.toast.show{transform:translateX(0)}
+.toast-success{background:var(--success)}
+.toast-error{background:var(--danger)}
+.toast-warning{background:var(--warning);color:#000}
+
+/* ── Pending Sync Indicator ── */
+.sync-indicator{background:var(--warning);color:#000;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;display:none;align-items:center;gap:4px}
+.sync-indicator.show{display:inline-flex}
+
+@media(min-width:768px){
+  .stats-grid{grid-template-columns:repeat(4,1fr)}
+  .app-content{padding:24px}
+}
+</style>
+</head>
+<body>
+
+<!-- Offline Banner -->
+<div id="offlineBanner" class="offline-banner">📡 You are offline — reports will be saved and sent when connection returns</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<!-- ═══════ LOGIN SCREEN ═══════ -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-box">
+    <div class="logo">🦺</div>
+    <h1>Site Safety</h1>
+    <p class="subtitle">Inspections & Near Miss Reporting</p>
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" id="loginUser" autocomplete="username" autocapitalize="none">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="loginPass" autocomplete="current-password">
+    </div>
+    <p id="loginError" style="color:var(--danger);font-size:13px;margin-bottom:12px" class="hidden"></p>
+    <button class="btn btn-primary" id="loginBtn">Sign In</button>
+  </div>
+</div>
+
+<!-- ═══════ MAIN APP ═══════ -->
+<div id="appScreen" class="hidden">
+  <header class="app-header">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:24px">🦺</span>
+      <h2>Site Safety</h2>
+    </div>
+    <div class="user-info">
+      <span id="syncIndicator" class="sync-indicator">⏳ <span id="syncCount">0</span> pending</span>
+      <span id="userBadge" class="user-badge"></span>
+      <button class="header-btn" id="logoutBtn" title="Sign out">⏻</button>
+    </div>
+  </header>
+
+  <div class="app-content" id="appContent">
+    <!-- Content injected by JS -->
+  </div>
+
+  <!-- Bottom Navigation (Operative) -->
+  <nav id="operativeNav" class="bottom-nav hidden">
+    <button data-page="home" class="active"><span class="nav-icon">🏠</span>Home</button>
+    <button data-page="near-miss"><span class="nav-icon">⚠️</span>Near Miss</button>
+    <button data-page="ladder"><span class="nav-icon">🪜</span>Ladder</button>
+    <button data-page="tower"><span class="nav-icon">🏗️</span>Tower</button>
+    <button data-page="mewp"><span class="nav-icon">🔧</span>MEWP</button>
+  </nav>
+
+  <!-- Bottom Navigation (Admin) -->
+  <nav id="adminNav" class="bottom-nav hidden">
+    <button data-page="dashboard" class="active"><span class="nav-icon">📊</span>Dashboard</button>
+    <button data-page="reports"><span class="nav-icon">⚠️</span>Reports</button>
+    <button data-page="inspections"><span class="nav-icon">📋</span>Inspections</button>
+    <button data-page="users"><span class="nav-icon">👥</span>Users</button>
+  </nav>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// STATE & CONFIG
+// ═══════════════════════════════════════
+let state = {
+  token: localStorage.getItem('token'),
+  user: null,
+  currentPage: 'home',
+  pendingSubmissions: JSON.parse(localStorage.getItem('pendingSubmissions') || '[]')
+};
+
+// Parse stored user safely
+try { state.user = JSON.parse(localStorage.getItem('user') || 'null'); } catch(e) { state.user = null; }
+
+const API = window.location.origin;
+
+function headers() {
+  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.token}` };
+}
+
+// Intercept all API fetches — auto-logout on 401
+const _originalFetch = window.fetch;
+window.fetch = async function(url, options) {
+  const res = await _originalFetch(url, options);
+  if (res.status === 401 && typeof url === 'string' && url.includes('/api/') && !url.includes('/api/auth/login')) {
+    state.token = null;
+    state.user = null;
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('appScreen').classList.add('hidden');
+    showToast('Session expired — please sign in again', 'warning');
+  }
+  return res;
+};
+
+// ═══════════════════════════════════════
+// TOAST NOTIFICATIONS
+// ═══════════════════════════════════════
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast toast-${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ═══════════════════════════════════════
+// OFFLINE / ONLINE HANDLING
+// ═══════════════════════════════════════
+function updateOnlineStatus() {
+  document.getElementById('offlineBanner').classList.toggle('show', !navigator.onLine);
+  if (navigator.onLine) syncPending();
+}
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
+function updateSyncIndicator() {
+  const el = document.getElementById('syncIndicator');
+  const count = document.getElementById('syncCount');
+  if (state.pendingSubmissions.length > 0) {
+    el.classList.add('show');
+    count.textContent = state.pendingSubmissions.length;
+  } else {
+    el.classList.remove('show');
+  }
+}
+
+async function syncPending() {
+  if (state.pendingSubmissions.length === 0) return;
+  const remaining = [];
+  for (const sub of state.pendingSubmissions) {
+    try {
+      const res = await fetch(`${API}/api/${sub.endpoint}`, { method: 'POST', headers: headers(), body: JSON.stringify(sub.data) });
+      if (!res.ok) throw new Error('Failed');
+    } catch { remaining.push(sub); }
+  }
+  state.pendingSubmissions = remaining;
+  localStorage.setItem('pendingSubmissions', JSON.stringify(remaining));
+  updateSyncIndicator();
+  if (remaining.length === 0 && state.pendingSubmissions.length !== remaining.length) {
+    showToast('All pending reports synced!', 'success');
+  }
+}
+
+async function submitForm(endpoint, data) {
+  if (!navigator.onLine) {
+    state.pendingSubmissions.push({ endpoint, data, timestamp: Date.now() });
+    localStorage.setItem('pendingSubmissions', JSON.stringify(state.pendingSubmissions));
+    updateSyncIndicator();
+    showToast('Saved offline — will sync when connected', 'warning');
+    return { offline: true };
+  }
+  const res = await fetch(`${API}/api/${endpoint}`, { method: 'POST', headers: headers(), body: JSON.stringify(data) });
+  if (!res.ok) throw new Error('Submission failed');
+  return res.json();
+}
+
+// ═══════════════════════════════════════
+// PHOTO HANDLING
+// ═══════════════════════════════════════
+async function uploadPhotos(fileInput) {
+  if (!fileInput.files || fileInput.files.length === 0) return '';
+  if (!navigator.onLine) {
+    // Store as base64 for offline
+    const promises = Array.from(fileInput.files).map(f => new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(f);
+    }));
+    const results = await Promise.all(promises);
+    return results.join(',');
+  }
+  const fd = new FormData();
+  Array.from(fileInput.files).forEach(f => fd.append('photos', f));
+  const res = await fetch(`${API}/api/upload`, { method: 'POST', headers: { 'Authorization': `Bearer ${state.token}` }, body: fd });
+  const data = await res.json();
+  return data.files.join(',');
+}
+
+// ═══════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════
+document.getElementById('loginBtn').addEventListener('click', login);
+document.getElementById('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+
+async function login() {
+  const errEl = document.getElementById('loginError');
+  errEl.classList.add('hidden');
+
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value;
+
+  if (!username || !password) {
+    errEl.textContent = 'Please enter both username and password';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  btn.textContent = 'Signing in...';
+
+  try {
+    const res = await fetch(`${API}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Invalid credentials');
+    }
+
+    const data = await res.json();
+    state.token = data.token;
+    state.user = data.user;
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    showApp();
+  } catch (err) {
+    console.error('Login failed:', err);
+    errEl.textContent = err.message === 'Failed to fetch'
+      ? 'Cannot connect to server — is it running?'
+      : 'Invalid username or password';
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+  }
+}
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  state.token = null;
+  state.user = null;
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('appScreen').classList.add('hidden');
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginError').classList.add('hidden');
+});
+
+// ═══════════════════════════════════════
+// INIT APP
+// ═══════════════════════════════════════
+function showApp() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('appScreen').classList.remove('hidden');
+  document.getElementById('userBadge').textContent = state.user.role;
+
+  if (state.user.role === 'admin') {
+    document.getElementById('adminNav').classList.remove('hidden');
+    document.getElementById('operativeNav').classList.add('hidden');
+    navigate('dashboard');
+  } else {
+    document.getElementById('operativeNav').classList.remove('hidden');
+    document.getElementById('adminNav').classList.add('hidden');
+    navigate('home');
+  }
+  updateSyncIndicator();
+  updateOnlineStatus();
+}
+
+// Check stored token on load — verify it's still valid
+if (state.token && state.user) {
+  fetch(`${API}/api/auth/me`, { headers: headers() })
+    .then(res => {
+      if (res.ok) {
+        return res.json().then(user => {
+          state.user = user;
+          showApp();
+        });
+      } else {
+        // Token expired or invalid — clear and show login
+        console.log('Stored token invalid, showing login');
+        state.token = null;
+        state.user = null;
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+    })
+    .catch(() => {
+      // Server not reachable — still try to show app (offline mode)
+      showApp();
+    });
+}
+
+// ═══════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════
+document.querySelectorAll('.bottom-nav button').forEach(btn => {
+  btn.addEventListener('click', () => navigate(btn.dataset.page));
+});
+
+function navigate(page) {
+  state.currentPage = page;
+  document.querySelectorAll('.bottom-nav button').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+  renderPage(page);
+}
+
+function renderPage(page) {
+  const c = document.getElementById('appContent');
+  const pages = {
+    // Operative pages
+    'home': renderHome,
+    'near-miss': renderNearMissForm,
+    'ladder': renderLadderForm,
+    'tower': renderTowerForm,
+    'mewp': renderMEWPForm,
+    // Admin pages
+    'dashboard': renderDashboard,
+    'reports': renderAdminReports,
+    'inspections': renderAdminInspections,
+    'users': renderAdminUsers,
+  };
+  if (pages[page]) pages[page](c);
+}
+
+// ═══════════════════════════════════════
+// TODAY'S DATE HELPER
+// ═══════════════════════════════════════
+function today() { return new Date().toISOString().split('T')[0]; }
+function now() { return new Date().toTimeString().slice(0, 5); }
+
+// ═══════════════════════════════════════
+// OPERATIVE: HOME
+// ═══════════════════════════════════════
+function renderHome(c) {
+  c.innerHTML = `
+    <div style="text-align:center;padding:30px 0 20px">
+      <h2 style="font-size:22px;margin-bottom:6px">Hello, ${state.user.full_name}</h2>
+      <p style="color:var(--text-light)">What would you like to report today?</p>
+    </div>
+    <div style="display:grid;gap:12px">
+      <button class="btn btn-danger" onclick="navigate('near-miss')" style="padding:20px;font-size:18px">⚠️ Near Miss Report</button>
+      <button class="btn btn-primary" onclick="navigate('ladder')" style="padding:20px;font-size:18px">🪜 Ladder Inspection</button>
+      <button class="btn btn-primary" onclick="navigate('tower')" style="padding:20px;font-size:18px">🏗️ Mobile Tower Inspection</button>
+      <button class="btn btn-primary" onclick="navigate('mewp')" style="padding:20px;font-size:18px">🔧 MEWP Inspection</button>
+    </div>
+    <div id="myRecent" style="margin-top:30px"></div>
+  `;
+  loadMyRecent();
+}
+
+async function loadMyRecent() {
+  if (!navigator.onLine) return;
+  try {
+    const [nm, ld, tw, mw] = await Promise.all([
+      fetch(`${API}/api/near-miss`, { headers: headers() }).then(r => r.json()),
+      fetch(`${API}/api/ladder-inspection`, { headers: headers() }).then(r => r.json()),
+      fetch(`${API}/api/tower-inspection`, { headers: headers() }).then(r => r.json()),
+      fetch(`${API}/api/mewp-inspection`, { headers: headers() }).then(r => r.json()),
+    ]);
+    const all = [
+      ...nm.slice(0, 3).map(r => ({ ...r, type: 'Near Miss', icon: '⚠️' })),
+      ...ld.slice(0, 3).map(r => ({ ...r, type: 'Ladder', icon: '🪜' })),
+      ...tw.slice(0, 3).map(r => ({ ...r, type: 'Tower', icon: '🏗️' })),
+      ...mw.slice(0, 3).map(r => ({ ...r, type: 'MEWP', icon: '🔧' })),
+    ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5);
+
+    const el = document.getElementById('myRecent');
+    if (!el || all.length === 0) return;
+    el.innerHTML = `<h3 style="margin-bottom:12px;font-size:16px;color:var(--text-light)">Your Recent Submissions</h3>` +
+      all.map(r => `<div class="card"><div class="card-header"><h3>${r.icon} ${r.type}</h3><span class="card-meta">${r.date}</span></div><div class="card-body"><p><strong>Location:</strong> ${r.location}</p></div></div>`).join('');
+  } catch {}
+}
+
+// ═══════════════════════════════════════
+// OPERATIVE: NEAR MISS FORM
+// ═══════════════════════════════════════
+function renderNearMissForm(c) {
+  c.innerHTML = `
+    <h2 style="margin-bottom:16px;display:flex;align-items:center;gap:8px">⚠️ Near Miss Report</h2>
+    <form id="nearMissForm">
+      <div class="form-section">
+        <h3>📅 When & Where</h3>
+        <div class="form-group"><label>Date</label><input type="date" name="date" value="${today()}" required></div>
+        <div class="form-group"><label>Time</label><input type="time" name="time" value="${now()}" required></div>
+        <div class="form-group"><label>Location / Area</label><input type="text" name="location" placeholder="e.g. Level 3, Block A" required></div>
+      </div>
+      <div class="form-section">
+        <h3>📝 Incident Details</h3>
+        <div class="form-group"><label>What happened?</label><textarea name="description" placeholder="Describe the near miss in detail..." rows="4" required></textarea></div>
+        <div class="form-group"><label>Potential Severity</label>
+          <div class="radio-group">
+            <label><input type="radio" name="potential_severity" value="Low" required> Low</label>
+            <label><input type="radio" name="potential_severity" value="Medium"> Medium</label>
+            <label><input type="radio" name="potential_severity" value="High"> High</label>
+            <label><input type="radio" name="potential_severity" value="Critical"> Critical</label>
+          </div>
+        </div>
+        <div class="form-group"><label>Immediate actions taken</label><textarea name="immediate_actions" placeholder="What did you do straight away?" rows="2"></textarea></div>
+      </div>
+      <div class="form-section">
+        <h3>🌤️ Additional Info</h3>
+        <div class="form-group"><label>Weather conditions</label>
+          <select name="weather_conditions">
+            <option value="">-- Select --</option>
+            <option>Dry / Clear</option><option>Rain</option><option>Wind</option><option>Snow / Ice</option><option>Fog</option><option>Hot / Humid</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Witnesses (names)</label><input type="text" name="witnesses" placeholder="e.g. John Smith, Jane Doe"></div>
+      </div>
+      <div class="form-section">
+        <h3>📷 Photos</h3>
+        <div class="photo-upload" onclick="this.querySelector('input').click()">
+          <input type="file" name="photos" accept="image/*" multiple capture="environment">
+          <p>📷 Tap to take photo or choose from gallery</p>
+        </div>
+        <div class="photo-preview" id="nearMissPhotos"></div>
+      </div>
+      <button type="submit" class="btn btn-danger" style="margin-top:8px">⚠️ Submit Near Miss Report</button>
+    </form>
+  `;
+  setupPhotoPreview('nearMissForm', 'nearMissPhotos');
+  document.getElementById('nearMissForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true; btn.textContent = 'Submitting...';
+    try {
+      const photos = await uploadPhotos(e.target.querySelector('input[type=file]'));
+      const data = Object.fromEntries(fd.entries());
+      data.photos = photos;
+      delete data[''];
+      await submitForm('near-miss', data);
+      showToast('Near miss report submitted!');
+      navigate('home');
+    } catch (err) { showToast('Failed to submit', 'error'); }
+    btn.disabled = false; btn.textContent = '⚠️ Submit Near Miss Report';
+  });
+}
+
+// ═══════════════════════════════════════
+// OPERATIVE: LADDER INSPECTION
+// ═══════════════════════════════════════
+function renderLadderForm(c) {
+  c.innerHTML = `
+    <h2 style="margin-bottom:16px;display:flex;align-items:center;gap:8px">🪜 Ladder Inspection</h2>
+    <form id="ladderForm">
+      <div class="form-section">
+        <h3>📋 Ladder Details</h3>
+        <div class="form-group"><label>Date</label><input type="date" name="date" value="${today()}" required></div>
+        <div class="form-group"><label>Ladder ID / Number</label><input type="text" name="ladder_id" placeholder="e.g. LAD-001" required></div>
+        <div class="form-group"><label>Ladder Type</label>
+          <select name="ladder_type" required>
+            <option value="">-- Select --</option>
+            <option>Step Ladder</option><option>Extension Ladder</option><option>Combination Ladder</option><option>Platform Ladder</option><option>Roof Ladder</option><option>Other</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Location</label><input type="text" name="location" placeholder="Where is the ladder being used?" required></div>
+      </div>
+      <div class="form-section">
+        <h3>🔍 Inspection Checks</h3>
+        ${conditionField('Stiles / Side Rails', 'stiles_condition')}
+        ${conditionField('Rungs / Steps', 'rungs_condition')}
+        ${conditionField('Feet / Anti-slip', 'feet_condition')}
+        ${conditionField('Locking Mechanism', 'locking_mechanism')}
+        ${conditionField('Labels / Markings Visible', 'labels_visible')}
+        ${conditionField('General Condition', 'general_condition')}
+      </div>
+      <div class="form-section">
+        <h3>✅ Verdict</h3>
+        <div class="form-group"><label>Safe to use?</label>
+          <div class="radio-group">
+            <label style="flex:1"><input type="radio" name="safe_to_use" value="Yes" required> ✅ Yes</label>
+            <label style="flex:1"><input type="radio" name="safe_to_use" value="No"> ❌ No</label>
+          </div>
+        </div>
+        <div class="form-group"><label>Defects found</label><textarea name="defects_found" placeholder="Describe any defects..." rows="2"></textarea></div>
+        <div class="form-group"><label>Actions taken</label><textarea name="actions_taken" placeholder="e.g. Taken out of service, tagged" rows="2"></textarea></div>
+      </div>
+      <div class="form-section">
+        <h3>📷 Photos</h3>
+        <div class="photo-upload" onclick="this.querySelector('input').click()">
+          <input type="file" name="photos" accept="image/*" multiple capture="environment">
+          <p>📷 Tap to take photo or choose from gallery</p>
+        </div>
+        <div class="photo-preview" id="ladderPhotos"></div>
+      </div>
+      <button type="submit" class="btn btn-primary" style="margin-top:8px">✅ Submit Ladder Inspection</button>
+    </form>
+  `;
+  setupPhotoPreview('ladderForm', 'ladderPhotos');
+  setupFormSubmit('ladderForm', 'ladder-inspection', '✅ Submit Ladder Inspection');
+}
+
+// ═══════════════════════════════════════
+// OPERATIVE: TOWER INSPECTION
+// ═══════════════════════════════════════
+function renderTowerForm(c) {
+  c.innerHTML = `
+    <h2 style="margin-bottom:16px;display:flex;align-items:center;gap:8px">🏗️ Mobile Tower Inspection</h2>
+    <form id="towerForm">
+      <div class="form-section">
+        <h3>📋 Tower Details</h3>
+        <div class="form-group"><label>Date</label><input type="date" name="date" value="${today()}" required></div>
+        <div class="form-group"><label>Tower ID / Number</label><input type="text" name="tower_id" placeholder="e.g. TOW-001" required></div>
+        <div class="form-group"><label>Location</label><input type="text" name="location" placeholder="Where is the tower erected?" required></div>
+        <div class="form-group"><label>Max Platform Height (m)</label><input type="text" name="max_platform_height" placeholder="e.g. 6.2"></div>
+      </div>
+      <div class="form-section">
+        <h3>🔍 Inspection Checks</h3>
+        ${conditionField('Base Plates', 'base_plates_condition')}
+        ${yesNoField('Castors Locked', 'castors_locked')}
+        ${yesNoField('Braces Secure', 'braces_secure')}
+        ${conditionField('Platforms', 'platforms_condition')}
+        ${yesNoField('Guardrails Fitted', 'guardrails_fitted')}
+        ${yesNoField('Toe Boards Fitted', 'toe_boards_fitted')}
+        ${yesNoField('Outriggers Deployed', 'outriggers_deployed')}
+        ${yesNoField('Access Ladder Secure', 'access_ladder_secure')}
+      </div>
+      <div class="form-section">
+        <h3>✅ Verdict</h3>
+        <div class="form-group"><label>Safe to use?</label>
+          <div class="radio-group">
+            <label style="flex:1"><input type="radio" name="safe_to_use" value="Yes" required> ✅ Yes</label>
+            <label style="flex:1"><input type="radio" name="safe_to_use" value="No"> ❌ No</label>
+          </div>
+        </div>
+        <div class="form-group"><label>Defects found</label><textarea name="defects_found" placeholder="Describe any defects..." rows="2"></textarea></div>
+        <div class="form-group"><label>Actions taken</label><textarea name="actions_taken" placeholder="e.g. Tower dismantled, area secured" rows="2"></textarea></div>
+      </div>
+      <div class="form-section">
+        <h3>📷 Photos</h3>
+        <div class="photo-upload" onclick="this.querySelector('input').click()">
+          <input type="file" name="photos" accept="image/*" multiple capture="environment">
+          <p>📷 Tap to take photo or choose from gallery</p>
+        </div>
+        <div class="photo-preview" id="towerPhotos"></div>
+      </div>
+      <button type="submit" class="btn btn-primary" style="margin-top:8px">✅ Submit Tower Inspection</button>
+    </form>
+  `;
+  setupPhotoPreview('towerForm', 'towerPhotos');
+  setupFormSubmit('towerForm', 'tower-inspection', '✅ Submit Tower Inspection');
+}
+
+// ═══════════════════════════════════════
+// OPERATIVE: MEWP INSPECTION
+// ═══════════════════════════════════════
+function renderMEWPForm(c) {
+  c.innerHTML = `
+    <h2 style="margin-bottom:16px;display:flex;align-items:center;gap:8px">🔧 MEWP Inspection</h2>
+    <form id="mewpForm">
+      <div class="form-section">
+        <h3>📋 MEWP Details</h3>
+        <div class="form-group"><label>Date</label><input type="date" name="date" value="${today()}" required></div>
+        <div class="form-group"><label>MEWP ID / Number</label><input type="text" name="mewp_id" placeholder="e.g. MEWP-001" required></div>
+        <div class="form-group"><label>MEWP Type</label>
+          <select name="mewp_type" required>
+            <option value="">-- Select --</option>
+            <option>Scissor Lift</option><option>Boom Lift (Articulating)</option><option>Boom Lift (Telescopic)</option><option>Cherry Picker</option><option>Spider Lift</option><option>Other</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Location</label><input type="text" name="location" placeholder="Where is the MEWP being used?" required></div>
+        <div class="form-group"><label>Hours / Meter Reading</label><input type="text" name="hours_meter_reading" placeholder="e.g. 1234"></div>
+      </div>
+      <div class="form-section">
+        <h3>🔍 Inspection Checks</h3>
+        ${yesNoField('Controls Functional', 'controls_functional')}
+        ${yesNoField('Emergency Controls Working', 'emergency_controls')}
+        ${conditionField('Guardrails', 'guardrails_condition')}
+        ${conditionField('Platform', 'platform_condition')}
+        ${conditionField('Hydraulics (no leaks)', 'hydraulics_condition')}
+        ${conditionField('Tyres / Wheels', 'tyres_condition')}
+        ${conditionField('Outriggers / Stabilisers', 'outriggers_condition')}
+        ${yesNoField('Harness Anchor Points OK', 'harness_anchor_points')}
+        ${yesNoField('Warning Devices Working', 'warning_devices')}
+      </div>
+      <div class="form-section">
+        <h3>✅ Verdict</h3>
+        <div class="form-group"><label>Safe to use?</label>
+          <div class="radio-group">
+            <label style="flex:1"><input type="radio" name="safe_to_use" value="Yes" required> ✅ Yes</label>
+            <label style="flex:1"><input type="radio" name="safe_to_use" value="No"> ❌ No</label>
+          </div>
+        </div>
+        <div class="form-group"><label>Defects found</label><textarea name="defects_found" placeholder="Describe any defects..." rows="2"></textarea></div>
+        <div class="form-group"><label>Actions taken</label><textarea name="actions_taken" placeholder="e.g. Taken out of service, reported to supervisor" rows="2"></textarea></div>
+      </div>
+      <div class="form-section">
+        <h3>📷 Photos</h3>
+        <div class="photo-upload" onclick="this.querySelector('input').click()">
+          <input type="file" name="photos" accept="image/*" multiple capture="environment">
+          <p>📷 Tap to take photo or choose from gallery</p>
+        </div>
+        <div class="photo-preview" id="mewpPhotos"></div>
+      </div>
+      <button type="submit" class="btn btn-primary" style="margin-top:8px">✅ Submit MEWP Inspection</button>
+    </form>
+  `;
+  setupPhotoPreview('mewpForm', 'mewpPhotos');
+  setupFormSubmit('mewpForm', 'mewp-inspection', '✅ Submit MEWP Inspection');
+}
+
+// ═══════════════════════════════════════
+// FORM HELPERS
+// ═══════════════════════════════════════
+function conditionField(label, name) {
+  return `<div class="form-group"><label>${label}</label>
+    <select name="${name}" required>
+      <option value="">-- Select --</option>
+      <option value="Good">Good</option>
+      <option value="Fair">Fair</option>
+      <option value="Poor">Poor</option>
+      <option value="N/A">N/A</option>
+    </select></div>`;
+}
+
+function yesNoField(label, name) {
+  return `<div class="form-group"><label>${label}</label>
+    <div class="radio-group">
+      <label><input type="radio" name="${name}" value="Yes" required> Yes</label>
+      <label><input type="radio" name="${name}" value="No"> No</label>
+      <label><input type="radio" name="${name}" value="N/A"> N/A</label>
+    </div></div>`;
+}
+
+function setupPhotoPreview(formId, previewId) {
+  const form = document.getElementById(formId);
+  const input = form.querySelector('input[type=file]');
+  const preview = document.getElementById(previewId);
+  input.addEventListener('change', () => {
+    preview.innerHTML = '';
+    Array.from(input.files).forEach(f => {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(f);
+      preview.appendChild(img);
+    });
+  });
+}
+
+function setupFormSubmit(formId, endpoint, btnText) {
+  document.getElementById(formId).addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true; btn.textContent = 'Submitting...';
+    try {
+      const photos = await uploadPhotos(e.target.querySelector('input[type=file]'));
+      const data = Object.fromEntries(fd.entries());
+      data.photos = photos;
+      await submitForm(endpoint, data);
+      showToast('Inspection submitted successfully!');
+      navigate('home');
+    } catch (err) { showToast('Failed to submit', 'error'); }
+    btn.disabled = false; btn.textContent = btnText;
+  });
+}
+
+// ═══════════════════════════════════════
+// ADMIN: DASHBOARD
+// ═══════════════════════════════════════
+async function renderDashboard(c) {
+  c.innerHTML = '<h2 style="margin-bottom:16px">📊 Dashboard</h2><p>Loading...</p>';
+  try {
+    const stats = await fetch(`${API}/api/stats`, { headers: headers() }).then(r => r.json());
+    c.innerHTML = `
+      <h2 style="margin-bottom:16px">📊 Dashboard</h2>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value">${stats.near_miss_total}</div><div class="stat-label">Total Near Misses</div></div>
+        <div class="stat-card warning"><div class="stat-value">${stats.near_miss_open}</div><div class="stat-label">Open Reports</div></div>
+        <div class="stat-card"><div class="stat-value">${stats.near_miss_today}</div><div class="stat-label">Near Misses Today</div></div>
+        <div class="stat-card"><div class="stat-value">${stats.operatives}</div><div class="stat-label">Operatives</div></div>
+      </div>
+      <h3 style="margin-bottom:12px;font-size:16px">Inspections</h3>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value">${stats.ladder_total}</div><div class="stat-label">Ladder (${stats.ladder_today} today)</div></div>
+        <div class="stat-card"><div class="stat-value">${stats.tower_total}</div><div class="stat-label">Tower (${stats.tower_today} today)</div></div>
+        <div class="stat-card"><div class="stat-value">${stats.mewp_total}</div><div class="stat-label">MEWP (${stats.mewp_today} today)</div></div>
+        <div class="stat-card danger"><div class="stat-value">${stats.unsafe_ladders + stats.unsafe_towers + stats.unsafe_mewps}</div><div class="stat-label">Flagged Unsafe</div></div>
+      </div>
+      <button class="btn btn-outline" onclick="renderDashboard(document.getElementById('appContent'))" style="margin-top:8px">🔄 Refresh</button>
+    `;
+  } catch { c.innerHTML = '<p>Failed to load dashboard</p>'; }
+}
+
+// ═══════════════════════════════════════
+// ADMIN: REPORTS
+// ═══════════════════════════════════════
+async function renderAdminReports(c) {
+  c.innerHTML = '<h2 style="margin-bottom:16px">⚠️ Near Miss Reports</h2><p>Loading...</p>';
+  try {
+    const reports = await fetch(`${API}/api/near-miss`, { headers: headers() }).then(r => r.json());
+    c.innerHTML = `<h2 style="margin-bottom:16px">⚠️ Near Miss Reports</h2>` +
+      (reports.length === 0 ? '<p style="color:var(--text-light)">No reports yet.</p>' :
+      reports.map(r => `
+        <div class="card" onclick="showReportDetail(${r.id})" style="cursor:pointer">
+          <div class="card-header">
+            <h3>#${r.id} — ${r.location}</h3>
+            <span class="badge badge-${r.status}">${r.status}</span>
+          </div>
+          <div class="card-body">
+            <p><strong>Reported by:</strong> ${r.reported_by} &nbsp;|&nbsp; <strong>Date:</strong> ${r.date} ${r.time}</p>
+            <p><strong>Severity:</strong> <span style="color:${r.potential_severity==='Critical'?'var(--danger)':r.potential_severity==='High'?'var(--warning)':'inherit'}">${r.potential_severity}</span></p>
+            <p>${r.description.substring(0, 120)}${r.description.length > 120 ? '...' : ''}</p>
+          </div>
+        </div>
+      `).join(''));
+  } catch { c.innerHTML = '<p>Failed to load reports</p>'; }
+}
+
+window.showReportDetail = async function(id) {
+  const reports = await fetch(`${API}/api/near-miss`, { headers: headers() }).then(r => r.json());
+  const r = reports.find(x => x.id === id);
+  if (!r) return;
+  const photos = r.photos ? r.photos.split(',').filter(Boolean) : [];
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal-overlay" onclick="if(event.target===this)this.remove()">
+      <div class="modal">
+        <h3>⚠️ Near Miss #${r.id}</h3>
+        <p><strong>Reported by:</strong> ${r.reported_by}</p>
+        <p><strong>Date/Time:</strong> ${r.date} ${r.time}</p>
+        <p><strong>Location:</strong> ${r.location}</p>
+        <p><strong>Severity:</strong> ${r.potential_severity}</p>
+        <p><strong>Description:</strong> ${r.description}</p>
+        ${r.immediate_actions ? `<p><strong>Immediate Actions:</strong> ${r.immediate_actions}</p>` : ''}
+        ${r.weather_conditions ? `<p><strong>Weather:</strong> ${r.weather_conditions}</p>` : ''}
+        ${r.witnesses ? `<p><strong>Witnesses:</strong> ${r.witnesses}</p>` : ''}
+        ${photos.length > 0 ? `<div class="modal-photos">${photos.map(p => `<img src="${p}" alt="Photo">`).join('')}</div>` : ''}
+        <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
+        <div class="form-group"><label>Status</label>
+          <select id="modalStatus"><option ${r.status==='open'?'selected':''}>open</option><option ${r.status==='reviewed'?'selected':''}>reviewed</option><option ${r.status==='closed'?'selected':''}>closed</option></select>
+        </div>
+        <div class="form-group"><label>Admin Notes</label><textarea id="modalNotes" rows="3">${r.admin_notes || ''}</textarea></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary btn-sm" onclick="updateReport(${r.id})">Save</button>
+          <button class="btn btn-outline btn-sm" onclick="this.closest('.modal-overlay').remove()">Close</button>
+        </div>
+      </div>
+    </div>
+  `);
+};
+
+window.updateReport = async function(id) {
+  const status = document.getElementById('modalStatus').value;
+  const admin_notes = document.getElementById('modalNotes').value;
+  await fetch(`${API}/api/near-miss/${id}`, { method: 'PATCH', headers: headers(), body: JSON.stringify({ status, admin_notes }) });
+  document.querySelector('.modal-overlay').remove();
+  showToast('Report updated');
+  renderAdminReports(document.getElementById('appContent'));
+};
+
+// ═══════════════════════════════════════
+// ADMIN: INSPECTIONS
+// ═══════════════════════════════════════
+async function renderAdminInspections(c) {
+  c.innerHTML = `
+    <h2 style="margin-bottom:16px">📋 Inspections</h2>
+    <div class="tab-bar">
+      <button class="active" onclick="loadInspections('ladder',this)">🪜 Ladders</button>
+      <button onclick="loadInspections('tower',this)">🏗️ Towers</button>
+      <button onclick="loadInspections('mewp',this)">🔧 MEWPs</button>
+    </div>
+    <div id="inspectionList">Loading...</div>
+  `;
+  loadInspections('ladder');
+}
+
+window.loadInspections = async function(type, btn) {
+  if (btn) {
+    btn.closest('.tab-bar').querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  const list = document.getElementById('inspectionList');
+  try {
+    const data = await fetch(`${API}/api/${type}-inspection`, { headers: headers() }).then(r => r.json());
+    if (data.length === 0) { list.innerHTML = '<p style="color:var(--text-light)">No inspections yet.</p>'; return; }
+    list.innerHTML = data.map(r => {
+      const by = r.inspected_by;
+      const safe = r.safe_to_use === 'Yes';
+      const id_field = r.ladder_id || r.tower_id || r.mewp_id;
+      return `
+        <div class="card" onclick="showInspectionDetail('${type}', ${JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;')})">
+          <div class="card-header">
+            <h3>${id_field} — ${r.location}</h3>
+            <span class="badge ${safe ? 'badge-safe' : 'badge-unsafe'}">${safe ? 'Safe' : 'UNSAFE'}</span>
+          </div>
+          <div class="card-body">
+            <p><strong>Inspected by:</strong> ${by} &nbsp;|&nbsp; <strong>Date:</strong> ${r.date}</p>
+            ${r.defects_found ? `<p style="color:var(--danger)"><strong>Defects:</strong> ${r.defects_found.substring(0, 100)}</p>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  } catch { list.innerHTML = '<p>Failed to load</p>'; }
+};
+
+window.showInspectionDetail = function(type, r) {
+  if (typeof r === 'string') r = JSON.parse(r);
+  const photos = r.photos ? r.photos.split(',').filter(Boolean) : [];
+  const fields = Object.entries(r).filter(([k]) => !['id','user_id','photos','created_at','inspected_by'].includes(k))
+    .map(([k, v]) => `<p><strong>${k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</strong> ${v || '—'}</p>`).join('');
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal-overlay" onclick="if(event.target===this)this.remove()">
+      <div class="modal">
+        <h3>${type === 'ladder' ? '🪜' : type === 'tower' ? '🏗️' : '🔧'} ${type.charAt(0).toUpperCase() + type.slice(1)} Inspection</h3>
+        <p><strong>Inspected by:</strong> ${r.inspected_by}</p>
+        ${fields}
+        ${photos.length > 0 ? `<div class="modal-photos">${photos.map(p => `<img src="${p}" alt="Photo">`).join('')}</div>` : ''}
+        <button class="btn btn-outline btn-sm" style="margin-top:16px" onclick="this.closest('.modal-overlay').remove()">Close</button>
+      </div>
+    </div>
+  `);
+};
+
+// ═══════════════════════════════════════
+// ADMIN: USER MANAGEMENT
+// ═══════════════════════════════════════
+async function renderAdminUsers(c) {
+  c.innerHTML = '<h2 style="margin-bottom:16px">👥 User Management</h2><div id="userList">Loading...</div>';
+  try {
+    const users = await fetch(`${API}/api/users`, { headers: headers() }).then(r => r.json());
+    const userList = document.getElementById('userList');
+    userList.innerHTML = `
+      <div class="form-section">
+        <h3>➕ Add Operative</h3>
+        <div class="form-group"><label>Full Name</label><input type="text" id="newFullName" placeholder="e.g. John Smith"></div>
+        <div class="form-group"><label>Username</label><input type="text" id="newUsername" placeholder="e.g. jsmith" autocapitalize="none"></div>
+        <div class="form-group"><label>Password</label><input type="password" id="newPassword" placeholder="Min 6 characters"></div>
+        <div class="form-group"><label>Role</label>
+          <select id="newRole"><option value="operative">Operative</option><option value="admin">Admin</option></select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="addUser()">Add User</button>
+      </div>
+      <h3 style="margin:20px 0 12px">Current Users</h3>
+      ${users.map(u => `
+        <div class="card">
+          <div class="card-header">
+            <h3>${u.full_name}</h3>
+            <span class="badge" style="background:#e2e8f0">${u.role}</span>
+          </div>
+          <div class="card-body">
+            <p><strong>Username:</strong> ${u.username}</p>
+            <p><strong>Created:</strong> ${new Date(u.created_at).toLocaleDateString()}</p>
+          </div>
+          ${u.role !== 'admin' ? `<button class="btn btn-outline btn-sm" style="margin-top:8px;color:var(--danger);border-color:var(--danger)" onclick="deleteUser(${u.id})">Remove</button>` : ''}
+        </div>
+      `).join('')}
+    `;
+  } catch { c.innerHTML += '<p>Failed to load users</p>'; }
+}
+
+window.addUser = async function() {
+  const full_name = document.getElementById('newFullName').value.trim();
+  const username = document.getElementById('newUsername').value.trim();
+  const password = document.getElementById('newPassword').value;
+  const role = document.getElementById('newRole').value;
+  if (!full_name || !username || !password || password.length < 6) { showToast('Please fill all fields (password min 6 chars)', 'error'); return; }
+  try {
+    await fetch(`${API}/api/users`, { method: 'POST', headers: headers(), body: JSON.stringify({ full_name, username, password, role }) });
+    showToast('User created');
+    renderAdminUsers(document.getElementById('appContent'));
+  } catch { showToast('Failed — username may already exist', 'error'); }
+};
+
+window.deleteUser = async function(id) {
+  if (!confirm('Remove this user?')) return;
+  await fetch(`${API}/api/users/${id}`, { method: 'DELETE', headers: headers() });
+  showToast('User removed');
+  renderAdminUsers(document.getElementById('appContent'));
+};
+
+// ═══════════════════════════════════════
+// SERVICE WORKER REGISTRATION
+// ═══════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
