@@ -178,6 +178,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <button data-page="ladder"><span class="nav-icon">🪜</span>Ladder</button>
     <button data-page="tower"><span class="nav-icon">🏗️</span>Tower</button>
     <button data-page="mewp"><span class="nav-icon">🔧</span>MEWP</button>
+    <button data-page="rescue"><span class="nav-icon">🆘</span>Rescue</button>
   </nav>
 
   <!-- Bottom Navigation (Admin) -->
@@ -186,6 +187,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <button data-page="reports"><span class="nav-icon">⚠️</span>Open</button>
     <button data-page="closed"><span class="nav-icon">✅</span>Closed</button>
     <button data-page="inspections"><span class="nav-icon">📋</span>Inspections</button>
+    <button data-page="rescue-plans"><span class="nav-icon">🆘</span>Rescue</button>
     <button data-page="users"><span class="nav-icon">👥</span>Users</button>
   </nav>
 </div>
@@ -441,11 +443,13 @@ function renderPage(page) {
     'ladder': renderLadderForm,
     'tower': renderTowerForm,
     'mewp': renderMEWPForm,
+    'rescue': renderRescuePage,
     // Admin pages
     'dashboard': renderDashboard,
     'reports': renderAdminReports,
     'closed': renderClosedReports,
     'inspections': renderAdminInspections,
+    'rescue-plans': renderAdminRescuePlans,
     'users': renderAdminUsers,
   };
   if (pages[page]) pages[page](c);
@@ -1141,6 +1145,33 @@ window.exportPDF = function(type, data) {
       ${data.admin_notes ? `<tr><td>Admin Notes</td><td>${data.admin_notes}</td></tr>` : ''}
       ${data.signature ? `<tr><td>Signature</td><td><img src="${data.signature}" style="max-width:200px;max-height:80px"></td></tr>` : ''}
     `;
+  } else if (type === 'rescue-plan') {
+    title = `Rescue Plan — ${data.project_name}`;
+    let checklist = {};
+    try { checklist = JSON.parse(data.checklist || '{}'); } catch {}
+    const ci = (key) => checklist[key] === 'Yes' ? 'YES' : 'NO';
+    content = `
+      <tr><td>Client</td><td>${data.client_name}</td></tr>
+      <tr><td>Project</td><td>${data.project_name}</td></tr>
+      <tr><td>Location</td><td>${data.location}</td></tr>
+      <tr><td>Operation</td><td>${data.operation}</td></tr>
+      <tr><td>Project Manager</td><td>${data.project_manager}</td></tr>
+      <tr><td>Date</td><td>${data.date}</td></tr>
+      <tr><td>Rescue Supervisor</td><td>${data.rescue_supervisor}</td></tr>
+      <tr><td>Attendant</td><td>${data.attendant || '—'}</td></tr>
+      <tr><td>Rescue Team</td><td>${data.rescue_team || '—'}</td></tr>
+      <tr><td>Comms Method</td><td>${data.comms_method}</td></tr>
+      <tr><td>Nearest Hospital</td><td>${data.nearest_hospital}</td></tr>
+      <tr><td>Rescue Method</td><td>${data.rescue_method}</td></tr>
+      ${data.scene_protection ? `<tr><td>Scene Protection</td><td>${data.scene_protection}</td></tr>` : ''}
+      <tr><td>Team Briefed</td><td>${ci('check_team_briefed')}</td></tr>
+      <tr><td>Equipment Checked</td><td>${ci('check_equipment_checked')}</td></tr>
+      <tr><td>Comms Tested</td><td>${ci('check_comms_tested')}</td></tr>
+      <tr><td>First Aid Confirmed</td><td>${ci('check_first_aid')}</td></tr>
+      <tr><td>Access Routes Confirmed</td><td>${ci('check_access_routes')}</td></tr>
+      <tr><td>Emergency Access Confirmed</td><td>${ci('check_emergency_services')}</td></tr>
+      ${data.signature ? `<tr><td>Signature</td><td><img src="${data.signature}" style="max-width:200px;max-height:80px"></td></tr>` : ''}
+    `;
   } else {
     const idField = data.ladder_id || data.tower_id || data.mewp_id || '';
     const byField = data.inspected_by || '';
@@ -1226,6 +1257,335 @@ function clearSignature(canvasId) {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// ═══════════════════════════════════════
+// OPERATIVE: RESCUE PLAN PAGE
+// ═══════════════════════════════════════
+function renderRescuePage(c) {
+  c.innerHTML = `
+    <h2 style="margin-bottom:16px;display:flex;align-items:center;gap:8px">🆘 Rescue Plans</h2>
+    <div class="tab-bar">
+      <button class="active" onclick="showRescueTab('new',this)">📝 New Plan</button>
+      <button onclick="showRescueTab('my-plans',this)">📋 My Plans</button>
+      <button onclick="showRescueTab('procedures',this)">🔄 Procedures</button>
+    </div>
+    <div id="rescueTabContent"></div>
+  `;
+  showRescueTab('new');
+}
+
+window.showRescueTab = function(tab, btn) {
+  if (btn) {
+    btn.closest('.tab-bar').querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  const el = document.getElementById('rescueTabContent');
+  if (tab === 'new') renderRescuePlanForm(el);
+  else if (tab === 'my-plans') loadMyRescuePlans(el);
+  else if (tab === 'procedures') renderRescueProcedures(el);
+};
+
+function renderRescuePlanForm(el) {
+  el.innerHTML = `
+    <form id="rescuePlanForm">
+      <div class="form-section">
+        <h3>📋 1. Project Details</h3>
+        <div class="form-group"><label>Client Name</label><input type="text" name="client_name" placeholder="e.g. GSK" required></div>
+        <div class="form-group"><label>Project Name</label><input type="text" name="project_name" placeholder="e.g. Building Services Install" required></div>
+        <div class="form-group"><label>Location</label><input type="text" name="location" placeholder="Full site address" required></div>
+        <div class="form-group"><label>Operation Being Assessed</label><input type="text" name="operation" placeholder="e.g. Work at height - MEWP operations" required></div>
+        <div class="form-group"><label>Project Manager</label><input type="text" name="project_manager" placeholder="Name" required></div>
+        <div class="form-group"><label>Date(s)</label><input type="date" name="date" value="${today()}" required></div>
+      </div>
+
+      <div class="form-section">
+        <h3>👥 2. Persons Responsible for Rescue</h3>
+        <div class="form-group"><label>Rescue Supervisor</label><input type="text" name="rescue_supervisor" placeholder="Name" required></div>
+        <div class="form-group"><label>Attendant</label><input type="text" name="attendant" placeholder="Name"></div>
+        <div class="form-group"><label>Rescue Team Members</label><textarea name="rescue_team" placeholder="Names of all rescue team members" rows="2"></textarea></div>
+      </div>
+
+      <div class="form-section">
+        <h3>📞 3. Communication & Emergency Contacts</h3>
+        <div class="form-group"><label>Communication Method</label>
+          <select name="comms_method" required>
+            <option value="">-- Select --</option>
+            <option>Two-way Radio</option><option>Mobile Phone</option><option>Verbal / Line of Sight</option><option>Tannoy / PA System</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Nearest Hospital / A&E</label><input type="text" name="nearest_hospital" placeholder="Hospital name and address" required></div>
+        <div class="form-group"><label>Site Manager — Name</label><input type="text" name="em_site_manager_name" placeholder="Name"></div>
+        <div class="form-group"><label>Site Manager — Phone</label><input type="tel" name="em_site_manager_phone" placeholder="Phone number"></div>
+        <div class="form-group"><label>First Aider — Name</label><input type="text" name="em_first_aider_name" placeholder="Name"></div>
+        <div class="form-group"><label>First Aider — Phone</label><input type="tel" name="em_first_aider_phone" placeholder="Phone number"></div>
+        <div class="form-group"><label>Fire Marshal — Name</label><input type="text" name="em_fire_marshal_name" placeholder="Name"></div>
+        <div class="form-group"><label>Fire Marshal — Phone</label><input type="tel" name="em_fire_marshal_phone" placeholder="Phone number"></div>
+      </div>
+
+      <div class="form-section">
+        <h3>🔧 4. Rescue Procedure</h3>
+        <div class="form-group"><label>Planned Rescue Method</label><textarea name="rescue_method" placeholder="Describe the planned rescue method in detail..." rows="4" required></textarea></div>
+        <div class="form-group"><label>Protection of Others / Scene</label><textarea name="scene_protection" placeholder="How will you protect other workers and the scene?" rows="3"></textarea></div>
+      </div>
+
+      <div class="form-section">
+        <h3>✅ 5. Pre-Rescue Checklist</h3>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="check_team_briefed" value="Yes"> Rescue team briefed and competent</label>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="check_equipment_checked" value="Yes"> Rescue equipment checked and in position</label>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="check_comms_tested" value="Yes"> Communications tested</label>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="check_first_aid" value="Yes"> First aid provision confirmed</label>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="check_access_routes" value="Yes"> Access / egress routes confirmed</label>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="check_emergency_services" value="Yes"> Emergency services access confirmed</label>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>🛠️ 6. Rescue Equipment Available</h3>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="equip_harness" value="Yes"> Full body harness</label>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="equip_lanyard" value="Yes"> Rescue lanyard / rope</label>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="equip_tripod" value="Yes"> Tripod / davit system</label>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="equip_winch" value="Yes"> Winch / descent device</label>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="equip_first_aid" value="Yes"> First aid kit</label>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="equip_stretcher" value="Yes"> Stretcher / spine board</label>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="equip_radio" value="Yes"> Two-way radios</label>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="equip_gas_monitor" value="Yes"> Gas monitor</label>
+        </div>
+        <div class="form-group"><label>Other Equipment</label><input type="text" name="equip_other" placeholder="Any other rescue equipment available"></div>
+      </div>
+
+      <div class="form-section">
+        <h3>✍️ Operative Signature</h3>
+        <canvas id="rescueSig" style="width:100%;height:120px;border:2px solid var(--border);border-radius:8px;background:#fff;touch-action:none"></canvas>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px;width:auto" onclick="clearSignature('rescueSig')">Clear Signature</button>
+      </div>
+
+      <button type="submit" class="btn btn-danger" style="margin-top:16px;padding:18px;font-size:18px">🆘 Submit Rescue Plan</button>
+    </form>
+  `;
+  createSignaturePad('rescueSig');
+  document.getElementById('rescuePlanForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true; btn.textContent = 'Submitting...';
+    try {
+      const data = {};
+      for (const [k, v] of fd.entries()) {
+        if (k.startsWith('check_') || k.startsWith('equip_')) {
+          if (!data.checklist) data.checklist = {};
+          data.checklist[k] = v;
+        } else {
+          data[k] = v;
+        }
+      }
+      data.checklist = JSON.stringify(data.checklist || {});
+      data.signature = getSignatureData('rescueSig');
+      await submitForm('rescue-plan', data);
+      showToast('Rescue plan submitted!');
+      navigate('home');
+    } catch (err) { showToast('Failed to submit', 'error'); }
+    btn.disabled = false; btn.textContent = '🆘 Submit Rescue Plan';
+  });
+}
+
+async function loadMyRescuePlans(el) {
+  el.innerHTML = '<p>Loading...</p>';
+  try {
+    const plans = await fetch(`${API}/api/rescue-plan`, { headers: headers() }).then(r => r.json());
+    if (plans.length === 0) { el.innerHTML = '<p style="color:var(--text-light)">No rescue plans submitted yet.</p>'; return; }
+    el.innerHTML = plans.map(p => `
+      <div class="card" onclick="showRescuePlanDetail(${p.id})" style="cursor:pointer">
+        <div class="card-header">
+          <h3>${p.project_name}</h3>
+          <span class="card-meta">${p.date}</span>
+        </div>
+        <div class="card-body">
+          <p><strong>Client:</strong> ${p.client_name} &nbsp;|&nbsp; <strong>Location:</strong> ${p.location}</p>
+          <p><strong>Rescue Supervisor:</strong> ${p.rescue_supervisor}</p>
+        </div>
+      </div>
+    `).join('');
+  } catch { el.innerHTML = '<p>Failed to load</p>'; }
+}
+
+// ═══════════════════════════════════════
+// RESCUE PROCEDURES VIEWER
+// ═══════════════════════════════════════
+function renderRescueProcedures(el) {
+  el.innerHTML = `
+    <div class="tab-bar" style="margin-bottom:12px">
+      <button class="active" onclick="showProcedure('general',this)">🔄 General</button>
+      <button onclick="showProcedure('mewp',this)">🔧 MEWP</button>
+      <button onclick="showProcedure('height',this)">🏗️ Height</button>
+      <button onclick="showProcedure('confined',this)">⛏️ Confined</button>
+    </div>
+    <div id="procedureContent"></div>
+  `;
+  showProcedure('general');
+}
+
+window.showProcedure = function(type, btn) {
+  if (btn) {
+    btn.closest('.tab-bar').querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  const el = document.getElementById('procedureContent');
+  const flowStyle = 'background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)';
+  const stepStyle = 'background:#fdf2f2;border-left:4px solid var(--primary);padding:14px;border-radius:0 8px 8px 0;margin-bottom:10px';
+  const arrowStyle = 'text-align:center;font-size:24px;color:var(--primary);margin:4px 0';
+  const warnStyle = 'background:#fef3c7;border-left:4px solid var(--warning);padding:14px;border-radius:0 8px 8px 0;margin-bottom:10px;font-size:14px';
+  const keyStyle = 'background:#e8f5e9;border-radius:8px;padding:14px;margin-top:12px;font-size:13px';
+
+  if (type === 'general') {
+    el.innerHTML = `
+      <div style="${flowStyle}">
+        <h3 style="color:var(--primary);margin-bottom:14px">RESCUE FLOW DIAGRAM</h3>
+        <div style="${stepStyle}"><strong>1. INCIDENT IDENTIFIED</strong><br>Operative or witness identifies emergency</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>2. RAISE ALARM</strong><br>Alert rescue team and supervisor immediately</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>3. SUPERVISOR ASSESS SITUATION</strong><br>Evaluate casualty, hazards, and safe access</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>4. RESCUE TEAM MOBILISED</strong><br>Deploy trained personnel with equipment</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>5. CASUALTY RETRIEVED</strong><br>Execute rescue using planned method</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>6. FIRST AID / HANDOVER TO EMERGENCY SERVICES</strong><br>Provide immediate care, call 999 if needed</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>7. AREA MADE SAFE AND INCIDENT REPORTED</strong><br>Isolate area, review method, complete reports</div>
+        <div style="${warnStyle}"><strong>IF CONDITION IS SEVERE:</strong> Call 999 immediately and direct ambulance to access point</div>
+        <div style="${keyStyle}"><strong>AFTER RESCUE:</strong> Stop work — Isolate area — Review method</div>
+      </div>`;
+  } else if (type === 'mewp') {
+    el.innerHTML = `
+      <div style="${flowStyle}">
+        <h3 style="color:var(--primary);margin-bottom:14px">MEWP RESCUE PROCEDURE</h3>
+        <div style="${stepStyle}"><strong>OPERATIVE IN MEWP BASKET</strong><br>Incident / illness / entrapment</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>GROUND OPERATIVE RAISES ALARM</strong><br>Stop work and secure area</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>SUPERVISOR ASSESS</strong><br>Casualty condition — Machine status — Safe access</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>CAN PLATFORM BE LOWERED USING NORMAL CONTROLS?</strong></div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <div style="flex:1;${stepStyle};background:#e8f5e9"><strong>YES →</strong> Lower platform using normal controls</div>
+          <div style="flex:1;${stepStyle};background:#fff3cd"><strong>NO →</strong> Use emergency descent system</div>
+        </div>
+        <div style="${warnStyle}"><strong>IF STILL UNSUCCESSFUL:</strong> Call Fire & Rescue specialist team</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>CASUALTY RECOVERED</strong><br>First aid / medical check</div>
+        <div style="${keyStyle}"><strong>KEY CONTROLS:</strong> Harness connected — Exclusion zone — Machine stable<br><strong>RESCUE PRIORITY:</strong> Communication — Safe lowering — Medical check<br><strong>ESCALATE IF:</strong> Entrapment — Electrical hazard — Machine failure</div>
+      </div>`;
+  } else if (type === 'height') {
+    el.innerHTML = `
+      <div style="${flowStyle}">
+        <h3 style="color:var(--primary);margin-bottom:14px">WORK AT HEIGHT RESCUE</h3>
+        <div style="${stepStyle}"><strong>OPERATIVE SUSPENDED / IN DISTRESS</strong><br>Working at height incident</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>RAISE ALARM</strong><br>Stop work and secure exclusion zone</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>SUPERVISOR ASSESS</strong><br>Fall arrest position — Suspension time — Safe rescue access</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>DEPLOY RESCUE METHOD</strong><br>Rescue kit / ladder / MEWP / rope</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>RECOVER CASUALTY TO SAFE LEVEL</strong></div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>FIRST AID / MEDICAL CHECK</strong><br>Monitor for suspension trauma</div>
+        <div style="${warnStyle}"><strong>CRITICAL:</strong> Suspension trauma can be fatal — time is critical. Recover casualty as fast as safely possible.</div>
+        <div style="${keyStyle}"><strong>KEY HAZARDS:</strong> Suspension trauma — Secondary fall risk — Sharp edges<br><strong>RESCUE PRIORITIES:</strong> 1. Communication — 2. Fast recovery — 3. Safe landing area<br><strong>ESCALATE IF:</strong> Casualty unconscious — Rescue not possible — CALL 999</div>
+      </div>`;
+  } else if (type === 'confined') {
+    el.innerHTML = `
+      <div style="${flowStyle}">
+        <h3 style="color:var(--primary);margin-bottom:14px">CONFINED SPACE RESCUE</h3>
+        <div style="${stepStyle}"><strong>OPERATIVE IN CONFINED SPACE</strong><br>Collapse / atmosphere hazard</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>ATTENDANT RAISES ALARM</strong><br>Stop entry and secure permit</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>SUPERVISOR ASSESS</strong><br>Gas readings — Communication status — Retrieval equipment</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>USE NON-ENTRY RETRIEVAL</strong><br>Tripod / winch system</div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>CASUALTY REMOVED FROM SPACE</strong></div>
+        <div style="${arrowStyle}">▼</div>
+        <div style="${stepStyle}"><strong>FIRST AID / OXYGEN</strong><br>Call emergency services</div>
+        <div style="${warnStyle}"><strong>CRITICAL RULE:</strong> DO NOT ENTER WITHOUT BREATHING APPARATUS</div>
+        <div style="${keyStyle}"><strong>ESSENTIAL CONTROLS:</strong> Gas monitor — Tripod — Top man — Permit<br><strong>ESCALATE IF:</strong> Rescue fails — Atmosphere unsafe — Call Fire Rescue</div>
+      </div>`;
+  }
+};
+
+// ═══════════════════════════════════════
+// RESCUE PLAN DETAIL VIEW
+// ═══════════════════════════════════════
+window.showRescuePlanDetail = async function(id) {
+  const plans = await fetch(`${API}/api/rescue-plan`, { headers: headers() }).then(r => r.json());
+  const p = plans.find(x => x.id === id);
+  if (!p) return;
+  let checklist = {};
+  try { checklist = JSON.parse(p.checklist || '{}'); } catch {}
+  const checkIcon = (key) => checklist[key] === 'Yes' ? '✅' : '❌';
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal-overlay" onclick="if(event.target===this)this.remove()">
+      <div class="modal">
+        <h3>🆘 Rescue Plan — ${p.project_name}</h3>
+        <p><strong>Client:</strong> ${p.client_name}</p>
+        <p><strong>Location:</strong> ${p.location}</p>
+        <p><strong>Operation:</strong> ${p.operation}</p>
+        <p><strong>Project Manager:</strong> ${p.project_manager}</p>
+        <p><strong>Date:</strong> ${p.date}</p>
+        <hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
+        <p><strong>Rescue Supervisor:</strong> ${p.rescue_supervisor}</p>
+        <p><strong>Attendant:</strong> ${p.attendant || '—'}</p>
+        <p><strong>Rescue Team:</strong> ${p.rescue_team || '—'}</p>
+        <hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
+        <p><strong>Comms Method:</strong> ${p.comms_method}</p>
+        <p><strong>Nearest Hospital:</strong> ${p.nearest_hospital}</p>
+        <p><strong>Rescue Method:</strong> ${p.rescue_method}</p>
+        ${p.scene_protection ? `<p><strong>Scene Protection:</strong> ${p.scene_protection}</p>` : ''}
+        <hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
+        <p><strong>Pre-Rescue Checklist:</strong></p>
+        <p style="font-size:13px">${checkIcon('check_team_briefed')} Team briefed &nbsp; ${checkIcon('check_equipment_checked')} Equipment checked &nbsp; ${checkIcon('check_comms_tested')} Comms tested</p>
+        <p style="font-size:13px">${checkIcon('check_first_aid')} First aid confirmed &nbsp; ${checkIcon('check_access_routes')} Access routes &nbsp; ${checkIcon('check_emergency_services')} Emergency access</p>
+        <p style="margin-top:8px"><strong>Equipment:</strong></p>
+        <p style="font-size:13px">${checkIcon('equip_harness')} Harness &nbsp; ${checkIcon('equip_lanyard')} Lanyard &nbsp; ${checkIcon('equip_tripod')} Tripod &nbsp; ${checkIcon('equip_winch')} Winch</p>
+        <p style="font-size:13px">${checkIcon('equip_first_aid')} First aid &nbsp; ${checkIcon('equip_stretcher')} Stretcher &nbsp; ${checkIcon('equip_radio')} Radios &nbsp; ${checkIcon('equip_gas_monitor')} Gas monitor</p>
+        ${p.signature ? `<div style="margin-top:12px"><strong>Signature:</strong><br><img src="${p.signature}" style="max-width:200px;max-height:80px;border:1px solid var(--border);border-radius:4px;margin-top:4px"></div>` : ''}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+          <button class="btn btn-outline btn-sm" onclick="exportPDF('rescue-plan', ${JSON.stringify(p).replace(/'/g, "\\'").replace(/"/g, '&quot;')})">📄 PDF</button>
+          <button class="btn btn-outline btn-sm" onclick="this.closest('.modal-overlay').remove()">Close</button>
+        </div>
+      </div>
+    </div>
+  `);
+};
+
+// ═══════════════════════════════════════
+// ADMIN: RESCUE PLANS
+// ═══════════════════════════════════════
+async function renderAdminRescuePlans(c) {
+  c.innerHTML = '<h2 style="margin-bottom:16px">🆘 Rescue Plans</h2><p>Loading...</p>';
+  try {
+    const plans = await fetch(`${API}/api/rescue-plan`, { headers: headers() }).then(r => r.json());
+    c.innerHTML = `<h2 style="margin-bottom:16px">🆘 Rescue Plans</h2>` +
+      (plans.length === 0 ? '<p style="color:var(--text-light)">No rescue plans submitted yet.</p>' :
+      plans.map(p => `
+        <div class="card" onclick="showRescuePlanDetail(${p.id})" style="cursor:pointer">
+          <div class="card-header">
+            <h3>${p.project_name}</h3>
+            <span class="card-meta">${p.date}</span>
+          </div>
+          <div class="card-body">
+            <p><strong>Client:</strong> ${p.client_name} &nbsp;|&nbsp; <strong>Location:</strong> ${p.location}</p>
+            <p><strong>Submitted by:</strong> ${p.submitted_by} &nbsp;|&nbsp; <strong>Rescue Supervisor:</strong> ${p.rescue_supervisor}</p>
+          </div>
+        </div>
+      `).join(''));
+  } catch { c.innerHTML = '<p>Failed to load rescue plans</p>'; }
 }
 
 if ('serviceWorker' in navigator) {

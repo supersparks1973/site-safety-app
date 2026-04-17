@@ -90,6 +90,20 @@ async function startApp() {
     actions_taken TEXT, photos TEXT, signature TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  await pool.query(`CREATE TABLE IF NOT EXISTS rescue_plans (
+    id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
+    date TEXT NOT NULL, client_name TEXT NOT NULL, project_name TEXT NOT NULL,
+    location TEXT NOT NULL, operation TEXT NOT NULL, project_manager TEXT NOT NULL,
+    rescue_supervisor TEXT NOT NULL, attendant TEXT, rescue_team TEXT,
+    comms_method TEXT NOT NULL, nearest_hospital TEXT NOT NULL,
+    em_site_manager_name TEXT, em_site_manager_phone TEXT,
+    em_first_aider_name TEXT, em_first_aider_phone TEXT,
+    em_fire_marshal_name TEXT, em_fire_marshal_phone TEXT,
+    rescue_method TEXT NOT NULL, scene_protection TEXT,
+    checklist TEXT, equip_other TEXT, signature TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   // Add signature column to existing tables if not present
   const migrateSig = async (table) => {
     try { await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS signature TEXT`); } catch(e) {}
@@ -279,6 +293,40 @@ async function startApp() {
     };
     Object.keys(stats).forEach(k => stats[k] = parseInt(stats[k]));
     res.json(stats);
+  });
+
+  // ═══════ RESCUE PLANS ═══════
+  app.post('/api/rescue-plan', authenticate, async (req, res) => {
+    const d = req.body;
+    const { rows } = await pool.query(
+      `INSERT INTO rescue_plans (user_id, date, client_name, project_name, location, operation, project_manager,
+        rescue_supervisor, attendant, rescue_team, comms_method, nearest_hospital,
+        em_site_manager_name, em_site_manager_phone, em_first_aider_name, em_first_aider_phone,
+        em_fire_marshal_name, em_fire_marshal_phone, rescue_method, scene_protection, checklist, equip_other, signature)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING id`,
+      [req.user.id, d.date, d.client_name, d.project_name, d.location, d.operation, d.project_manager,
+       d.rescue_supervisor, d.attendant || '', d.rescue_team || '', d.comms_method, d.nearest_hospital,
+       d.em_site_manager_name || '', d.em_site_manager_phone || '', d.em_first_aider_name || '', d.em_first_aider_phone || '',
+       d.em_fire_marshal_name || '', d.em_fire_marshal_phone || '', d.rescue_method, d.scene_protection || '',
+       d.checklist || '{}', d.equip_other || '', d.signature || '']);
+    sendAdminEmail(`New Rescue Plan: ${d.project_name}`,
+      `<h2>Rescue Plan Submitted</h2><p><strong>By:</strong> ${req.user.full_name}</p><p><strong>Client:</strong> ${d.client_name}</p><p><strong>Project:</strong> ${d.project_name}</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Rescue Supervisor:</strong> ${d.rescue_supervisor}</p>`);
+    res.json({ id: rows[0].id, message: 'Rescue plan submitted' });
+  });
+
+  app.get('/api/rescue-plan', authenticate, async (req, res) => {
+    if (req.user.role === 'admin') {
+      const { rows } = await pool.query('SELECT r.*, u.full_name as submitted_by FROM rescue_plans r JOIN users u ON r.user_id = u.id ORDER BY r.created_at DESC');
+      res.json(rows);
+    } else {
+      const { rows } = await pool.query('SELECT r.*, u.full_name as submitted_by FROM rescue_plans r JOIN users u ON r.user_id = u.id WHERE r.user_id = $1 ORDER BY r.created_at DESC', [req.user.id]);
+      res.json(rows);
+    }
+  });
+
+  app.delete('/api/rescue-plan/:id', authenticate, adminOnly, async (req, res) => {
+    await pool.query('DELETE FROM rescue_plans WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
   });
 
   // ═══════ EMAIL DIGEST ═══════
