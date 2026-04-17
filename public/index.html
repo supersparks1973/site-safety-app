@@ -136,16 +136,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 <!-- ═══════ LOGIN SCREEN ═══════ -->
 <div id="loginScreen" class="login-screen">
   <div class="login-box">
-    <div class="logo" style="font-size:14px">
-      <svg viewBox="0 0 300 80" style="width:220px;margin:0 auto;display:block">
-        <path d="M40 40 L25 15 L15 40 L25 65 Z" fill="#8B8B8B" opacity="0.7"/>
-        <path d="M40 40 L55 15 L65 40 L55 65 Z" fill="#8B1A1A" opacity="0.8"/>
-        <path d="M40 10 L40 70" stroke="#555" stroke-width="2" opacity="0.3"/>
-        <text x="80" y="38" font-family="Arial,sans-serif" font-size="26" font-weight="bold" fill="#4A4A4A">Man</text>
-        <text x="128" y="38" font-family="Arial,sans-serif" font-size="26" font-weight="bold" fill="#4A4A4A">Projects</text>
-        <text x="242" y="38" font-family="Arial,sans-serif" font-size="20" fill="#8B8B8B">Ltd</text>
-        <text x="80" y="58" font-family="Arial,sans-serif" font-size="9" fill="#8B8B8B" letter-spacing="1">Electrical and Mechanical Building Services</text>
-      </svg>
+    <div class="logo">
+      <img src="/logo.svg" alt="ManProjects Ltd" style="width:280px;margin:0 auto 10px;display:block">
     </div>
     <h1 style="color:var(--primary)">Site Safety</h1>
     <p class="subtitle">Inspections & Near Miss Reporting</p>
@@ -1177,7 +1169,7 @@ window.exportPDF = function(type, data) {
     @media print{body{padding:15px}.footer{position:fixed;bottom:20px;left:0;right:0}}
   </style></head><body>
     <div class="header">
-      <div><div class="company">Man<span>Projects</span> Ltd</div><div class="tagline">Electrical and Mechanical Building Services</div></div>
+      <div><img src="${window.location.origin}/logo.svg" alt="ManProjects Ltd" style="height:50px"></div>
       <div style="text-align:right;font-size:12px;color:#888">Generated: ${new Date().toLocaleDateString('en-GB')}<br>${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div>
     </div>
     <h2>${title}</h2>
