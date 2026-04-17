@@ -886,8 +886,9 @@ window.showReportDetail = async function(id) {
           <select id="modalStatus"><option ${r.status==='open'?'selected':''}>open</option><option ${r.status==='reviewed'?'selected':''}>reviewed</option><option ${r.status==='closed'?'selected':''}>closed</option></select>
         </div>
         <div class="form-group"><label>Admin Notes</label><textarea id="modalNotes" rows="3">${r.admin_notes || ''}</textarea></div>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-primary btn-sm" onclick="updateReport(${r.id})">Save</button>
+          ${r.status === 'closed' ? `<button class="btn btn-danger btn-sm" onclick="deleteReport(${r.id})">🗑️ Delete Report</button>` : ''}
           <button class="btn btn-outline btn-sm" onclick="this.closest('.modal-overlay').remove()">Close</button>
         </div>
       </div>
@@ -907,6 +908,14 @@ window.updateReport = async function(id) {
     showToast('Report updated');
     navigate(state.currentPage);
   }
+};
+
+window.deleteReport = async function(id) {
+  if (!confirm('Are you sure you want to permanently delete this report? This cannot be undone.')) return;
+  await fetch(`${API}/api/near-miss/${id}`, { method: 'DELETE', headers: headers() });
+  document.querySelector('.modal-overlay').remove();
+  showToast('Report deleted');
+  navigate('closed');
 };
 
 // ═══════════════════════════════════════

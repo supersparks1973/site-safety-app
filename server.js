@@ -185,6 +185,11 @@ async function startApp() {
     res.json({ success: true });
   });
 
+  app.delete('/api/near-miss/:id', authenticate, adminOnly, async (req, res) => {
+    await pool.query('DELETE FROM near_miss_reports WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  });
+
   app.post('/api/ladder-inspection', authenticate, async (req, res) => {
     const d = req.body;
     const { rows } = await pool.query(
