@@ -53,7 +53,7 @@ async function startApp() {
     date TEXT NOT NULL, time TEXT NOT NULL, location TEXT NOT NULL,
     description TEXT NOT NULL, potential_severity TEXT NOT NULL,
     immediate_actions TEXT, weather_conditions TEXT, witnesses TEXT,
-    photos TEXT, status TEXT DEFAULT 'open', admin_notes TEXT,
+    photos TEXT, signature TEXT, status TEXT DEFAULT 'open', admin_notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
 
@@ -64,7 +64,7 @@ async function startApp() {
     feet_condition TEXT NOT NULL, locking_mechanism TEXT NOT NULL,
     labels_visible TEXT NOT NULL, general_condition TEXT NOT NULL,
     safe_to_use TEXT NOT NULL, defects_found TEXT, actions_taken TEXT,
-    photos TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    photos TEXT, signature TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
 
   await pool.query(`CREATE TABLE IF NOT EXISTS tower_inspections (
@@ -75,7 +75,7 @@ async function startApp() {
     guardrails_fitted TEXT NOT NULL, toe_boards_fitted TEXT NOT NULL,
     outriggers_deployed TEXT NOT NULL, access_ladder_secure TEXT NOT NULL,
     safe_to_use TEXT NOT NULL, max_platform_height TEXT, defects_found TEXT,
-    actions_taken TEXT, photos TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    actions_taken TEXT, photos TEXT, signature TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
 
   await pool.query(`CREATE TABLE IF NOT EXISTS mewp_inspections (
@@ -87,8 +87,14 @@ async function startApp() {
     tyres_condition TEXT NOT NULL, outriggers_condition TEXT NOT NULL,
     harness_anchor_points TEXT NOT NULL, warning_devices TEXT NOT NULL,
     safe_to_use TEXT NOT NULL, hours_meter_reading TEXT, defects_found TEXT,
-    actions_taken TEXT, photos TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    actions_taken TEXT, photos TEXT, signature TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
+
+  // Add signature column to existing tables if not present
+  const migrateSig = async (table) => {
+    try { await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS signature TEXT`); } catch(e) {}
+  };
+  await Promise.all(['near_miss_reports','ladder_inspections','tower_inspections','mewp_inspections'].map(migrateSig));
 
   const { rows: admins } = await pool.query("SELECT id FROM users WHERE role = 'admin'");
   if (admins.length === 0) {
@@ -162,8 +168,8 @@ async function startApp() {
   app.post('/api/near-miss', authenticate, async (req, res) => {
     const d = req.body;
     const { rows } = await pool.query(
-      'INSERT INTO near_miss_reports (user_id, date, time, location, description, potential_severity, immediate_actions, weather_conditions, witnesses, photos) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id',
-      [req.user.id, d.date, d.time, d.location, d.description, d.potential_severity, d.immediate_actions || '', d.weather_conditions || '', d.witnesses || '', d.photos || '']);
+      'INSERT INTO near_miss_reports (user_id, date, time, location, description, potential_severity, immediate_actions, weather_conditions, witnesses, photos, signature) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id',
+      [req.user.id, d.date, d.time, d.location, d.description, d.potential_severity, d.immediate_actions || '', d.weather_conditions || '', d.witnesses || '', d.photos || '', d.signature || '']);
     sendAdminEmail(`New Near Miss Report #${rows[0].id}`,
       `<h2>Near Miss Report</h2><p><strong>Reported by:</strong> ${req.user.full_name}</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Severity:</strong> ${d.potential_severity}</p><p><strong>Description:</strong> ${d.description}</p>`);
     res.json({ id: rows[0].id, message: 'Near miss report submitted' });
@@ -193,8 +199,8 @@ async function startApp() {
   app.post('/api/ladder-inspection', authenticate, async (req, res) => {
     const d = req.body;
     const { rows } = await pool.query(
-      'INSERT INTO ladder_inspections (user_id, date, ladder_id, ladder_type, location, stiles_condition, rungs_condition, feet_condition, locking_mechanism, labels_visible, general_condition, safe_to_use, defects_found, actions_taken, photos) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id',
-      [req.user.id, d.date, d.ladder_id, d.ladder_type, d.location, d.stiles_condition, d.rungs_condition, d.feet_condition, d.locking_mechanism, d.labels_visible, d.general_condition, d.safe_to_use, d.defects_found || '', d.actions_taken || '', d.photos || '']);
+      'INSERT INTO ladder_inspections (user_id, date, ladder_id, ladder_type, location, stiles_condition, rungs_condition, feet_condition, locking_mechanism, labels_visible, general_condition, safe_to_use, defects_found, actions_taken, photos, signature) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id',
+      [req.user.id, d.date, d.ladder_id, d.ladder_type, d.location, d.stiles_condition, d.rungs_condition, d.feet_condition, d.locking_mechanism, d.labels_visible, d.general_condition, d.safe_to_use, d.defects_found || '', d.actions_taken || '', d.photos || '', d.signature || '']);
     const safetyFlag = d.safe_to_use === 'No' ? ' ⚠️ UNSAFE' : '';
     sendAdminEmail(`Ladder Inspection #${rows[0].id}${safetyFlag}`,
       `<h2>Ladder Inspection</h2><p><strong>Inspected by:</strong> ${req.user.full_name}</p><p><strong>Ladder:</strong> ${d.ladder_id} (${d.ladder_type})</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Safe to use:</strong> ${d.safe_to_use}</p>${d.defects_found ? `<p><strong>Defects:</strong> ${d.defects_found}</p>` : ''}`);
@@ -214,8 +220,8 @@ async function startApp() {
   app.post('/api/tower-inspection', authenticate, async (req, res) => {
     const d = req.body;
     const { rows } = await pool.query(
-      'INSERT INTO tower_inspections (user_id, date, tower_id, location, base_plates_condition, castors_locked, braces_secure, platforms_condition, guardrails_fitted, toe_boards_fitted, outriggers_deployed, access_ladder_secure, safe_to_use, max_platform_height, defects_found, actions_taken, photos) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id',
-      [req.user.id, d.date, d.tower_id, d.location, d.base_plates_condition, d.castors_locked, d.braces_secure, d.platforms_condition, d.guardrails_fitted, d.toe_boards_fitted, d.outriggers_deployed, d.access_ladder_secure, d.safe_to_use, d.max_platform_height || '', d.defects_found || '', d.actions_taken || '', d.photos || '']);
+      'INSERT INTO tower_inspections (user_id, date, tower_id, location, base_plates_condition, castors_locked, braces_secure, platforms_condition, guardrails_fitted, toe_boards_fitted, outriggers_deployed, access_ladder_secure, safe_to_use, max_platform_height, defects_found, actions_taken, photos, signature) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id',
+      [req.user.id, d.date, d.tower_id, d.location, d.base_plates_condition, d.castors_locked, d.braces_secure, d.platforms_condition, d.guardrails_fitted, d.toe_boards_fitted, d.outriggers_deployed, d.access_ladder_secure, d.safe_to_use, d.max_platform_height || '', d.defects_found || '', d.actions_taken || '', d.photos || '', d.signature || '']);
     const safetyFlag = d.safe_to_use === 'No' ? ' ⚠️ UNSAFE' : '';
     sendAdminEmail(`Tower Inspection #${rows[0].id}${safetyFlag}`,
       `<h2>Mobile Tower Inspection</h2><p><strong>Inspected by:</strong> ${req.user.full_name}</p><p><strong>Tower:</strong> ${d.tower_id}</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Safe to use:</strong> ${d.safe_to_use}</p>${d.defects_found ? `<p><strong>Defects:</strong> ${d.defects_found}</p>` : ''}`);
@@ -235,8 +241,8 @@ async function startApp() {
   app.post('/api/mewp-inspection', authenticate, async (req, res) => {
     const d = req.body;
     const { rows } = await pool.query(
-      'INSERT INTO mewp_inspections (user_id, date, mewp_id, mewp_type, location, controls_functional, emergency_controls, guardrails_condition, platform_condition, hydraulics_condition, tyres_condition, outriggers_condition, harness_anchor_points, warning_devices, safe_to_use, hours_meter_reading, defects_found, actions_taken, photos) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING id',
-      [req.user.id, d.date, d.mewp_id, d.mewp_type, d.location, d.controls_functional, d.emergency_controls, d.guardrails_condition, d.platform_condition, d.hydraulics_condition, d.tyres_condition, d.outriggers_condition, d.harness_anchor_points, d.warning_devices, d.safe_to_use, d.hours_meter_reading || '', d.defects_found || '', d.actions_taken || '', d.photos || '']);
+      'INSERT INTO mewp_inspections (user_id, date, mewp_id, mewp_type, location, controls_functional, emergency_controls, guardrails_condition, platform_condition, hydraulics_condition, tyres_condition, outriggers_condition, harness_anchor_points, warning_devices, safe_to_use, hours_meter_reading, defects_found, actions_taken, photos, signature) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING id',
+      [req.user.id, d.date, d.mewp_id, d.mewp_type, d.location, d.controls_functional, d.emergency_controls, d.guardrails_condition, d.platform_condition, d.hydraulics_condition, d.tyres_condition, d.outriggers_condition, d.harness_anchor_points, d.warning_devices, d.safe_to_use, d.hours_meter_reading || '', d.defects_found || '', d.actions_taken || '', d.photos || '', d.signature || '']);
     const safetyFlag = d.safe_to_use === 'No' ? ' ⚠️ UNSAFE' : '';
     sendAdminEmail(`MEWP Inspection #${rows[0].id}${safetyFlag}`,
       `<h2>MEWP Inspection</h2><p><strong>Inspected by:</strong> ${req.user.full_name}</p><p><strong>MEWP:</strong> ${d.mewp_id} (${d.mewp_type})</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Safe to use:</strong> ${d.safe_to_use}</p>${d.defects_found ? `<p><strong>Defects:</strong> ${d.defects_found}</p>` : ''}`);
@@ -273,6 +279,90 @@ async function startApp() {
     };
     Object.keys(stats).forEach(k => stats[k] = parseInt(stats[k]));
     res.json(stats);
+  });
+
+  // ═══════ EMAIL DIGEST ═══════
+  async function sendDigest(period) {
+    if (!transporter || !ADMIN_EMAIL) return;
+    const since = new Date();
+    if (period === 'daily') since.setDate(since.getDate() - 1);
+    else since.setDate(since.getDate() - 7);
+    const sinceStr = since.toISOString().split('T')[0];
+
+    const nmRes = await pool.query('SELECT COUNT(*) as c FROM near_miss_reports WHERE date >= $1', [sinceStr]);
+    const ldRes = await pool.query('SELECT COUNT(*) as c FROM ladder_inspections WHERE date >= $1', [sinceStr]);
+    const twRes = await pool.query('SELECT COUNT(*) as c FROM tower_inspections WHERE date >= $1', [sinceStr]);
+    const mwRes = await pool.query('SELECT COUNT(*) as c FROM mewp_inspections WHERE date >= $1', [sinceStr]);
+    const openRes = await pool.query("SELECT COUNT(*) as c FROM near_miss_reports WHERE status = 'open'");
+    const unsafeLd = await pool.query("SELECT COUNT(*) as c FROM ladder_inspections WHERE safe_to_use = 'No' AND date >= $1", [sinceStr]);
+    const unsafeTw = await pool.query("SELECT COUNT(*) as c FROM tower_inspections WHERE safe_to_use = 'No' AND date >= $1", [sinceStr]);
+    const unsafeMw = await pool.query("SELECT COUNT(*) as c FROM mewp_inspections WHERE safe_to_use = 'No' AND date >= $1", [sinceStr]);
+
+    const label = period === 'daily' ? 'Daily' : 'Weekly';
+    const html = `
+      <h2 style="color:#8B1A1A">ManProjects Ltd — ${label} Safety Digest</h2>
+      <p>Period: ${sinceStr} to ${new Date().toISOString().split('T')[0]}</p>
+      <table style="border-collapse:collapse;width:100%">
+        <tr style="background:#f5f5f5"><td style="padding:10px;border:1px solid #ddd"><strong>Near Miss Reports</strong></td><td style="padding:10px;border:1px solid #ddd">${nmRes.rows[0].c}</td></tr>
+        <tr><td style="padding:10px;border:1px solid #ddd"><strong>Ladder Inspections</strong></td><td style="padding:10px;border:1px solid #ddd">${ldRes.rows[0].c}</td></tr>
+        <tr style="background:#f5f5f5"><td style="padding:10px;border:1px solid #ddd"><strong>Tower Inspections</strong></td><td style="padding:10px;border:1px solid #ddd">${twRes.rows[0].c}</td></tr>
+        <tr><td style="padding:10px;border:1px solid #ddd"><strong>MEWP Inspections</strong></td><td style="padding:10px;border:1px solid #ddd">${mwRes.rows[0].c}</td></tr>
+        <tr style="background:#fff3cd"><td style="padding:10px;border:1px solid #ddd"><strong>Open Near Misses</strong></td><td style="padding:10px;border:1px solid #ddd">${openRes.rows[0].c}</td></tr>
+        <tr style="background:#f8d7da"><td style="padding:10px;border:1px solid #ddd"><strong>Flagged Unsafe (${label})</strong></td><td style="padding:10px;border:1px solid #ddd">${parseInt(unsafeLd.rows[0].c) + parseInt(unsafeTw.rows[0].c) + parseInt(unsafeMw.rows[0].c)}</td></tr>
+      </table>
+      <p style="margin-top:20px;font-size:12px;color:#888">ManProjects Ltd — Site Safety System</p>
+    `;
+    await sendAdminEmail(`${label} Safety Digest`, html);
+  }
+
+  // API endpoint to trigger digest manually (admin only)
+  app.post('/api/digest/:period', authenticate, adminOnly, async (req, res) => {
+    const period = req.params.period === 'weekly' ? 'weekly' : 'daily';
+    await sendDigest(period);
+    res.json({ success: true, message: `${period} digest sent` });
+  });
+
+  // Auto-schedule digest: run check on each request (lightweight)
+  let lastDailyDigest = null;
+  let lastWeeklyDigest = null;
+  function checkDigestSchedule() {
+    const now = new Date();
+    const hour = now.getHours();
+    const day = now.getDay(); // 0=Sun
+    const todayKey = now.toISOString().split('T')[0];
+    const weekKey = `${now.getFullYear()}-W${Math.ceil((now.getDate() + 6 - now.getDay()) / 7)}`;
+
+    // Daily digest at 7am
+    if (hour >= 7 && lastDailyDigest !== todayKey) {
+      lastDailyDigest = todayKey;
+      sendDigest('daily').catch(err => console.error('Daily digest error:', err.message));
+    }
+    // Weekly digest on Monday at 7am
+    if (day === 1 && hour >= 7 && lastWeeklyDigest !== weekKey) {
+      lastWeeklyDigest = weekKey;
+      sendDigest('weekly').catch(err => console.error('Weekly digest error:', err.message));
+    }
+  }
+  // Check schedule every 30 minutes
+  setInterval(checkDigestSchedule, 30 * 60 * 1000);
+  checkDigestSchedule();
+
+  // ═══════ INSPECTION REMINDERS ═══════
+  app.get('/api/reminders', authenticate, adminOnly, async (req, res) => {
+    // Find equipment not inspected in the last 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const cutoff = sevenDaysAgo.toISOString().split('T')[0];
+
+    const ladders = await pool.query(`SELECT ladder_id, MAX(date) as last_inspected FROM ladder_inspections GROUP BY ladder_id HAVING MAX(date) < $1`, [cutoff]);
+    const towers = await pool.query(`SELECT tower_id, MAX(date) as last_inspected FROM tower_inspections GROUP BY tower_id HAVING MAX(date) < $1`, [cutoff]);
+    const mewps = await pool.query(`SELECT mewp_id, MAX(date) as last_inspected FROM mewp_inspections GROUP BY mewp_id HAVING MAX(date) < $1`, [cutoff]);
+
+    res.json({
+      overdue_ladders: ladders.rows,
+      overdue_towers: towers.rows,
+      overdue_mewps: mewps.rows
+    });
   });
 
   app.get('*', (req, res) => {

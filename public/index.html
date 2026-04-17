@@ -6,11 +6,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1e293b">
-<title>Site Safety</title>
+<title>ManProjects Ltd — Site Safety</title>
 <link rel="manifest" href="/manifest.json">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--primary:#2563eb;--primary-dark:#1d4ed8;--danger:#dc2626;--warning:#f59e0b;--success:#16a34a;--bg:#f1f5f9;--card:#fff;--text:#1e293b;--text-light:#64748b;--border:#e2e8f0;--radius:12px;--shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06)}
+:root{--primary:#8B1A1A;--primary-dark:#6B1414;--danger:#dc2626;--warning:#f59e0b;--success:#16a34a;--bg:#f1f5f9;--card:#fff;--text:#1e293b;--text-light:#64748b;--border:#e2e8f0;--radius:12px;--shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06)}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
 .hidden{display:none!important}
 
@@ -29,7 +29,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .form-group textarea{resize:vertical;min-height:80px}
 .form-group .radio-group{display:flex;gap:8px;flex-wrap:wrap}
 .form-group .radio-group label{display:flex;align-items:center;gap:6px;font-weight:400;padding:8px 14px;border:2px solid var(--border);border-radius:8px;cursor:pointer;transition:all .2s;font-size:14px}
-.form-group .radio-group label:has(input:checked){border-color:var(--primary);background:#eff6ff}
+.form-group .radio-group label:has(input:checked){border-color:var(--primary);background:#fdf2f2}
 .form-group .radio-group input[type=radio]{width:auto;margin:0}
 .form-group .condition-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .form-group .condition-grid label{display:flex;align-items:center;gap:6px;font-weight:400;font-size:14px}
@@ -88,7 +88,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 /* ── Tab bar ── */
 .tab-bar{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
 .tab-bar button{flex-shrink:0;padding:8px 16px;border:2px solid var(--border);background:var(--card);border-radius:20px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text-light);white-space:nowrap;transition:all .2s}
-.tab-bar button.active{border-color:var(--primary);background:#eff6ff;color:var(--primary)}
+.tab-bar button.active{border-color:var(--primary);background:#fdf2f2;color:var(--primary)}
 
 /* ── Photo upload ── */
 .photo-upload{border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s}
@@ -136,8 +136,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 <!-- ═══════ LOGIN SCREEN ═══════ -->
 <div id="loginScreen" class="login-screen">
   <div class="login-box">
-    <div class="logo">🦺</div>
-    <h1>Site Safety</h1>
+    <div class="logo" style="font-size:14px">
+      <svg viewBox="0 0 300 80" style="width:220px;margin:0 auto;display:block">
+        <path d="M40 40 L25 15 L15 40 L25 65 Z" fill="#8B8B8B" opacity="0.7"/>
+        <path d="M40 40 L55 15 L65 40 L55 65 Z" fill="#8B1A1A" opacity="0.8"/>
+        <path d="M40 10 L40 70" stroke="#555" stroke-width="2" opacity="0.3"/>
+        <text x="80" y="38" font-family="Arial,sans-serif" font-size="26" font-weight="bold" fill="#4A4A4A">Man</text>
+        <text x="128" y="38" font-family="Arial,sans-serif" font-size="26" font-weight="bold" fill="#4A4A4A">Projects</text>
+        <text x="242" y="38" font-family="Arial,sans-serif" font-size="20" fill="#8B8B8B">Ltd</text>
+        <text x="80" y="58" font-family="Arial,sans-serif" font-size="9" fill="#8B8B8B" letter-spacing="1">Electrical and Mechanical Building Services</text>
+      </svg>
+    </div>
+    <h1 style="color:var(--primary)">Site Safety</h1>
     <p class="subtitle">Inspections & Near Miss Reporting</p>
     <div class="form-group">
       <label>Username</label>
@@ -154,10 +164,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
 <!-- ═══════ MAIN APP ═══════ -->
 <div id="appScreen" class="hidden">
-  <header class="app-header">
+  <header class="app-header" style="background:linear-gradient(135deg,#1e293b 0%,#2d3748 100%)">
     <div style="display:flex;align-items:center;gap:10px">
-      <span style="font-size:24px">🦺</span>
-      <h2>Site Safety</h2>
+      <h2 style="font-size:16px"><span style="color:#ccc">ManProjects</span> <span style="font-weight:400;font-size:13px;color:#999">Site Safety</span></h2>
     </div>
     <div class="user-info">
       <span id="syncIndicator" class="sync-indicator">⏳ <span id="syncCount">0</span> pending</span>
@@ -543,10 +552,16 @@ function renderNearMissForm(c) {
         </div>
         <div class="photo-preview" id="nearMissPhotos"></div>
       </div>
+      <div class="form-section">
+        <h3>✍️ Operative Signature</h3>
+        <canvas id="nearMissSig" style="width:100%;height:120px;border:2px solid var(--border);border-radius:8px;background:#fff;touch-action:none"></canvas>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px;width:auto" onclick="clearSignature('nearMissSig')">Clear Signature</button>
+      </div>
       <button type="submit" class="btn btn-danger" style="margin-top:16px;padding:18px;font-size:18px">⚠️ Submit Near Miss Report</button>
     </form>
   `;
   setupPhotoPreview('nearMissForm', 'nearMissPhotos');
+  createSignaturePad('nearMissSig');
   document.getElementById('nearMissForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -556,6 +571,7 @@ function renderNearMissForm(c) {
       const photos = await uploadPhotos(e.target.querySelector('input[type=file]'));
       const data = Object.fromEntries(fd.entries());
       data.photos = photos;
+      data.signature = getSignatureData('nearMissSig');
       delete data[''];
       await submitForm('near-miss', data);
       showToast('Near miss report submitted!');
@@ -612,11 +628,17 @@ function renderLadderForm(c) {
         </div>
         <div class="photo-preview" id="ladderPhotos"></div>
       </div>
+      <div class="form-section">
+        <h3>✍️ Operative Signature</h3>
+        <canvas id="ladderSig" style="width:100%;height:120px;border:2px solid var(--border);border-radius:8px;background:#fff;touch-action:none"></canvas>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px;width:auto" onclick="clearSignature('ladderSig')">Clear Signature</button>
+      </div>
       <button type="submit" class="btn btn-primary" style="margin-top:16px;padding:18px;font-size:18px">✅ Submit Ladder Inspection</button>
     </form>
   `;
   setupPhotoPreview('ladderForm', 'ladderPhotos');
-  setupFormSubmit('ladderForm', 'ladder-inspection', '✅ Submit Ladder Inspection');
+  createSignaturePad('ladderSig');
+  setupFormSubmit('ladderForm', 'ladder-inspection', '✅ Submit Ladder Inspection', 'ladderSig');
 }
 
 // ═══════════════════════════════════════
@@ -663,11 +685,17 @@ function renderTowerForm(c) {
         </div>
         <div class="photo-preview" id="towerPhotos"></div>
       </div>
+      <div class="form-section">
+        <h3>✍️ Operative Signature</h3>
+        <canvas id="towerSig" style="width:100%;height:120px;border:2px solid var(--border);border-radius:8px;background:#fff;touch-action:none"></canvas>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px;width:auto" onclick="clearSignature('towerSig')">Clear Signature</button>
+      </div>
       <button type="submit" class="btn btn-primary" style="margin-top:16px;padding:18px;font-size:18px">✅ Submit Tower Inspection</button>
     </form>
   `;
   setupPhotoPreview('towerForm', 'towerPhotos');
-  setupFormSubmit('towerForm', 'tower-inspection', '✅ Submit Tower Inspection');
+  createSignaturePad('towerSig');
+  setupFormSubmit('towerForm', 'tower-inspection', '✅ Submit Tower Inspection', 'towerSig');
 }
 
 // ═══════════════════════════════════════
@@ -721,11 +749,17 @@ function renderMEWPForm(c) {
         </div>
         <div class="photo-preview" id="mewpPhotos"></div>
       </div>
+      <div class="form-section">
+        <h3>✍️ Operative Signature</h3>
+        <canvas id="mewpSig" style="width:100%;height:120px;border:2px solid var(--border);border-radius:8px;background:#fff;touch-action:none"></canvas>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px;width:auto" onclick="clearSignature('mewpSig')">Clear Signature</button>
+      </div>
       <button type="submit" class="btn btn-primary" style="margin-top:16px;padding:18px;font-size:18px">✅ Submit MEWP Inspection</button>
     </form>
   `;
   setupPhotoPreview('mewpForm', 'mewpPhotos');
-  setupFormSubmit('mewpForm', 'mewp-inspection', '✅ Submit MEWP Inspection');
+  createSignaturePad('mewpSig');
+  setupFormSubmit('mewpForm', 'mewp-inspection', '✅ Submit MEWP Inspection', 'mewpSig');
 }
 
 // ═══════════════════════════════════════
@@ -765,7 +799,7 @@ function setupPhotoPreview(formId, previewId) {
   });
 }
 
-function setupFormSubmit(formId, endpoint, btnText) {
+function setupFormSubmit(formId, endpoint, btnText, sigCanvasId) {
   document.getElementById(formId).addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -775,6 +809,7 @@ function setupFormSubmit(formId, endpoint, btnText) {
       const photos = await uploadPhotos(e.target.querySelector('input[type=file]'));
       const data = Object.fromEntries(fd.entries());
       data.photos = photos;
+      if (sigCanvasId) data.signature = getSignatureData(sigCanvasId);
       await submitForm(endpoint, data);
       showToast('Inspection submitted successfully!');
       navigate('home');
@@ -806,8 +841,55 @@ async function renderDashboard(c) {
         <div class="stat-card danger"><div class="stat-value">${stats.unsafe_ladders + stats.unsafe_towers + stats.unsafe_mewps}</div><div class="stat-label">Flagged Unsafe</div></div>
       </div>
       <button class="btn btn-outline" onclick="renderDashboard(document.getElementById('appContent'))" style="margin-top:8px">🔄 Refresh</button>
+
+      <div class="form-section" style="margin-top:20px">
+        <h3>📧 Email Digest</h3>
+        <p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Auto-sent daily at 7am and weekly on Mondays (when email is configured). You can also send one now:</p>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" onclick="sendDigest('daily')">📧 Send Daily Digest</button>
+          <button class="btn btn-outline btn-sm" onclick="sendDigest('weekly')">📧 Send Weekly Digest</button>
+        </div>
+      </div>
+
+      <div id="remindersSection" style="margin-top:16px"></div>
     `;
+    loadReminders();
   } catch { c.innerHTML = '<p>Failed to load dashboard</p>'; }
+}
+
+window.sendDigest = async function(period) {
+  try {
+    await fetch(API + '/api/digest/' + period, { method: 'POST', headers: headers() });
+    showToast(period.charAt(0).toUpperCase() + period.slice(1) + ' digest sent!');
+  } catch { showToast('Failed to send digest — is email configured?', 'error'); }
+};
+
+async function loadReminders() {
+  try {
+    const data = await fetch(API + '/api/reminders', { headers: headers() }).then(r => r.json());
+    const el = document.getElementById('remindersSection');
+    if (!el) return;
+    const all = [
+      ...data.overdue_ladders.map(r => ({ id: r.ladder_id, type: '🪜 Ladder', last: r.last_inspected })),
+      ...data.overdue_towers.map(r => ({ id: r.tower_id, type: '🏗️ Tower', last: r.last_inspected })),
+      ...data.overdue_mewps.map(r => ({ id: r.mewp_id, type: '🔧 MEWP', last: r.last_inspected })),
+    ];
+    if (all.length === 0) {
+      el.innerHTML = '<div class="form-section"><h3>🔔 Inspection Reminders</h3><p style="color:var(--success);font-size:14px">All equipment inspected within the last 7 days — no overdue items!</p></div>';
+      return;
+    }
+    el.innerHTML = `
+      <div class="form-section">
+        <h3 style="color:var(--warning)">🔔 Overdue Inspections (7+ days)</h3>
+        ${all.map(r => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)">
+            <div><strong>${r.type}</strong> — ${r.id}</div>
+            <div style="font-size:12px;color:var(--danger)">Last: ${r.last}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch {}
 }
 
 // ═══════════════════════════════════════
@@ -888,7 +970,8 @@ window.showReportDetail = async function(id) {
         <div class="form-group"><label>Admin Notes</label><textarea id="modalNotes" rows="3">${r.admin_notes || ''}</textarea></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-primary btn-sm" onclick="updateReport(${r.id})">Save</button>
-          ${r.status === 'closed' ? `<button class="btn btn-danger btn-sm" onclick="deleteReport(${r.id})">🗑️ Delete Report</button>` : ''}
+          <button class="btn btn-outline btn-sm" onclick="exportPDF('near-miss', ${JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;')})">📄 PDF</button>
+          ${r.status === 'closed' ? `<button class="btn btn-danger btn-sm" onclick="deleteReport(${r.id})">🗑️ Delete</button>` : ''}
           <button class="btn btn-outline btn-sm" onclick="this.closest('.modal-overlay').remove()">Close</button>
         </div>
       </div>
@@ -974,7 +1057,11 @@ window.showInspectionDetail = function(type, r) {
         <p><strong>Inspected by:</strong> ${r.inspected_by}</p>
         ${fields}
         ${photos.length > 0 ? `<div class="modal-photos">${photos.map(p => `<img src="${p}" alt="Photo">`).join('')}</div>` : ''}
-        <button class="btn btn-outline btn-sm" style="margin-top:16px" onclick="this.closest('.modal-overlay').remove()">Close</button>
+        ${r.signature ? `<div style="margin-top:12px"><strong>Signature:</strong><br><img src="${r.signature}" style="max-width:200px;max-height:80px;border:1px solid var(--border);border-radius:4px;margin-top:4px"></div>` : ''}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+          <button class="btn btn-outline btn-sm" onclick="exportPDF('${type}', ${JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;')})">📄 PDF</button>
+          <button class="btn btn-outline btn-sm" onclick="this.closest('.modal-overlay').remove()">Close</button>
+        </div>
       </div>
     </div>
   `);
@@ -1040,6 +1127,115 @@ window.deleteUser = async function(id) {
 // ═══════════════════════════════════════
 // SERVICE WORKER REGISTRATION
 // ═══════════════════════════════════════
+// ═══════════════════════════════════════
+// PDF EXPORT
+// ═══════════════════════════════════════
+window.exportPDF = function(type, data) {
+  if (typeof data === 'string') data = JSON.parse(data);
+  let title, content;
+
+  if (type === 'near-miss') {
+    title = `Near Miss Report #${data.id}`;
+    content = `
+      <tr><td>Reported By</td><td>${data.reported_by}</td></tr>
+      <tr><td>Date / Time</td><td>${data.date} ${data.time}</td></tr>
+      <tr><td>Location</td><td>${data.location}</td></tr>
+      <tr><td>Severity</td><td>${data.potential_severity}</td></tr>
+      <tr><td>Description</td><td>${data.description}</td></tr>
+      ${data.immediate_actions ? `<tr><td>Immediate Actions</td><td>${data.immediate_actions}</td></tr>` : ''}
+      ${data.weather_conditions ? `<tr><td>Weather</td><td>${data.weather_conditions}</td></tr>` : ''}
+      ${data.witnesses ? `<tr><td>Witnesses</td><td>${data.witnesses}</td></tr>` : ''}
+      <tr><td>Status</td><td>${data.status}</td></tr>
+      ${data.admin_notes ? `<tr><td>Admin Notes</td><td>${data.admin_notes}</td></tr>` : ''}
+      ${data.signature ? `<tr><td>Signature</td><td><img src="${data.signature}" style="max-width:200px;max-height:80px"></td></tr>` : ''}
+    `;
+  } else {
+    const idField = data.ladder_id || data.tower_id || data.mewp_id || '';
+    const byField = data.inspected_by || '';
+    title = `${type.charAt(0).toUpperCase() + type.slice(1)} Inspection — ${idField}`;
+    content = Object.entries(data)
+      .filter(([k]) => !['id','user_id','photos','created_at','inspected_by'].includes(k))
+      .map(([k, v]) => {
+        if (k === 'signature' && v) return `<tr><td>Signature</td><td><img src="${v}" style="max-width:200px;max-height:80px"></td></tr>`;
+        return `<tr><td>${k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</td><td>${v || '—'}</td></tr>`;
+      }).join('');
+    content = `<tr><td>Inspected By</td><td>${byField}</td></tr>` + content;
+  }
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
+    body{font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:30px;color:#333}
+    .header{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #8B1A1A;padding-bottom:15px;margin-bottom:20px}
+    .company{font-size:22px;font-weight:bold;color:#4A4A4A}
+    .company span{color:#8B1A1A}
+    .tagline{font-size:10px;color:#8B8B8B;letter-spacing:1px}
+    h2{color:#8B1A1A;font-size:18px;margin-bottom:16px}
+    table{width:100%;border-collapse:collapse}
+    td{padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:13px;vertical-align:top}
+    td:first-child{font-weight:600;width:180px;color:#555;background:#fafafa}
+    .footer{margin-top:30px;padding-top:15px;border-top:1px solid #ddd;font-size:11px;color:#999;text-align:center}
+    @media print{body{padding:15px}.footer{position:fixed;bottom:20px;left:0;right:0}}
+  </style></head><body>
+    <div class="header">
+      <div><div class="company">Man<span>Projects</span> Ltd</div><div class="tagline">Electrical and Mechanical Building Services</div></div>
+      <div style="text-align:right;font-size:12px;color:#888">Generated: ${new Date().toLocaleDateString('en-GB')}<br>${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div>
+    </div>
+    <h2>${title}</h2>
+    <table>${content}</table>
+    <div class="footer">ManProjects Ltd — Site Safety Report — Confidential</div>
+    <script>setTimeout(()=>window.print(),500)<\/script>
+  </body></html>`);
+  win.document.close();
+};
+
+// ═══════════════════════════════════════
+// SIGNATURE PAD
+// ═══════════════════════════════════════
+function createSignaturePad(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let drawing = false;
+  let lastX = 0, lastY = 0;
+
+  canvas.width = canvas.offsetWidth;
+  canvas.height = 120;
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+  }
+
+  canvas.addEventListener('mousedown', e => { drawing = true; const p = getPos(e); lastX = p.x; lastY = p.y; });
+  canvas.addEventListener('mousemove', e => { if (!drawing) return; const p = getPos(e); ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke(); lastX = p.x; lastY = p.y; });
+  canvas.addEventListener('mouseup', () => drawing = false);
+  canvas.addEventListener('mouseleave', () => drawing = false);
+
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; const p = getPos(e); lastX = p.x; lastY = p.y; }, { passive: false });
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; const p = getPos(e); ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke(); lastX = p.x; lastY = p.y; }, { passive: false });
+  canvas.addEventListener('touchend', () => drawing = false);
+}
+
+function getSignatureData(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return '';
+  const ctx = canvas.getContext('2d');
+  const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  const hasContent = pixels.some((v, i) => i % 4 === 3 && v > 0);
+  return hasContent ? canvas.toDataURL('image/png') : '';
+}
+
+function clearSignature(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
