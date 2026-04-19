@@ -112,7 +112,7 @@ async function startApp() {
     id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id),
     external_name TEXT,
     category TEXT NOT NULL, course_name TEXT NOT NULL, provider TEXT,
-    card_number TEXT, completion_date TEXT NOT NULL, expiry_date TEXT,
+    card_number TEXT, completion_date TEXT, expiry_date TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
 
@@ -121,6 +121,9 @@ async function startApp() {
     try { await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS signature TEXT`); } catch(e) {}
   };
   await Promise.all(['near_miss_reports','ladder_inspections','tower_inspections','mewp_inspections'].map(migrateSig));
+
+  // Allow completion_date to be NULL for existing training_records table
+  try { await pool.query(`ALTER TABLE training_records ALTER COLUMN completion_date DROP NOT NULL`); } catch(e) {}
 
   // Add external_name to training_records and make user_id nullable
   try { await pool.query('ALTER TABLE training_records ADD COLUMN IF NOT EXISTS external_name TEXT'); } catch(e) {}
@@ -849,7 +852,7 @@ async function startApp() {
     const userId = d.user_id && d.user_id !== 'null' ? d.user_id : null;
     const { rows } = await pool.query(
       'INSERT INTO training_records (user_id, external_name, category, course_name, provider, card_number, completion_date, expiry_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
-      [userId, d.external_name || null, d.category, d.course_name, d.provider || '', d.card_number || '', d.completion_date, d.expiry_date || null]);
+      [userId, d.external_name || null, d.category, d.course_name, d.provider || '', d.card_number || '', d.completion_date || null, d.expiry_date || null]);
     res.json({ id: rows[0].id, message: 'Training record added' });
   });
 

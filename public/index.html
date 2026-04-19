@@ -2084,7 +2084,7 @@ async function renderMyTraining(c) {
             <div class="card-body">
               <p><strong>Category:</strong> ${r.category}</p>
               <p><strong>Provider:</strong> ${r.provider || '—'}</p>
-              <p><strong>Completed:</strong> ${r.completion_date} ${r.expiry_date ? `&nbsp;|&nbsp; <strong>Expires:</strong> ${r.expiry_date}` : ''}</p>
+              <p>${r.completion_date ? `<strong>Completed:</strong> ${r.completion_date}` : ''}${r.completion_date && r.expiry_date ? ' &nbsp;|&nbsp; ' : ''}${r.expiry_date ? `<strong>Expires:</strong> ${r.expiry_date}` : ''}${!r.completion_date && !r.expiry_date ? '<em style="color:var(--text-light)">No dates recorded</em>' : ''}</p>
               ${r.card_number ? `<p><strong>Card/Cert No:</strong> ${r.card_number}</p>` : ''}
               ${daysLeft !== null && daysLeft < 30 && daysLeft >= 0 ? `<p style="color:var(--warning);font-weight:600">⚠️ Expires in ${daysLeft} days</p>` : ''}
               ${daysLeft !== null && daysLeft < 0 ? `<p style="color:var(--danger);font-weight:600">❌ Expired ${Math.abs(daysLeft)} days ago</p>` : ''}
@@ -2142,7 +2142,7 @@ async function renderAdminTraining(c) {
         <div class="form-group"><label>Course / Qualification Name</label><input type="text" id="trainCourse" placeholder="e.g. IPAF Operator, CSCS Blue Card, PASMA"></div>
         <div class="form-group"><label>Training Provider</label><input type="text" id="trainProvider" placeholder="e.g. CITB, IPAF Ltd"></div>
         <div class="form-group"><label>Card / Certificate Number</label><input type="text" id="trainCardNo" placeholder="e.g. CSCS-12345678"></div>
-        <div class="form-group"><label>Completion Date</label><input type="date" id="trainComplete" value="${today()}"></div>
+        <div class="form-group"><label>Completion Date (optional)</label><input type="date" id="trainComplete"></div>
         <div class="form-group"><label>Expiry Date (leave blank if none)</label><input type="date" id="trainExpiry"></div>
         <button class="btn btn-primary btn-sm" onclick="addTrainingRecord()">Add Record</button>
       </div>
@@ -2199,7 +2199,7 @@ window.showTrainingView = function(view, btn) {
         </div>
         <div class="card-body">
           <p><strong>Category:</strong> ${r.category} &nbsp;|&nbsp; <strong>Provider:</strong> ${r.provider || '—'}</p>
-          <p><strong>Completed:</strong> ${r.completion_date} ${r.expiry_date ? `&nbsp;|&nbsp; <strong>Expires:</strong> ${r.expiry_date}` : ''}</p>
+          <p>${r.completion_date ? `<strong>Completed:</strong> ${r.completion_date}` : ''}${r.completion_date && r.expiry_date ? ' &nbsp;|&nbsp; ' : ''}${r.expiry_date ? `<strong>Expires:</strong> ${r.expiry_date}` : ''}${!r.completion_date && !r.expiry_date ? '<em style="color:var(--text-light)">No dates recorded</em>' : ''}</p>
           ${r.card_number ? `<p><strong>Card/Cert:</strong> ${r.card_number}</p>` : ''}
         </div>
         <button class="btn btn-outline btn-sm" style="margin-top:8px;color:var(--danger);border-color:var(--danger);width:auto" onclick="deleteTraining(${r.id})">Remove</button>
@@ -2245,7 +2245,7 @@ function renderTrainingMatrix(el, records) {
     } else if (exp) {
       return `<td class="tm-cell tm-valid" title="${rec.course_name} \u2014 Valid\nExpiry: ${rec.expiry_date}\nCard: ${rec.card_number||'N/A'}"><span class="tm-badge tm-ok">\u2713</span></td>`;
     } else {
-      return `<td class="tm-cell tm-valid" title="${rec.course_name} \u2014 No expiry\nCompleted: ${rec.completion_date}\nCard: ${rec.card_number||'N/A'}"><span class="tm-badge tm-ok">\u2713</span></td>`;
+      return `<td class="tm-cell tm-valid" title="${rec.course_name} \u2014 No expiry${rec.completion_date ? '\nCompleted: '+rec.completion_date : ''}\nCard: ${rec.card_number||'N/A'}"><span class="tm-badge tm-ok">\u2713</span></td>`;
     }
   };
 
@@ -2310,7 +2310,7 @@ window.addTrainingRecord = async function() {
   const completion_date = document.getElementById('trainComplete').value;
   const expiry_date = document.getElementById('trainExpiry').value;
 
-  if (!course_name || !completion_date) { showToast('Please enter course name and completion date', 'error'); return; }
+  if (!course_name) { showToast('Please enter a course name', 'error'); return; }
 
   const isExternal = userSelect === 'external';
   if (isExternal && !externalName) { showToast('Please enter the operative name', 'error'); return; }
