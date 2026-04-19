@@ -80,30 +80,60 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .badge-unsafe{background:#fee2e2;color:#991b1b}
 
 /* ── Stats Grid ── */
-.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
-.stat-card{background:var(--card);border-radius:var(--radius);padding:18px 16px;box-shadow:var(--shadow);text-align:center;border-left:4px solid var(--primary);transition:transform .15s,box-shadow .15s}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.stat-card{background:var(--card);border-radius:14px;padding:18px 14px;box-shadow:0 2px 8px rgba(0,0,0,.06);text-align:center;border-left:4px solid var(--primary);transition:transform .15s,box-shadow .15s;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;right:0;width:50px;height:50px;background:linear-gradient(135deg,transparent 50%,rgba(139,26,26,.04) 50%);border-radius:0 14px 0 0}
 .stat-card:active{transform:scale(.97)}
-.stat-card .stat-value{font-size:30px;font-weight:800;color:var(--primary);letter-spacing:-0.5px}
-.stat-card .stat-label{font-size:11px;color:var(--text-light);margin-top:6px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
-.stat-card .stat-icon{font-size:22px;margin-bottom:4px}
+.stat-card .stat-value{font-size:32px;font-weight:800;color:var(--primary);letter-spacing:-1px;line-height:1}
+.stat-card .stat-label{font-size:10px;color:var(--text-light);margin-top:8px;text-transform:uppercase;letter-spacing:0.8px;font-weight:700}
+.stat-card .stat-icon{font-size:24px;margin-bottom:6px}
 .stat-card.danger{border-left-color:var(--danger)}
+.stat-card.danger::before{background:linear-gradient(135deg,transparent 50%,rgba(220,38,38,.06) 50%)}
 .stat-card.danger .stat-value{color:var(--danger)}
 .stat-card.warning{border-left-color:var(--warning)}
+.stat-card.warning::before{background:linear-gradient(135deg,transparent 50%,rgba(245,158,11,.06) 50%)}
 .stat-card.warning .stat-value{color:var(--warning)}
 .stat-card.success{border-left-color:var(--success)}
+.stat-card.success::before{background:linear-gradient(135deg,transparent 50%,rgba(22,163,74,.06) 50%)}
 .stat-card.success .stat-value{color:var(--success)}
 
 /* ── Dashboard Banner ── */
-.dash-banner{background:linear-gradient(135deg,#8B1A1A 0%,#B22222 50%,#8B1A1A 100%);border-radius:var(--radius);padding:24px 22px;margin-bottom:20px;color:#fff;display:flex;align-items:center;gap:18px;box-shadow:0 4px 15px rgba(139,26,26,.3)}
-.dash-banner img{height:56px;border-radius:8px;background:#fff;padding:6px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
-.dash-banner .banner-text h2{font-size:20px;font-weight:700;letter-spacing:0.5px;margin-bottom:2px}
-.dash-banner .banner-text p{font-size:12px;opacity:.85;letter-spacing:1px}
-.dash-banner .banner-date{margin-left:auto;text-align:right;font-size:12px;opacity:.8;line-height:1.6}
+.dash-banner{background:linear-gradient(135deg,#6B1414 0%,#8B1A1A 30%,#B22222 70%,#8B1A1A 100%);border-radius:16px;padding:24px 22px;margin-bottom:20px;color:#fff;display:flex;align-items:center;gap:18px;box-shadow:0 6px 20px rgba(139,26,26,.35);position:relative;overflow:hidden}
+.dash-banner::after{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;background:rgba(255,255,255,.06);border-radius:50%}
+.dash-banner::before{content:'';position:absolute;bottom:-40px;left:-20px;width:100px;height:100px;background:rgba(255,255,255,.04);border-radius:50%}
+.dash-banner img{height:56px;border-radius:10px;background:#fff;padding:6px;box-shadow:0 3px 12px rgba(0,0,0,.25);position:relative;z-index:1}
+.dash-banner .banner-text{position:relative;z-index:1}
+.dash-banner .banner-text h2{font-size:20px;font-weight:700;letter-spacing:0.5px;margin-bottom:3px;text-shadow:0 1px 3px rgba(0,0,0,.2)}
+.dash-banner .banner-text p{font-size:11px;opacity:.8;letter-spacing:1.5px;font-weight:500}
+.dash-banner .banner-date{margin-left:auto;text-align:right;font-size:12px;opacity:.8;line-height:1.6;position:relative;z-index:1}
 
 /* ── Section Divider ── */
-.dash-section{margin-bottom:20px}
-.dash-section-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:0.5px}
-.dash-section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.dash-section{margin-bottom:22px}
+.dash-section-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:0.6px}
+.dash-section-title::after{content:'';flex:1;height:2px;background:linear-gradient(90deg,var(--border),transparent)}
+
+/* ── Quick Actions ── */
+.quick-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px}
+.quick-action{background:var(--card);border-radius:12px;padding:16px 10px;box-shadow:var(--shadow);text-align:center;cursor:pointer;transition:all .2s;border:2px solid transparent;text-decoration:none;color:var(--text)}
+.quick-action:hover,.quick-action:active{border-color:var(--primary);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.1)}
+.quick-action .qa-icon{font-size:28px;margin-bottom:6px;display:block}
+.quick-action .qa-label{font-size:11px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:0.3px}
+
+/* ── Activity Feed ── */
+.activity-feed{background:var(--card);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.activity-item{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-bottom:1px solid #F3F4F6;transition:background .15s}
+.activity-item:last-child{border-bottom:none}
+.activity-item:hover{background:#F9FAFB}
+.activity-dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.activity-content{flex:1;min-width:0}
+.activity-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:2px}
+.activity-meta{font-size:12px;color:var(--text-light)}
+.activity-time{font-size:11px;color:#999;flex-shrink:0;margin-top:3px}
+
+/* ── Week Summary Bar ── */
+.week-bar{display:flex;gap:4px;align-items:flex-end;height:50px;margin-top:8px}
+.week-day{flex:1;background:linear-gradient(to top,var(--primary),#B22222);border-radius:4px 4px 0 0;min-height:4px;transition:height .4s ease;position:relative}
+.week-day-label{font-size:9px;color:var(--text-light);text-align:center;margin-top:4px;font-weight:600}
 
 /* ── Tab bar ── */
 .tab-bar{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
@@ -850,10 +880,16 @@ function setupFormSubmit(formId, endpoint, btnText, sigCanvasId) {
 async function renderDashboard(c) {
   c.innerHTML = '<div class="dash-banner"><div class="banner-text"><h2>Loading...</h2></div></div>';
   try {
-    const stats = await fetch(`${API}/api/stats`, { headers: headers() }).then(r => r.json());
+    const [stats, activity] = await Promise.all([
+      fetch(`${API}/api/stats`, { headers: headers() }).then(r => r.json()),
+      fetch(`${API}/api/dashboard-activity`, { headers: headers() }).then(r => r.json()).catch(() => ({ recent: [], weekly: [] }))
+    ]);
     const d = new Date();
     const dateStr = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     const timeStr = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const totalAll = stats.near_miss_total + stats.ladder_total + stats.tower_total + stats.mewp_total;
+    const todayAll = stats.near_miss_today + stats.ladder_today + stats.tower_today + stats.mewp_today;
+    const maxWeek = Math.max(...activity.weekly.map(w => w.count), 1);
 
     c.innerHTML = `
       <div class="dash-banner">
@@ -869,9 +905,32 @@ async function renderDashboard(c) {
       <div id="remindersSection" style="margin-bottom:16px"></div>
 
       <div class="dash-section">
+        <div class="dash-section-title">🚀 Quick Actions</div>
+        <div class="quick-actions">
+          <div class="quick-action" onclick="navigate('reports')"><span class="qa-icon">⚠️</span><span class="qa-label">Open Reports</span></div>
+          <div class="quick-action" onclick="navigate('inspections')"><span class="qa-icon">📋</span><span class="qa-label">Inspections</span></div>
+          <div class="quick-action" onclick="navigate('training')"><span class="qa-icon">🎓</span><span class="qa-label">Training</span></div>
+        </div>
+      </div>
+
+      <div class="dash-section">
+        <div class="dash-section-title">📈 Overview</div>
+        <div style="background:var(--card);border-radius:14px;padding:18px;box-shadow:var(--shadow);margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div><span style="font-size:13px;color:var(--text-light);font-weight:600">TOTAL SUBMISSIONS</span><br><span style="font-size:28px;font-weight:800;color:var(--primary)">${totalAll}</span></div>
+            <div style="text-align:right"><span style="font-size:13px;color:var(--text-light);font-weight:600">TODAY</span><br><span style="font-size:28px;font-weight:800;color:${todayAll > 0 ? 'var(--success)' : 'var(--text-light)'}">${todayAll}</span></div>
+          </div>
+          <div style="font-size:11px;color:var(--text-light);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Last 7 Days Activity</div>
+          <div class="week-bar">
+            ${activity.weekly.map(w => `<div style="flex:1;text-align:center"><div style="background:linear-gradient(to top,var(--primary),#B22222);border-radius:4px 4px 0 0;height:${Math.max(4, (w.count/maxWeek)*46)}px;margin:0 auto;width:80%;transition:height .4s"></div><div class="week-day-label">${w.day}</div></div>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div class="dash-section">
         <div class="dash-section-title">⚠️ Near Miss Reports</div>
         <div class="stats-grid">
-          <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-value">${stats.near_miss_total}</div><div class="stat-label">Total Reports</div></div>
+          <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-value">${stats.near_miss_total}</div><div class="stat-label">Total</div></div>
           <div class="stat-card warning"><div class="stat-icon">📂</div><div class="stat-value">${stats.near_miss_open}</div><div class="stat-label">Open</div></div>
           <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-value">${stats.near_miss_today}</div><div class="stat-label">Today</div></div>
           <div class="stat-card success"><div class="stat-icon">👷</div><div class="stat-value">${stats.operatives}</div><div class="stat-label">Operatives</div></div>
@@ -884,28 +943,50 @@ async function renderDashboard(c) {
           <div class="stat-card"><div class="stat-icon">🪜</div><div class="stat-value">${stats.ladder_total}</div><div class="stat-label">Ladder${stats.ladder_today ? ' (' + stats.ladder_today + ' today)' : ''}</div></div>
           <div class="stat-card"><div class="stat-icon">🏗️</div><div class="stat-value">${stats.tower_total}</div><div class="stat-label">Tower${stats.tower_today ? ' (' + stats.tower_today + ' today)' : ''}</div></div>
           <div class="stat-card"><div class="stat-icon">🔧</div><div class="stat-value">${stats.mewp_total}</div><div class="stat-label">MEWP${stats.mewp_today ? ' (' + stats.mewp_today + ' today)' : ''}</div></div>
-          <div class="stat-card danger"><div class="stat-icon">🚫</div><div class="stat-value">${stats.unsafe_ladders + stats.unsafe_towers + stats.unsafe_mewps}</div><div class="stat-label">Flagged Unsafe</div></div>
+          <div class="stat-card danger"><div class="stat-icon">🚫</div><div class="stat-value">${stats.unsafe_ladders + stats.unsafe_towers + stats.unsafe_mewps}</div><div class="stat-label">Unsafe</div></div>
         </div>
       </div>
+
+      ${activity.recent.length > 0 ? `
+      <div class="dash-section">
+        <div class="dash-section-title">🕐 Recent Activity</div>
+        <div class="activity-feed">
+          ${activity.recent.map(r => {
+            const icons = {'near-miss':'⚠️','ladder':'🪜','tower':'🏗️','mewp':'🔧'};
+            const labels = {'near-miss':'Near Miss','ladder':'Ladder Inspection','tower':'Tower Inspection','mewp':'MEWP Inspection'};
+            const dotColor = r.type === 'near-miss' ? '#f59e0b' : (r.detail === 'No' ? '#dc2626' : '#16a34a');
+            const ago = Math.floor((Date.now() - new Date(r.created_at).getTime()) / 3600000);
+            const timeAgo = ago < 1 ? 'Just now' : ago < 24 ? ago + 'h ago' : Math.floor(ago/24) + 'd ago';
+            return `<div class="activity-item">
+              <div class="activity-dot" style="background:${dotColor}"></div>
+              <div class="activity-content">
+                <div class="activity-title">${icons[r.type]||''} ${labels[r.type]||r.type}</div>
+                <div class="activity-meta">${r.by_name} \u2014 ${r.location}</div>
+              </div>
+              <div class="activity-time">${timeAgo}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>` : ''}
 
       <div class="dash-section">
         <div class="dash-section-title">📧 Email Digest</div>
         <div class="form-section" style="margin-bottom:0">
           <p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Auto-sent daily at 7am and weekly on Mondays when email is configured.</p>
           <div style="display:flex;gap:8px">
-            <button class="btn btn-outline btn-sm" onclick="sendDigest('daily')">📧 Daily Digest</button>
-            <button class="btn btn-outline btn-sm" onclick="sendDigest('weekly')">📧 Weekly Digest</button>
+            <button class="btn btn-outline btn-sm" onclick="sendDigest('daily')">📧 Daily</button>
+            <button class="btn btn-outline btn-sm" onclick="sendDigest('weekly')">📧 Weekly</button>
           </div>
         </div>
       </div>
 
-      <div style="text-align:center;margin-top:16px">
-        <button class="btn btn-outline btn-sm" onclick="renderDashboard(document.getElementById('appContent'))" style="width:auto;gap:6px">🔄 Refresh Dashboard</button>
+      <div style="text-align:center;margin-top:12px;margin-bottom:16px">
+        <button class="btn btn-outline btn-sm" onclick="renderDashboard(document.getElementById('appContent'))" style="width:auto;gap:6px">🔄 Refresh</button>
       </div>
     `;
     loadTrainingAlerts();
     loadReminders();
-  } catch { c.innerHTML = '<p>Failed to load dashboard</p>'; }
+  } catch(e) { console.error(e); c.innerHTML = '<p>Failed to load dashboard</p>'; }
 }
 
 window.sendDigest = async function(period) {

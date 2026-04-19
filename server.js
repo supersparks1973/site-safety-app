@@ -654,6 +654,38 @@ async function startApp() {
     res.json(stats);
   });
 
+  // ═══════ DASHBOARD: RECENT ACTIVITY + WEEKLY STATS ═══════
+  app.get('/api/dashboard-activity', authenticate, adminOnly, async (req, res) => {
+    try {
+      const { rows: recent } = await pool.query(`
+        (SELECT 'near-miss' as type, n.id, n.date, n.location, n.potential_severity as detail, u.full_name as by_name, n.created_at FROM near_miss_reports n JOIN users u ON n.user_id = u.id ORDER BY n.created_at DESC LIMIT 5)
+        UNION ALL
+        (SELECT 'ladder' as type, l.id, l.date, l.location, l.safe_to_use as detail, u.full_name as by_name, l.created_at FROM ladder_inspections l JOIN users u ON l.user_id = u.id ORDER BY l.created_at DESC LIMIT 5)
+        UNION ALL
+        (SELECT 'tower' as type, t.id, t.date, t.location, t.safe_to_use as detail, u.full_name as by_name, t.created_at FROM tower_inspections t JOIN users u ON t.user_id = u.id ORDER BY t.created_at DESC LIMIT 5)
+        UNION ALL
+        (SELECT 'mewp' as type, m.id, m.date, m.location, m.safe_to_use as detail, u.full_name as by_name, m.created_at FROM mewp_inspections m JOIN users u ON m.user_id = u.id ORDER BY m.created_at DESC LIMIT 5)
+        ORDER BY created_at DESC LIMIT 8
+      `);
+
+      // Weekly counts (last 7 days)
+      const weekly = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(); d.setDate(d.getDate() - i);
+        const ds = d.toISOString().split('T')[0];
+        const day = d.toLocaleDateString('en-GB', { weekday: 'short' });
+        const { rows: [{c}] } = await pool.query(
+          `SELECT (SELECT COUNT(*) FROM near_miss_reports WHERE date=$1) +
+                  (SELECT COUNT(*) FROM ladder_inspections WHERE date=$1) +
+                  (SELECT COUNT(*) FROM tower_inspections WHERE date=$1) +
+                  (SELECT COUNT(*) FROM mewp_inspections WHERE date=$1) as c`, [ds]);
+        weekly.push({ day, date: ds, count: parseInt(c) });
+      }
+
+      res.json({ recent, weekly });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
   // ═══════ RESCUE PLANS ═══════
   app.post('/api/rescue-plan', authenticate, async (req, res) => {
     const d = req.body;
