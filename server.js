@@ -10,6 +10,26 @@ const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
         Header, Footer, AlignmentType, BorderStyle, WidthType,
         ShadingType, PageNumber, PageBreak } = require('docx');
 
+// ═══════ SMS (TWILIO) ═══════
+let twilioClient = null;
+const TWILIO_FROM = process.env.TWILIO_PHONE || '';
+const ADMIN_PHONE = process.env.ADMIN_PHONE || '';
+if (process.env.TWILIO_SID && process.env.TWILIO_AUTH) {
+  try {
+    const twilio = require('twilio');
+    twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH);
+    console.log('Twilio SMS enabled');
+  } catch(e) { console.log('Twilio not available — SMS disabled'); }
+}
+
+async function sendSMS(to, message) {
+  if (!twilioClient || !TWILIO_FROM || !to) return;
+  try {
+    await twilioClient.messages.create({ body: message, from: TWILIO_FROM, to });
+    console.log(`SMS sent to ${to}`);
+  } catch(e) { console.error('SMS failed:', e.message); }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'site-safety-secret-change-in-production';
@@ -913,6 +933,83 @@ async function startApp() {
       overdue_mewps: mewps.rows
     });
   });
+
+  // ═══════ TRAINING EXPIRY SMS ALERTS ═══════
+  let lastSmsCheckDate = '';
+
+  async function checkTrainingExpirySMS() {
+    const today = new Date().toISOString().split('T')[0];
+    // Only run once per day
+    if (lastSmsCheckDate === today) return;
+
+    const now = new Date();
+    const day14 = new Date(now); day14.setDate(day14.getDate() + 14);
+    const day30 = new Date(now); day30.setDate(day30.getDate() + 30);
+    const date14 = day14.toISOString().split('T')[0];
+    const date30 = day30.toISOString().split('T')[0];
+
+    try {
+      // Find training expiring in exactly 30 days (+/- 1 day window)
+      const day29 = new Date(now); day29.setDate(day29.getDate() + 29);
+      const day31 = new Date(now); day31.setDate(day31.getDate() + 31);
+      const { rows: exp30 } = await pool.query(
+        `SELECT t.*, COALESCE(u.full_name, t.external_name, 'Unknown') as operative_name
+         FROM training_records t LEFT JOIN users u ON t.user_id = u.id
+         WHERE t.expiry_date >= $1 AND t.expiry_date <= $2`,
+        [day29.toISOString().split('T')[0], day31.toISOString().split('T')[0]]
+      );
+
+      // Find training expiring in exactly 14 days (+/- 1 day window)
+      const day13 = new Date(now); day13.setDate(day13.getDate() + 13);
+      const day15 = new Date(now); day15.setDate(day15.getDate() + 15);
+      const { rows: exp14 } = await pool.query(
+        `SELECT t.*, COALESCE(u.full_name, t.external_name, 'Unknown') as operative_name
+         FROM training_records t LEFT JOIN users u ON t.user_id = u.id
+         WHERE t.expiry_date >= $1 AND t.expiry_date <= $2`,
+        [day13.toISOString().split('T')[0], day15.toISOString().split('T')[0]]
+      );
+
+      // Also find already expired
+      const { rows: expired } = await pool.query(
+        `SELECT t.*, COALESCE(u.full_name, t.external_name, 'Unknown') as operative_name
+         FROM training_records t LEFT JOIN users u ON t.user_id = u.id
+         WHERE t.expiry_date < $1 AND t.expiry_date >= $2`,
+        [today, day29.toISOString().split('T')[0].replace(/\d{2}$/, '01')]
+      );
+
+      let messages = [];
+
+      if (exp30.length > 0) {
+        const list = exp30.map(r => `${r.operative_name} - ${r.course_name} (${r.expiry_date})`).join('\n');
+        messages.push(`[ManProjects] 30-DAY WARNING\nTraining expiring in 30 days:\n${list}`);
+      }
+
+      if (exp14.length > 0) {
+        const list = exp14.map(r => `${r.operative_name} - ${r.course_name} (${r.expiry_date})`).join('\n');
+        messages.push(`[ManProjects] 14-DAY URGENT\nTraining expiring in 14 days:\n${list}`);
+      }
+
+      // Send each message
+      for (const msg of messages) {
+        await sendSMS(ADMIN_PHONE, msg);
+        // Also send email if configured
+        if (transporter && ADMIN_EMAIL) {
+          await sendAdminEmail('Training Expiry Alert', `<pre style="font-family:Arial;font-size:14px">${msg.replace(/\n/g, '<br>')}</pre>`);
+        }
+      }
+
+      if (messages.length > 0) {
+        console.log(`Training expiry check: sent ${messages.length} alert(s)`);
+      }
+
+      lastSmsCheckDate = today;
+    } catch(e) { console.error('Training expiry check failed:', e.message); }
+  }
+
+  // Check every hour, runs once per day
+  setInterval(checkTrainingExpirySMS, 60 * 60 * 1000);
+  // Run on startup after a short delay
+  setTimeout(checkTrainingExpirySMS, 10000);
 
   app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
