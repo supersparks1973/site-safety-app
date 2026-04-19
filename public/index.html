@@ -1197,84 +1197,235 @@ window.deleteUser = async function(id) {
 // ═══════════════════════════════════════
 window.exportPDF = function(type, data) {
   if (typeof data === 'string') data = JSON.parse(data);
-  let title, content;
+
+  // Helper functions
+  const row = (label, value) => `<tr><td class="lbl">${label}</td><td>${value || '\u2014'}</td></tr>`;
+  const row2 = (l1,v1,l2,v2) => `<tr><td class="lbl">${l1}</td><td>${v1||'\u2014'}</td><td class="lbl">${l2}</td><td>${v2||'\u2014'}</td></tr>`;
+  const rowFull = (label, value) => `<tr><td class="lbl">${label}</td><td colspan="3">${value || '\u2014'}</td></tr>`;
+  const condBadge = (val) => {
+    const v = (val||'').toLowerCase();
+    const pass = ['pass','good','yes','functional','secure','fitted','locked','deployed','visible'].includes(v);
+    const fail = ['fail','poor','no','defective'].includes(v);
+    return pass ? `<span class="badge-pass">${val}</span>` : fail ? `<span class="badge-fail">${val}</span>` : (val||'\u2014');
+  };
+  const sevBadge = (sev) => {
+    const c = sev==='High' ? '#C0392B' : sev==='Medium' ? '#E67E22' : '#27AE60';
+    return `<span style="background:${c};color:#fff;padding:3px 12px;border-radius:4px;font-weight:700;font-size:12px">${sev}</span>`;
+  };
+  const checkRow = (val, label) => `<div class="check-item">${val === 'Yes' ? '<span class="check-yes">&#9745;</span>' : '<span class="check-no">&#9744;</span>'} ${label}</div>`;
+  const section = (title) => `<div class="section-title">${title}</div>`;
+
+  let title, subtitle, refNum, body;
 
   if (type === 'near-miss') {
-    title = `Near Miss Report #${data.id}`;
-    content = `
-      <tr><td>Reported By</td><td>${data.reported_by}</td></tr>
-      <tr><td>Date / Time</td><td>${data.date} ${data.time}</td></tr>
-      <tr><td>Location</td><td>${data.location}</td></tr>
-      <tr><td>Severity</td><td>${data.potential_severity}</td></tr>
-      <tr><td>Description</td><td>${data.description}</td></tr>
-      ${data.immediate_actions ? `<tr><td>Immediate Actions</td><td>${data.immediate_actions}</td></tr>` : ''}
-      ${data.weather_conditions ? `<tr><td>Weather</td><td>${data.weather_conditions}</td></tr>` : ''}
-      ${data.witnesses ? `<tr><td>Witnesses</td><td>${data.witnesses}</td></tr>` : ''}
-      <tr><td>Status</td><td>${data.status}</td></tr>
-      ${data.admin_notes ? `<tr><td>Admin Notes</td><td>${data.admin_notes}</td></tr>` : ''}
-      ${data.signature ? `<tr><td>Signature</td><td><img src="${data.signature}" style="max-width:200px;max-height:80px"></td></tr>` : ''}
+    title = 'NEAR MISS REPORT';
+    refNum = `NM-${String(data.id).padStart(4,'0')}`;
+    subtitle = `Reference: ${refNum}`;
+    body = `
+      ${section('INCIDENT DETAILS')}
+      <table class="dt">${row2('Reported By', data.reported_by, 'Date / Time', data.date + ' ' + data.time)}
+      ${row2('Location', data.location, 'Severity', sevBadge(data.potential_severity))}
+      ${row2('Status', '<span style="text-transform:uppercase;font-weight:600">' + (data.status||'open') + '</span>', '', '')}</table>
+      ${section('DESCRIPTION')}
+      <div class="text-block">${data.description}</div>
+      ${data.immediate_actions ? section('IMMEDIATE ACTIONS TAKEN') + '<div class="text-block">' + data.immediate_actions + '</div>' : ''}
+      ${data.weather_conditions || data.witnesses ? section('ADDITIONAL INFORMATION') + '<table class="dt">' +
+        (data.weather_conditions ? row('Weather Conditions', data.weather_conditions) : '') +
+        (data.witnesses ? row('Witnesses', data.witnesses) : '') + '</table>' : ''}
+      ${data.admin_notes ? section('ADMIN NOTES') + '<div class="text-block" style="background:#FFF8E1;border-left:4px solid #F9A825">' + data.admin_notes + '</div>' : ''}
+      ${data.signature ? section('SIGNATURE') + '<div style="margin-top:8px"><img src="' + data.signature + '" style="max-width:250px;max-height:80px;border:1px solid #ddd;border-radius:4px"></div>' : ''}
     `;
   } else if (type === 'rescue-plan') {
-    title = `Rescue Plan — ${data.project_name}`;
+    title = 'RESCUE PLAN / EMERGENCY RESPONSE';
+    refNum = `RP-${String(data.id).padStart(4,'0')}`;
+    subtitle = `Reference: ${refNum}`;
     let checklist = {};
     try { checklist = JSON.parse(data.checklist || '{}'); } catch {}
-    const ci = (key) => checklist[key] === 'Yes' ? 'YES' : 'NO';
-    content = `
-      <tr><td>Client</td><td>${data.client_name}</td></tr>
-      <tr><td>Project</td><td>${data.project_name}</td></tr>
-      <tr><td>Location</td><td>${data.location}</td></tr>
-      <tr><td>Operation</td><td>${data.operation}</td></tr>
-      <tr><td>Project Manager</td><td>${data.project_manager}</td></tr>
-      <tr><td>Date</td><td>${data.date}</td></tr>
-      <tr><td>Rescue Supervisor</td><td>${data.rescue_supervisor}</td></tr>
-      <tr><td>Attendant</td><td>${data.attendant || '—'}</td></tr>
-      <tr><td>Rescue Team</td><td>${data.rescue_team || '—'}</td></tr>
-      <tr><td>Comms Method</td><td>${data.comms_method}</td></tr>
-      <tr><td>Nearest Hospital</td><td>${data.nearest_hospital}</td></tr>
-      <tr><td>Rescue Method</td><td>${data.rescue_method}</td></tr>
-      ${data.scene_protection ? `<tr><td>Scene Protection</td><td>${data.scene_protection}</td></tr>` : ''}
-      <tr><td>Team Briefed</td><td>${ci('check_team_briefed')}</td></tr>
-      <tr><td>Equipment Checked</td><td>${ci('check_equipment_checked')}</td></tr>
-      <tr><td>Comms Tested</td><td>${ci('check_comms_tested')}</td></tr>
-      <tr><td>First Aid Confirmed</td><td>${ci('check_first_aid')}</td></tr>
-      <tr><td>Access Routes Confirmed</td><td>${ci('check_access_routes')}</td></tr>
-      <tr><td>Emergency Access Confirmed</td><td>${ci('check_emergency_services')}</td></tr>
-      ${data.signature ? `<tr><td>Signature</td><td><img src="${data.signature}" style="max-width:200px;max-height:80px"></td></tr>` : ''}
+    body = `
+      ${section('1. PROJECT DETAILS')}
+      <table class="dt">${row2('Client', data.client_name, 'Project', data.project_name)}
+      ${row2('Location', data.location, 'Operation', data.operation)}
+      ${row2('Project Manager', data.project_manager, 'Date', data.date)}</table>
+      ${section('2. PERSONS RESPONSIBLE FOR RESCUE')}
+      <table class="dt">${row2('Rescue Supervisor', data.rescue_supervisor, 'Attendant', data.attendant)}
+      ${rowFull('Rescue Team', data.rescue_team)}</table>
+      ${section('3. COMMUNICATION & EMERGENCY CONTACTS')}
+      <table class="dt">${row2('Comms Method', data.comms_method, 'Nearest Hospital', data.nearest_hospital)}</table>
+      ${section('4. RESCUE PROCEDURE')}
+      <table class="dt">${rowFull('Planned Method', data.rescue_method)}
+      ${data.scene_protection ? rowFull('Scene Protection', data.scene_protection) : ''}</table>
+      ${section('5. PRE-RESCUE CHECKLIST')}
+      <div class="check-grid">
+        ${checkRow(checklist.check_team_briefed, 'Rescue team briefed and competent')}
+        ${checkRow(checklist.check_equipment_checked, 'Rescue equipment checked and in position')}
+        ${checkRow(checklist.check_comms_tested, 'Communications tested')}
+        ${checkRow(checklist.check_first_aid, 'First aid provision confirmed')}
+        ${checkRow(checklist.check_access_routes, 'Access / egress routes confirmed')}
+        ${checkRow(checklist.check_emergency_services, 'Emergency services access confirmed')}
+      </div>
+      ${section('6. RESCUE EQUIPMENT AVAILABLE')}
+      <div class="check-grid two-col">
+        ${checkRow(checklist.equip_harness, 'Full body harness')}
+        ${checkRow(checklist.equip_first_aid, 'First aid kit')}
+        ${checkRow(checklist.equip_lanyard, 'Rescue lanyard / rope')}
+        ${checkRow(checklist.equip_stretcher, 'Stretcher / spine board')}
+        ${checkRow(checklist.equip_tripod, 'Tripod / davit system')}
+        ${checkRow(checklist.equip_radio, 'Two-way radios')}
+        ${checkRow(checklist.equip_winch, 'Winch / descent device')}
+        ${checkRow(checklist.equip_gas_monitor, 'Gas monitor')}
+      </div>
+      ${data.signature ? section('7. SIGNATURE') + '<div style="margin-top:8px"><img src="' + data.signature + '" style="max-width:250px;max-height:80px;border:1px solid #ddd;border-radius:4px"></div>' : ''}
+    `;
+  } else if (type === 'ladder') {
+    title = 'LADDER INSPECTION REPORT';
+    refNum = `LI-${String(data.id).padStart(4,'0')}`;
+    subtitle = `Reference: ${refNum}`;
+    const safeLabel = data.safe_to_use === 'Yes' ? '<span class="badge-pass" style="font-size:14px;padding:6px 16px">YES \u2014 Safe to Use</span>' : '<span class="badge-fail" style="font-size:14px;padding:6px 16px">NO \u2014 Not Safe to Use</span>';
+    body = `
+      ${section('GENERAL INFORMATION')}
+      <table class="dt">${row2('Inspected By', data.inspected_by, 'Date', data.date)}
+      ${row2('Ladder ID', data.ladder_id, 'Ladder Type', data.ladder_type)}
+      ${rowFull('Location', data.location)}</table>
+      ${section('INSPECTION CHECKLIST')}
+      <table class="dt checklist-table">
+        <tr class="th-row"><td class="lbl" style="width:55%">Check Item</td><td style="width:45%">Condition</td></tr>
+        <tr><td class="lbl">Stiles Condition</td><td>${condBadge(data.stiles_condition)}</td></tr>
+        <tr><td class="lbl">Rungs Condition</td><td>${condBadge(data.rungs_condition)}</td></tr>
+        <tr><td class="lbl">Feet Condition</td><td>${condBadge(data.feet_condition)}</td></tr>
+        <tr><td class="lbl">Locking Mechanism</td><td>${condBadge(data.locking_mechanism)}</td></tr>
+        <tr><td class="lbl">Labels Visible</td><td>${condBadge(data.labels_visible)}</td></tr>
+        <tr><td class="lbl">General Condition</td><td>${condBadge(data.general_condition)}</td></tr>
+      </table>
+      ${section('OUTCOME')}
+      <div style="margin:12px 0">${safeLabel}</div>
+      ${data.defects_found ? '<table class="dt">' + rowFull('Defects Found', data.defects_found) + '</table>' : ''}
+      ${data.actions_taken ? '<table class="dt">' + rowFull('Actions Taken', data.actions_taken) + '</table>' : ''}
+      ${data.signature ? section('SIGNATURE') + '<div style="margin-top:8px"><img src="' + data.signature + '" style="max-width:250px;max-height:80px;border:1px solid #ddd;border-radius:4px"></div>' : ''}
+    `;
+  } else if (type === 'tower') {
+    title = 'TOWER SCAFFOLD INSPECTION REPORT';
+    refNum = `TI-${String(data.id).padStart(4,'0')}`;
+    subtitle = `Reference: ${refNum}`;
+    const safeLabel = data.safe_to_use === 'Yes' ? '<span class="badge-pass" style="font-size:14px;padding:6px 16px">YES \u2014 Safe to Use</span>' : '<span class="badge-fail" style="font-size:14px;padding:6px 16px">NO \u2014 Not Safe to Use</span>';
+    body = `
+      ${section('GENERAL INFORMATION')}
+      <table class="dt">${row2('Inspected By', data.inspected_by, 'Date', data.date)}
+      ${row2('Tower ID', data.tower_id, 'Location', data.location)}
+      ${data.max_platform_height ? rowFull('Max Platform Height', data.max_platform_height) : ''}</table>
+      ${section('INSPECTION CHECKLIST')}
+      <table class="dt checklist-table">
+        <tr class="th-row"><td class="lbl" style="width:55%">Check Item</td><td style="width:45%">Condition</td></tr>
+        <tr><td class="lbl">Base Plates</td><td>${condBadge(data.base_plates_condition)}</td></tr>
+        <tr><td class="lbl">Castors Locked</td><td>${condBadge(data.castors_locked)}</td></tr>
+        <tr><td class="lbl">Braces Secure</td><td>${condBadge(data.braces_secure)}</td></tr>
+        <tr><td class="lbl">Platforms Condition</td><td>${condBadge(data.platforms_condition)}</td></tr>
+        <tr><td class="lbl">Guardrails Fitted</td><td>${condBadge(data.guardrails_fitted)}</td></tr>
+        <tr><td class="lbl">Toe Boards Fitted</td><td>${condBadge(data.toe_boards_fitted)}</td></tr>
+        <tr><td class="lbl">Outriggers Deployed</td><td>${condBadge(data.outriggers_deployed)}</td></tr>
+        <tr><td class="lbl">Access Ladder Secure</td><td>${condBadge(data.access_ladder_secure)}</td></tr>
+      </table>
+      ${section('OUTCOME')}
+      <div style="margin:12px 0">${safeLabel}</div>
+      ${data.defects_found ? '<table class="dt">' + rowFull('Defects Found', data.defects_found) + '</table>' : ''}
+      ${data.actions_taken ? '<table class="dt">' + rowFull('Actions Taken', data.actions_taken) + '</table>' : ''}
+      ${data.signature ? section('SIGNATURE') + '<div style="margin-top:8px"><img src="' + data.signature + '" style="max-width:250px;max-height:80px;border:1px solid #ddd;border-radius:4px"></div>' : ''}
+    `;
+  } else if (type === 'mewp') {
+    title = 'MEWP INSPECTION REPORT';
+    refNum = `MI-${String(data.id).padStart(4,'0')}`;
+    subtitle = `Reference: ${refNum}`;
+    const safeLabel = data.safe_to_use === 'Yes' ? '<span class="badge-pass" style="font-size:14px;padding:6px 16px">YES \u2014 Safe to Use</span>' : '<span class="badge-fail" style="font-size:14px;padding:6px 16px">NO \u2014 Not Safe to Use</span>';
+    body = `
+      ${section('GENERAL INFORMATION')}
+      <table class="dt">${row2('Inspected By', data.inspected_by, 'Date', data.date)}
+      ${row2('MEWP ID', data.mewp_id, 'MEWP Type', data.mewp_type)}
+      ${row2('Location', data.location, 'Hours Meter', data.hours_meter_reading)}</table>
+      ${section('INSPECTION CHECKLIST')}
+      <table class="dt checklist-table">
+        <tr class="th-row"><td class="lbl" style="width:55%">Check Item</td><td style="width:45%">Condition</td></tr>
+        <tr><td class="lbl">Controls Functional</td><td>${condBadge(data.controls_functional)}</td></tr>
+        <tr><td class="lbl">Emergency Controls</td><td>${condBadge(data.emergency_controls)}</td></tr>
+        <tr><td class="lbl">Guardrails Condition</td><td>${condBadge(data.guardrails_condition)}</td></tr>
+        <tr><td class="lbl">Platform Condition</td><td>${condBadge(data.platform_condition)}</td></tr>
+        <tr><td class="lbl">Hydraulics Condition</td><td>${condBadge(data.hydraulics_condition)}</td></tr>
+        <tr><td class="lbl">Tyres Condition</td><td>${condBadge(data.tyres_condition)}</td></tr>
+        <tr><td class="lbl">Outriggers Condition</td><td>${condBadge(data.outriggers_condition)}</td></tr>
+        <tr><td class="lbl">Harness Anchor Points</td><td>${condBadge(data.harness_anchor_points)}</td></tr>
+        <tr><td class="lbl">Warning Devices</td><td>${condBadge(data.warning_devices)}</td></tr>
+      </table>
+      ${section('OUTCOME')}
+      <div style="margin:12px 0">${safeLabel}</div>
+      ${data.defects_found ? '<table class="dt">' + rowFull('Defects Found', data.defects_found) + '</table>' : ''}
+      ${data.actions_taken ? '<table class="dt">' + rowFull('Actions Taken', data.actions_taken) + '</table>' : ''}
+      ${data.signature ? section('SIGNATURE') + '<div style="margin-top:8px"><img src="' + data.signature + '" style="max-width:250px;max-height:80px;border:1px solid #ddd;border-radius:4px"></div>' : ''}
     `;
   } else {
-    const idField = data.ladder_id || data.tower_id || data.mewp_id || '';
-    const byField = data.inspected_by || '';
-    title = `${type.charAt(0).toUpperCase() + type.slice(1)} Inspection — ${idField}`;
-    content = Object.entries(data)
-      .filter(([k]) => !['id','user_id','photos','created_at','inspected_by'].includes(k))
+    title = `${type.charAt(0).toUpperCase() + type.slice(1)} Report`;
+    refNum = String(data.id).padStart(4,'0');
+    subtitle = `Reference: ${refNum}`;
+    body = '<table class="dt">' + Object.entries(data)
+      .filter(([k]) => !['id','user_id','photos','created_at'].includes(k))
       .map(([k, v]) => {
-        if (k === 'signature' && v) return `<tr><td>Signature</td><td><img src="${v}" style="max-width:200px;max-height:80px"></td></tr>`;
-        return `<tr><td>${k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</td><td>${v || '—'}</td></tr>`;
-      }).join('');
-    content = `<tr><td>Inspected By</td><td>${byField}</td></tr>` + content;
+        if (k === 'signature' && v) return `<tr><td class="lbl">Signature</td><td colspan="3"><img src="${v}" style="max-width:250px;max-height:80px"></td></tr>`;
+        return `<tr><td class="lbl">${k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</td><td colspan="3">${v || '\u2014'}</td></tr>`;
+      }).join('') + '</table>';
   }
 
   const win = window.open('', '_blank');
-  win.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
-    body{font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:30px;color:#333}
-    .header{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #8B1A1A;padding-bottom:15px;margin-bottom:20px}
-    .company{font-size:22px;font-weight:bold;color:#4A4A4A}
-    .company span{color:#8B1A1A}
-    .tagline{font-size:10px;color:#8B8B8B;letter-spacing:1px}
-    h2{color:#8B1A1A;font-size:18px;margin-bottom:16px}
-    table{width:100%;border-collapse:collapse}
-    td{padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:13px;vertical-align:top}
-    td:first-child{font-weight:600;width:180px;color:#555;background:#fafafa}
-    .footer{margin-top:30px;padding-top:15px;border-top:1px solid #ddd;font-size:11px;color:#999;text-align:center}
-    @media print{body{padding:15px}.footer{position:fixed;bottom:20px;left:0;right:0}}
+  win.document.write(`<!DOCTYPE html><html><head><title>ManProjects \u2014 ${title}</title><style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:Arial,Helvetica,sans-serif;max-width:780px;margin:0 auto;padding:40px 35px;color:#333;font-size:13px;line-height:1.4}
+    .header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #8B1A1A;padding-bottom:14px;margin-bottom:6px}
+    .header-left{display:flex;align-items:center;gap:14px}
+    .header-logo img{height:50px}
+    .header-text .company{font-size:20px;font-weight:700;color:#4A4A4A;letter-spacing:0.5px}
+    .header-text .company b{color:#8B1A1A}
+    .header-text .tagline{font-size:9px;color:#999;letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+    .header-right{text-align:right;font-size:11px;color:#888;line-height:1.5}
+    .doc-title{text-align:center;margin:22px 0 4px;font-size:20px;font-weight:700;color:#8B1A1A;letter-spacing:1px}
+    .doc-ref{text-align:center;font-size:12px;color:#999;margin-bottom:22px}
+    .section-title{font-size:13px;font-weight:700;color:#8B1A1A;margin:22px 0 8px;padding:6px 10px;background:#F5F0F0;border-left:4px solid #8B1A1A;letter-spacing:0.5px}
+    table.dt{width:100%;border-collapse:collapse;margin-bottom:4px}
+    table.dt td{padding:8px 10px;border:1px solid #E0E0E0;font-size:12px;vertical-align:top}
+    table.dt td.lbl{font-weight:600;color:#555;background:#F8F8F8;width:160px}
+    table.dt tr:nth-child(even) td:not(.lbl){background:#FCFCFC}
+    .th-row td{background:#E8E8E8 !important;font-weight:700 !important;color:#4A4A4A !important;font-size:12px;text-transform:uppercase;letter-spacing:0.5px}
+    .badge-pass{display:inline-block;background:#E6F4EA;color:#1B7D3A;padding:3px 12px;border-radius:4px;font-weight:700;font-size:12px;border:1px solid #B7E1C7}
+    .badge-fail{display:inline-block;background:#FCE8E6;color:#C0392B;padding:3px 12px;border-radius:4px;font-weight:700;font-size:12px;border:1px solid #F5C6C2}
+    .text-block{padding:12px 14px;background:#FAFAFA;border:1px solid #E0E0E0;border-radius:4px;margin:6px 0 4px;font-size:12px;line-height:1.6}
+    .check-grid{display:flex;flex-wrap:wrap;gap:2px 0;margin:6px 0}
+    .check-grid .check-item{width:100%;padding:6px 12px;font-size:12px;border-bottom:1px solid #F0F0F0}
+    .check-grid.two-col .check-item{width:50%}
+    .check-yes{color:#1B7D3A;font-size:16px}
+    .check-no{color:#C0392B;font-size:16px}
+    .footer{margin-top:36px;padding-top:14px;border-top:2px solid #8B1A1A;display:flex;justify-content:space-between;font-size:10px;color:#999}
+    .footer-left{font-weight:600;color:#8B1A1A}
+    @media print{
+      body{padding:20px 25px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .badge-pass,.badge-fail,.section-title,.th-row td,table.dt td.lbl{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .footer{position:fixed;bottom:15px;left:25px;right:25px}
+    }
   </style></head><body>
     <div class="header">
-      <div><img src="${window.location.origin}/logo.png" alt="ManProjects Ltd" style="height:50px"></div>
-      <div style="text-align:right;font-size:12px;color:#888">Generated: ${new Date().toLocaleDateString('en-GB')}<br>${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div>
+      <div class="header-left">
+        <div class="header-logo"><img src="${window.location.origin}/logo.png" alt="ManProjects Ltd"></div>
+        <div class="header-text">
+          <div class="company"><b>Man</b>Projects Ltd</div>
+          <div class="tagline">Electrical &amp; Mechanical Building Services</div>
+        </div>
+      </div>
+      <div class="header-right">
+        Generated: ${new Date().toLocaleDateString('en-GB')}<br>
+        ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}
+      </div>
     </div>
-    <h2>${title}</h2>
-    <table>${content}</table>
-    <div class="footer">ManProjects Ltd — Site Safety Report — Confidential</div>
+    <div class="doc-title">${title}</div>
+    <div class="doc-ref">${subtitle}</div>
+    ${body}
+    <div class="footer">
+      <div class="footer-left">ManProjects Ltd</div>
+      <div>Site Safety Report \u2014 Confidential \u2014 ${refNum}</div>
+    </div>
     <script>setTimeout(()=>window.print(),500)<\/script>
   </body></html>`);
   win.document.close();
