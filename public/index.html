@@ -1007,6 +1007,7 @@ window.showReportDetail = async function(id) {
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-primary btn-sm" onclick="updateReport(${r.id})">Save</button>
           <button class="btn btn-outline btn-sm" onclick="exportPDF('near-miss', ${JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;')})">📄 PDF</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadDocx('near-miss', ${r.id}, 'Near_Miss_${r.date}')">📝 Word Doc</button>
           ${r.status === 'closed' ? `<button class="btn btn-danger btn-sm" onclick="deleteReport(${r.id})">🗑️ Delete</button>` : ''}
           <button class="btn btn-outline btn-sm" onclick="this.closest('.modal-overlay').remove()">Close</button>
         </div>
@@ -1096,11 +1097,40 @@ window.showInspectionDetail = function(type, r) {
         ${r.signature ? `<div style="margin-top:12px"><strong>Signature:</strong><br><img src="${r.signature}" style="max-width:200px;max-height:80px;border:1px solid var(--border);border-radius:4px;margin-top:4px"></div>` : ''}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
           <button class="btn btn-outline btn-sm" onclick="exportPDF('${type}', ${JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;')})">📄 PDF</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadDocx('${type}', ${r.id}, '${type}_Inspection_${(r.date||'').replace(/'/g, '')}')">📝 Word Doc</button>
           <button class="btn btn-outline btn-sm" onclick="this.closest('.modal-overlay').remove()">Close</button>
         </div>
       </div>
     </div>
   `);
+};
+
+// ═══════════════════════════════════════
+// DOWNLOAD WORD DOC HELPER
+// ═══════════════════════════════════════
+window.downloadDocx = async function(type, id, name) {
+  const endpoints = {
+    'near-miss': 'near-miss',
+    'ladder': 'ladder-inspection',
+    'tower': 'tower-inspection',
+    'mewp': 'mewp-inspection'
+  };
+  const endpoint = endpoints[type] || type;
+  try {
+    const res = await fetch(`${API}/api/${endpoint}/${id}/docx`, { headers: headers() });
+    if (!res.ok) throw new Error('Download failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name.replace(/[^a-zA-Z0-9_-]/g, '_')}.docx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert('Failed to download Word document. Please try again.');
+  }
 };
 
 // ═══════════════════════════════════════

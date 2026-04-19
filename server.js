@@ -288,6 +288,349 @@ async function startApp() {
     }
   });
 
+  // ═══════ REPORT / INSPECTION WORD DOC DOWNLOADS ═══════
+  const docxHelpers = () => {
+    const maroon = "8B1A1A", grey = "4A4A4A";
+    const bdr = { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" };
+    const bds = { top: bdr, bottom: bdr, left: bdr, right: bdr };
+    const cm = { top: 60, bottom: 60, left: 100, right: 100 };
+    const pw = 9360;
+    const lbl = (text, w) => new TableCell({ borders: bds, width: { size: w, type: WidthType.DXA }, shading: { fill: "E8E8E8", type: ShadingType.CLEAR }, margins: cm,
+      children: [new Paragraph({ children: [new TextRun({ text, bold: true, font: "Arial", size: 20, color: grey })] })] });
+    const val = (text, w, span) => new TableCell({ borders: bds, width: { size: w, type: WidthType.DXA }, margins: cm, columnSpan: span || 1,
+      children: [new Paragraph({ children: [new TextRun({ text: text || '\u2014', font: "Arial", size: 20 })] })] });
+    const condCell = (text, w) => {
+      const isPass = ['pass','good','yes','functional','secure','fitted','locked','deployed','visible'].includes((text||'').toLowerCase());
+      const isFail = ['fail','poor','no','defective'].includes((text||'').toLowerCase());
+      return new TableCell({ borders: bds, width: { size: w, type: WidthType.DXA }, margins: cm,
+        shading: isPass ? { fill: "E6F4EA", type: ShadingType.CLEAR } : isFail ? { fill: "FCE8E6", type: ShadingType.CLEAR } : undefined,
+        children: [new Paragraph({ children: [new TextRun({ text: text || '\u2014', font: "Arial", size: 20, bold: isFail, color: isFail ? "C0392B" : undefined })] })] });
+    };
+    const sh = (text) => new Paragraph({ spacing: { before: 300, after: 120 },
+      children: [new TextRun({ text, bold: true, font: "Arial", size: 24, color: maroon })] });
+    const mkHeader = (subtitle) => ({
+      default: new Header({ children: [new Paragraph({
+        border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: maroon, space: 4 } },
+        children: [
+          new TextRun({ text: "ManProjects", bold: true, font: "Arial", size: 22, color: grey }),
+          new TextRun({ text: " Ltd", font: "Arial", size: 18, color: "999999" }),
+          new TextRun({ text: "    Electrical and Mechanical Building Services", font: "Arial", size: 14, color: "999999" }),
+        ]
+      })] })
+    });
+    const mkFooter = (docType) => ({
+      default: new Footer({ children: [new Paragraph({
+        alignment: AlignmentType.CENTER,
+        border: { top: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC", space: 4 } },
+        children: [
+          new TextRun({ text: `ManProjects Ltd \u2014 ${docType}  |  Page `, font: "Arial", size: 16, color: "999999" }),
+          new TextRun({ children: [PageNumber.CURRENT], font: "Arial", size: 16, color: "999999" }),
+        ]
+      })] })
+    });
+    const pageProps = {
+      page: { size: { width: 11906, height: 16838 }, margin: { top: 1200, right: 1200, bottom: 1200, left: 1200 } }
+    };
+    return { maroon, grey, bds, cm, pw, lbl, val, condCell, sh, mkHeader, mkFooter, pageProps };
+  };
+
+  // Near-miss Word doc
+  app.get('/api/near-miss/:id/docx', authenticate, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT n.*, u.full_name as reported_by FROM near_miss_reports n JOIN users u ON n.user_id = u.id WHERE n.id = $1', [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+      const r = rows[0];
+      const h = docxHelpers();
+      const sevColor = r.potential_severity === 'High' ? "C0392B" : r.potential_severity === 'Medium' ? "E67E22" : "27AE60";
+
+      const doc = new Document({
+        styles: { default: { document: { run: { font: "Arial", size: 22 } } } },
+        sections: [{
+          properties: h.pageProps,
+          headers: h.mkHeader("Near Miss Report"),
+          footers: h.mkFooter("Near Miss Report"),
+          children: [
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 0 },
+              children: [new TextRun({ text: "MAN PROJECTS LTD", bold: true, font: "Arial", size: 32, color: h.maroon })] }),
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80, after: 40 },
+              children: [new TextRun({ text: "NEAR MISS REPORT", bold: true, font: "Arial", size: 24, color: h.grey })] }),
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 40, after: 200 },
+              children: [new TextRun({ text: `Reference: NM-${String(r.id).padStart(4, '0')}`, font: "Arial", size: 20, color: "999999" })] }),
+
+            h.sh("INCIDENT DETAILS"),
+            new Table({ width: { size: h.pw, type: WidthType.DXA }, columnWidths: [2200, 2480, 2200, 2480], rows: [
+              new TableRow({ children: [h.lbl("Reported By", 2200), h.val(r.reported_by, 2480), h.lbl("Date", 2200), h.val(r.date, 2480)] }),
+              new TableRow({ children: [h.lbl("Time", 2200), h.val(r.time, 2480), h.lbl("Location", 2200), h.val(r.location, 2480)] }),
+              new TableRow({ children: [h.lbl("Severity", 2200), new TableCell({ borders: h.bds, width: { size: 2480, type: WidthType.DXA }, margins: h.cm,
+                children: [new Paragraph({ children: [new TextRun({ text: r.potential_severity, bold: true, font: "Arial", size: 20, color: sevColor })] })] }),
+                h.lbl("Status", 2200), h.val((r.status || 'open').toUpperCase(), 2480)] }),
+            ] }),
+
+            h.sh("DESCRIPTION"),
+            new Table({ width: { size: h.pw, type: WidthType.DXA }, columnWidths: [h.pw], rows: [
+              new TableRow({ children: [new TableCell({ borders: h.bds, width: { size: h.pw, type: WidthType.DXA }, margins: h.cm,
+                children: [new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: r.description || '\u2014', font: "Arial", size: 20 })] })] })] })
+            ] }),
+
+            ...(r.immediate_actions ? [
+              h.sh("IMMEDIATE ACTIONS TAKEN"),
+              new Table({ width: { size: h.pw, type: WidthType.DXA }, columnWidths: [h.pw], rows: [
+                new TableRow({ children: [new TableCell({ borders: h.bds, width: { size: h.pw, type: WidthType.DXA }, margins: h.cm,
+                  children: [new Paragraph({ children: [new TextRun({ text: r.immediate_actions, font: "Arial", size: 20 })] })] })] })
+              ] })
+            ] : []),
+
+            ...(r.weather_conditions || r.witnesses ? [
+              h.sh("ADDITIONAL INFORMATION"),
+              new Table({ width: { size: h.pw, type: WidthType.DXA }, columnWidths: [2200, 7160], rows: [
+                ...(r.weather_conditions ? [new TableRow({ children: [h.lbl("Weather", 2200), h.val(r.weather_conditions, 7160)] })] : []),
+                ...(r.witnesses ? [new TableRow({ children: [h.lbl("Witnesses", 2200), h.val(r.witnesses, 7160)] })] : []),
+              ] })
+            ] : []),
+
+            ...(r.admin_notes ? [
+              h.sh("ADMIN NOTES"),
+              new Table({ width: { size: h.pw, type: WidthType.DXA }, columnWidths: [h.pw], rows: [
+                new TableRow({ children: [new TableCell({ borders: h.bds, width: { size: h.pw, type: WidthType.DXA }, margins: h.cm,
+                  shading: { fill: "FFF8E1", type: ShadingType.CLEAR },
+                  children: [new Paragraph({ children: [new TextRun({ text: r.admin_notes, font: "Arial", size: 20 })] })] })] })
+              ] })
+            ] : []),
+
+            ...(r.signature ? [
+              h.sh("SIGNATURE"),
+              new Paragraph({ children: [new TextRun({ text: "Operative signature captured digitally in the Site Safety App.", font: "Arial", size: 20, color: "888888", italics: true })] }),
+            ] : []),
+
+            new Paragraph({ spacing: { before: 400 }, alignment: AlignmentType.CENTER,
+              children: [new TextRun({ text: "ManProjects Ltd \u2014 Near Miss Report \u2014 Confidential", font: "Arial", size: 16, color: "999999" })] }),
+          ]
+        }]
+      });
+
+      const buffer = await Packer.toBuffer(doc);
+      const filename = `Near_Miss_NM${String(r.id).padStart(4,'0')}_${r.date}.docx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (e) { console.error('Near miss DOCX error:', e); res.status(500).json({ error: 'Failed to generate document' }); }
+  });
+
+  // Ladder inspection Word doc
+  app.get('/api/ladder-inspection/:id/docx', authenticate, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT l.*, u.full_name as inspected_by FROM ladder_inspections l JOIN users u ON l.user_id = u.id WHERE l.id = $1', [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+      const r = rows[0];
+      const h = docxHelpers();
+      const safeColor = r.safe_to_use === 'Yes' ? "27AE60" : "C0392B";
+
+      const doc = new Document({
+        styles: { default: { document: { run: { font: "Arial", size: 22 } } } },
+        sections: [{
+          properties: h.pageProps,
+          headers: h.mkHeader("Ladder Inspection"),
+          footers: h.mkFooter("Ladder Inspection"),
+          children: [
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 0 },
+              children: [new TextRun({ text: "MAN PROJECTS LTD", bold: true, font: "Arial", size: 32, color: h.maroon })] }),
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80, after: 40 },
+              children: [new TextRun({ text: "LADDER INSPECTION REPORT", bold: true, font: "Arial", size: 24, color: h.grey })] }),
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 40, after: 200 },
+              children: [new TextRun({ text: `Reference: LI-${String(r.id).padStart(4, '0')}`, font: "Arial", size: 20, color: "999999" })] }),
+
+            h.sh("GENERAL INFORMATION"),
+            new Table({ width: { size: h.pw, type: WidthType.DXA }, columnWidths: [2200, 2480, 2200, 2480], rows: [
+              new TableRow({ children: [h.lbl("Inspected By", 2200), h.val(r.inspected_by, 2480), h.lbl("Date", 2200), h.val(r.date, 2480)] }),
+              new TableRow({ children: [h.lbl("Ladder ID", 2200), h.val(r.ladder_id, 2480), h.lbl("Ladder Type", 2200), h.val(r.ladder_type, 2480)] }),
+              new TableRow({ children: [h.lbl("Location", 2200), h.val(r.location, 7160, 3)] }),
+            ] }),
+
+            h.sh("INSPECTION CHECKLIST"),
+            new Table({ width: { size: h.pw, type: WidthType.DXA }, columnWidths: [5000, 4360], rows: [
+              new TableRow({ children: [
+                new TableCell({ borders: h.bds, width: { size: 5000, type: WidthType.DXA }, shading: { fill: "E8E8E8", type: ShadingType.CLEAR }, margins: h.cm,
+                  children: [new Paragraph({ children: [new TextRun({ text: "Check Item", bold: true, font: "Arial", size: 20, color: h.grey })] })] }),
+                new TableCell({ borders: h.bds, width: { size: 4360, type: WidthType.DXA }, shading: { fill: "E8E8E8", type: ShadingType.CLEAR }, margins: h.cm,
+                  children: [new Paragraph({ children: [new TextRun({ text: "Condition", bold: true, font: "Arial", size: 20, color: h.grey })] })] }),
+              ] }),
+              new TableRow({ children: [h.lbl("Stiles Condition", 5000), h.condCell(r.stiles_condition, 4360)] }),
+              new TableRow({ children: [h.lbl("Rungs Condition", 5000), h.condCell(r.rungs_condition, 4360)] }),
+              new TableRow({ children: [h.lbl("Feet Condition", 5000), h.condCell(r.feet_condition, 4360)] }),
+              new TableRow({ children: [h.lbl("Locking Mechanism", 5000), h.condCell(r.locking_mechanism, 4360)] }),
+              new TableRow({ children: [h.lbl("Labels Visible", 5000), h.condCell(r.labels_visible, 4360)] }),
+              new TableRow({ children: [h.lbl("General Condition", 5000), h.condCell(r.general_condition, 4360)] }),
+            ] }),
+
+            h.sh("OUTCOME"),
+            new Table({ width: { size: h.pw, type: WidthType.DXA }, columnWidths: [2200, 7160], rows: [
+              new TableRow({ children: [h.lbl("Safe to Use", 2200), new TableCell({ borders: h.bds, width: { size: 7160, type: WidthType.DXA }, margins: h.cm,
+                shading: { fill: r.safe_to_use === 'Yes' ? "E6F4EA" : "FCE8E6", type: ShadingType.CLEAR },
+                children: [new Paragraph({ children: [new TextRun({ text: r.safe_to_use === 'Yes' ? 'YES \u2014 Safe to Use' : 'NO \u2014 Not Safe to Use', bold: true, font: "Arial", size: 22, color: safeColor })] })] })] }),
+              ...(r.defects_found ? [new TableRow({ children: [h.lbl("Defects Found", 2200), h.val(r.defects_found, 7160)] })] : []),
+              ...(r.actions_taken ? [new TableRow({ children: [h.lbl("Actions Taken", 2200), h.val(r.actions_taken, 7160)] })] : []),
+            ] }),
+
+            ...(r.signature ? [h.sh("SIGNATURE"), new Paragraph({ children: [new TextRun({ text: "Operative signature captured digitally in the Site Safety App.", font: "Arial", size: 20, color: "888888", italics: true })] })] : []),
+            new Paragraph({ spacing: { before: 400 }, alignment: AlignmentType.CENTER,
+              children: [new TextRun({ text: "ManProjects Ltd \u2014 Ladder Inspection \u2014 Confidential", font: "Arial", size: 16, color: "999999" })] }),
+          ]
+        }]
+      });
+
+      const buffer = await Packer.toBuffer(doc);
+      const filename = `Ladder_Inspection_LI${String(r.id).padStart(4,'0')}_${r.date}.docx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (e) { console.error('Ladder DOCX error:', e); res.status(500).json({ error: 'Failed to generate document' }); }
+  });
+
+  // Tower inspection Word doc
+  app.get('/api/tower-inspection/:id/docx', authenticate, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT t.*, u.full_name as inspected_by FROM tower_inspections t JOIN users u ON t.user_id = u.id WHERE t.id = $1', [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+      const r = rows[0];
+      const h = docxHelpers();
+      const safeColor = r.safe_to_use === 'Yes' ? "27AE60" : "C0392B";
+
+      const doc = new Document({
+        styles: { default: { document: { run: { font: "Arial", size: 22 } } } },
+        sections: [{
+          properties: h.pageProps,
+          headers: h.mkHeader("Tower Scaffold Inspection"),
+          footers: h.mkFooter("Tower Scaffold Inspection"),
+          children: [
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 0 },
+              children: [new TextRun({ text: "MAN PROJECTS LTD", bold: true, font: "Arial", size: 32, color: h.maroon })] }),
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80, after: 40 },
+              children: [new TextRun({ text: "TOWER SCAFFOLD INSPECTION REPORT", bold: true, font: "Arial", size: 24, color: h.grey })] }),
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 40, after: 200 },
+              children: [new TextRun({ text: `Reference: TI-${String(r.id).padStart(4, '0')}`, font: "Arial", size: 20, color: "999999" })] }),
+
+            h.sh("GENERAL INFORMATION"),
+            new Table({ width: { size: h.pw, type: WidthType.DXA }, columnWidths: [2200, 2480, 2200, 2480], rows: [
+              new TableRow({ children: [h.lbl("Inspected By", 2200), h.val(r.inspected_by, 2480), h.lbl("Date", 2200), h.val(r.date, 2480)] }),
+              new TableRow({ children: [h.lbl("Tower ID", 2200), h.val(r.tower_id, 2480), h.lbl("Location", 2200), h.val(r.location, 2480)] }),
+              ...(r.max_platform_height ? [new TableRow({ children: [h.lbl("Max Platform Height", 2200), h.val(r.max_platform_height, 7160, 3)] })] : []),
+            ] }),
+
+            h.sh("INSPECTION CHECKLIST"),
+            new Table({ width: { size: h.pw, type: WidthType.DXA }, columnWidths: [5000, 4360], rows: [
+              new TableRow({ children: [
+                new TableCell({ borders: h.bds, width: { size: 5000, type: WidthType.DXA }, shading: { fill: "E8E8E8", type: ShadingType.CLEAR }, margins: h.cm,
+                  children: [new Paragraph({ children: [new TextRun({ text: "Check Item", bold: true, font: "Arial", size: 20, color: h.grey })] })] }),
+                new TableCell({ borders: h.bds, width: { size: 4360, type: WidthType.DXA }, shading: { fill: "E8E8E8", type: ShadingType.CLEAR }, margins: h.cm,
+                  children: [new Paragraph({ children: [new TextRun({ text: "Condition", bold: true, font: "Arial", size: 20, color: h.grey })] })] }),
+              ] }),
+              new TableRow({ children: [h.lbl("Base Plates", 5000), h.condCell(r.base_plates_condition, 4360)] }),
+              new TableRow({ children: [h.lbl("Castors Locked", 5000), h.condCell(r.castors_locked, 4360)] }),
+              new TableRow({ children: [h.lbl("Braces Secure", 5000), h.condCell(r.braces_secure, 4360)] }),
+              new TableRow({ children: [h.lbl("Platforms Condition", 5000), h.condCell(r.platforms_condition, 4360)] }),
+              new TableRow({ children: [h.lbl("Guardrails Fitted", 5000), h.condCell(r.guardrails_fitted, 4360)] }),
+              new TableRow({ children: [h.lbl("Toe Boards Fitted", 5000), h.condCell(r.toe_boards_fitted, 4360)] }),
+              new TableRow({ children: [h.lbl("Outriggers Deployed", 5000), h.condCell(r.outriggers_deployed, 4360)] }),
+              new TableRow({ children: [h.lbl("Access Ladder Secure", 5000), h.condCell(r.access_ladder_secure, 4360)] }),
+            ] }),
+
+            h.sh("OUTCOME"),
+            new Table({ width: { size: h.pw, type: WidthType.DXA }, columnWidths: [2200, 7160], rows: [
+              new TableRow({ children: [h.lbl("Safe to Use", 2200), new TableCell({ borders: h.bds, width: { size: 7160, type: WidthType.DXA }, margins: h.cm,
+                shading: { fill: r.safe_to_use === 'Yes' ? "E6F4EA" : "FCE8E6", type: ShadingType.CLEAR },
+                children: [new Paragraph({ children: [new TextRun({ text: r.safe_to_use === 'Yes' ? 'YES \u2014 Safe to Use' : 'NO \u2014 Not Safe to Use', bold: true, font: "Arial", size: 22, color: safeColor })] })] })] }),
+              ...(r.defects_found ? [new TableRow({ children: [h.lbl("Defects Found", 2200), h.val(r.defects_found, 7160)] })] : []),
+              ...(r.actions_taken ? [new TableRow({ children: [h.lbl("Actions Taken", 2200), h.val(r.actions_taken, 7160)] })] : []),
+            ] }),
+
+            ...(r.signature ? [h.sh("SIGNATURE"), new Paragraph({ children: [new TextRun({ text: "Operative signature captured digitally in the Site Safety App.", font: "Arial", size: 20, color: "888888", italics: true })] })] : []),
+            new Paragraph({ spacing: { before: 400 }, alignment: AlignmentType.CENTER,
+              children: [new TextRun({ text: "ManProjects Ltd \u2014 Tower Scaffold Inspection \u2014 Confidential", font: "Arial", size: 16, color: "999999" })] }),
+          ]
+        }]
+      });
+
+      const buffer = await Packer.toBuffer(doc);
+      const filename = `Tower_Inspection_TI${String(r.id).padStart(4,'0')}_${r.date}.docx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (e) { console.error('Tower DOCX error:', e); res.status(500).json({ error: 'Failed to generate document' }); }
+  });
+
+  // MEWP inspection Word doc
+  app.get('/api/mewp-inspection/:id/docx', authenticate, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT m.*, u.full_name as inspected_by FROM mewp_inspections m JOIN users u ON m.user_id = u.id WHERE m.id = $1', [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+      const r = rows[0];
+      const h = docxHelpers();
+      const safeColor = r.safe_to_use === 'Yes' ? "27AE60" : "C0392B";
+
+      const doc = new Document({
+        styles: { default: { document: { run: { font: "Arial", size: 22 } } } },
+        sections: [{
+          properties: h.pageProps,
+          headers: h.mkHeader("MEWP Inspection"),
+          footers: h.mkFooter("MEWP Inspection"),
+          children: [
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 0 },
+              children: [new TextRun({ text: "MAN PROJECTS LTD", bold: true, font: "Arial", size: 32, color: h.maroon })] }),
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80, after: 40 },
+              children: [new TextRun({ text: "MEWP INSPECTION REPORT", bold: true, font: "Arial", size: 24, color: h.grey })] }),
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 40, after: 200 },
+              children: [new TextRun({ text: `Reference: MI-${String(r.id).padStart(4, '0')}`, font: "Arial", size: 20, color: "999999" })] }),
+
+            h.sh("GENERAL INFORMATION"),
+            new Table({ width: { size: h.pw, type: WidthType.DXA }, columnWidths: [2200, 2480, 2200, 2480], rows: [
+              new TableRow({ children: [h.lbl("Inspected By", 2200), h.val(r.inspected_by, 2480), h.lbl("Date", 2200), h.val(r.date, 2480)] }),
+              new TableRow({ children: [h.lbl("MEWP ID", 2200), h.val(r.mewp_id, 2480), h.lbl("MEWP Type", 2200), h.val(r.mewp_type, 2480)] }),
+              new TableRow({ children: [h.lbl("Location", 2200), h.val(r.location, 2480), h.lbl("Hours Meter", 2200), h.val(r.hours_meter_reading, 2480)] }),
+            ] }),
+
+            h.sh("INSPECTION CHECKLIST"),
+            new Table({ width: { size: h.pw, type: WidthType.DXA }, columnWidths: [5000, 4360], rows: [
+              new TableRow({ children: [
+                new TableCell({ borders: h.bds, width: { size: 5000, type: WidthType.DXA }, shading: { fill: "E8E8E8", type: ShadingType.CLEAR }, margins: h.cm,
+                  children: [new Paragraph({ children: [new TextRun({ text: "Check Item", bold: true, font: "Arial", size: 20, color: h.grey })] })] }),
+                new TableCell({ borders: h.bds, width: { size: 4360, type: WidthType.DXA }, shading: { fill: "E8E8E8", type: ShadingType.CLEAR }, margins: h.cm,
+                  children: [new Paragraph({ children: [new TextRun({ text: "Condition", bold: true, font: "Arial", size: 20, color: h.grey })] })] }),
+              ] }),
+              new TableRow({ children: [h.lbl("Controls Functional", 5000), h.condCell(r.controls_functional, 4360)] }),
+              new TableRow({ children: [h.lbl("Emergency Controls", 5000), h.condCell(r.emergency_controls, 4360)] }),
+              new TableRow({ children: [h.lbl("Guardrails Condition", 5000), h.condCell(r.guardrails_condition, 4360)] }),
+              new TableRow({ children: [h.lbl("Platform Condition", 5000), h.condCell(r.platform_condition, 4360)] }),
+              new TableRow({ children: [h.lbl("Hydraulics Condition", 5000), h.condCell(r.hydraulics_condition, 4360)] }),
+              new TableRow({ children: [h.lbl("Tyres Condition", 5000), h.condCell(r.tyres_condition, 4360)] }),
+              new TableRow({ children: [h.lbl("Outriggers Condition", 5000), h.condCell(r.outriggers_condition, 4360)] }),
+              new TableRow({ children: [h.lbl("Harness Anchor Points", 5000), h.condCell(r.harness_anchor_points, 4360)] }),
+              new TableRow({ children: [h.lbl("Warning Devices", 5000), h.condCell(r.warning_devices, 4360)] }),
+            ] }),
+
+            h.sh("OUTCOME"),
+            new Table({ width: { size: h.pw, type: WidthType.DXA }, columnWidths: [2200, 7160], rows: [
+              new TableRow({ children: [h.lbl("Safe to Use", 2200), new TableCell({ borders: h.bds, width: { size: 7160, type: WidthType.DXA }, margins: h.cm,
+                shading: { fill: r.safe_to_use === 'Yes' ? "E6F4EA" : "FCE8E6", type: ShadingType.CLEAR },
+                children: [new Paragraph({ children: [new TextRun({ text: r.safe_to_use === 'Yes' ? 'YES \u2014 Safe to Use' : 'NO \u2014 Not Safe to Use', bold: true, font: "Arial", size: 22, color: safeColor })] })] })] }),
+              ...(r.defects_found ? [new TableRow({ children: [h.lbl("Defects Found", 2200), h.val(r.defects_found, 7160)] })] : []),
+              ...(r.actions_taken ? [new TableRow({ children: [h.lbl("Actions Taken", 2200), h.val(r.actions_taken, 7160)] })] : []),
+            ] }),
+
+            ...(r.signature ? [h.sh("SIGNATURE"), new Paragraph({ children: [new TextRun({ text: "Operative signature captured digitally in the Site Safety App.", font: "Arial", size: 20, color: "888888", italics: true })] })] : []),
+            new Paragraph({ spacing: { before: 400 }, alignment: AlignmentType.CENTER,
+              children: [new TextRun({ text: "ManProjects Ltd \u2014 MEWP Inspection \u2014 Confidential", font: "Arial", size: 16, color: "999999" })] }),
+          ]
+        }]
+      });
+
+      const buffer = await Packer.toBuffer(doc);
+      const filename = `MEWP_Inspection_MI${String(r.id).padStart(4,'0')}_${r.date}.docx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (e) { console.error('MEWP DOCX error:', e); res.status(500).json({ error: 'Failed to generate document' }); }
+  });
+
   app.get('/api/stats', authenticate, adminOnly, async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const q = async (sql, params = []) => (await pool.query(sql, params)).rows[0].c;
