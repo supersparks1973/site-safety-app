@@ -105,7 +105,8 @@ async function startApp() {
   )`);
 
   await pool.query(`CREATE TABLE IF NOT EXISTS training_records (
-    id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
+    id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id),
+    external_name TEXT,
     category TEXT NOT NULL, course_name TEXT NOT NULL, provider TEXT,
     card_number TEXT, completion_date TEXT NOT NULL, expiry_date TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -116,6 +117,10 @@ async function startApp() {
     try { await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS signature TEXT`); } catch(e) {}
   };
   await Promise.all(['near_miss_reports','ladder_inspections','tower_inspections','mewp_inspections'].map(migrateSig));
+
+  // Add external_name to training_records and make user_id nullable
+  try { await pool.query('ALTER TABLE training_records ADD COLUMN IF NOT EXISTS external_name TEXT'); } catch(e) {}
+  try { await pool.query('ALTER TABLE training_records ALTER COLUMN user_id DROP NOT NULL'); } catch(e) {}
 
   const { rows: admins } = await pool.query("SELECT id FROM users WHERE role = 'admin'");
   if (admins.length === 0) {
@@ -339,14 +344,15 @@ async function startApp() {
   // ═══════ TRAINING MATRIX ═══════
   app.post('/api/training', authenticate, adminOnly, async (req, res) => {
     const d = req.body;
+    const userId = d.user_id && d.user_id !== 'null' ? d.user_id : null;
     const { rows } = await pool.query(
-      'INSERT INTO training_records (user_id, category, course_name, provider, card_number, completion_date, expiry_date) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
-      [d.user_id, d.category, d.course_name, d.provider || '', d.card_number || '', d.completion_date, d.expiry_date || null]);
+      'INSERT INTO training_records (user_id, external_name, category, course_name, provider, card_number, completion_date, expiry_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
+      [userId, d.external_name || null, d.category, d.course_name, d.provider || '', d.card_number || '', d.completion_date, d.expiry_date || null]);
     res.json({ id: rows[0].id, message: 'Training record added' });
   });
 
   app.get('/api/training', authenticate, async (req, res) => {
-    const { rows } = await pool.query('SELECT t.*, u.full_name as operative_name FROM training_records t JOIN users u ON t.user_id = u.id ORDER BY t.expiry_date ASC NULLS LAST');
+    const { rows } = await pool.query(`SELECT t.*, COALESCE(u.full_name, t.external_name, 'Unknown') as operative_name FROM training_records t LEFT JOIN users u ON t.user_id = u.id ORDER BY t.expiry_date ASC NULLS LAST`);
     res.json(rows);
   });
 

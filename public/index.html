@@ -1699,9 +1699,11 @@ async function renderAdminTraining(c) {
         <h3>➕ Add Training Record</h3>
         <div class="form-group"><label>Operative</label>
           <select id="trainUser">
+            <option value="external">— Type name below (not on system) —</option>
             ${users.filter(u=>u.role==='operative').map(u=>`<option value="${u.id}">${u.full_name}</option>`).join('')}
           </select>
         </div>
+        <div class="form-group" id="externalNameGroup"><label>Operative Name (if not on system)</label><input type="text" id="trainExternalName" placeholder="e.g. John Smith (subcontractor)"></div>
         <div class="form-group"><label>Category</label>
           <select id="trainCategory">
             <option>Competency Card</option><option>Safety Training</option><option>Equipment Training</option><option>First Aid</option><option>Working at Height</option><option>Confined Space</option><option>Electrical</option><option>Mechanical</option><option>Other</option>
@@ -1768,7 +1770,8 @@ window.filterTraining = function(filter, btn) {
 };
 
 window.addTrainingRecord = async function() {
-  const user_id = document.getElementById('trainUser').value;
+  const userSelect = document.getElementById('trainUser').value;
+  const externalName = document.getElementById('trainExternalName').value.trim();
   const category = document.getElementById('trainCategory').value;
   const course_name = document.getElementById('trainCourse').value.trim();
   const provider = document.getElementById('trainProvider').value.trim();
@@ -1778,10 +1781,21 @@ window.addTrainingRecord = async function() {
 
   if (!course_name || !completion_date) { showToast('Please enter course name and completion date', 'error'); return; }
 
+  const isExternal = userSelect === 'external';
+  if (isExternal && !externalName) { showToast('Please enter the operative name', 'error'); return; }
+
+  const body = { category, course_name, provider, card_number, completion_date, expiry_date };
+  if (isExternal) {
+    body.user_id = null;
+    body.external_name = externalName;
+  } else {
+    body.user_id = userSelect;
+  }
+
   try {
     await fetch(`${API}/api/training`, {
       method: 'POST', headers: headers(),
-      body: JSON.stringify({ user_id, category, course_name, provider, card_number, completion_date, expiry_date })
+      body: JSON.stringify(body)
     });
     showToast('Training record added');
     renderAdminTraining(document.getElementById('appContent'));
