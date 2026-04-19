@@ -104,6 +104,13 @@ async function startApp() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  await pool.query(`CREATE TABLE IF NOT EXISTS training_records (
+    id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
+    category TEXT NOT NULL, course_name TEXT NOT NULL, provider TEXT,
+    card_number TEXT, completion_date TEXT NOT NULL, expiry_date TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   // Add signature column to existing tables if not present
   const migrateSig = async (table) => {
     try { await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS signature TEXT`); } catch(e) {}
@@ -326,6 +333,25 @@ async function startApp() {
 
   app.delete('/api/rescue-plan/:id', authenticate, adminOnly, async (req, res) => {
     await pool.query('DELETE FROM rescue_plans WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  });
+
+  // ═══════ TRAINING MATRIX ═══════
+  app.post('/api/training', authenticate, adminOnly, async (req, res) => {
+    const d = req.body;
+    const { rows } = await pool.query(
+      'INSERT INTO training_records (user_id, category, course_name, provider, card_number, completion_date, expiry_date) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+      [d.user_id, d.category, d.course_name, d.provider || '', d.card_number || '', d.completion_date, d.expiry_date || null]);
+    res.json({ id: rows[0].id, message: 'Training record added' });
+  });
+
+  app.get('/api/training', authenticate, async (req, res) => {
+    const { rows } = await pool.query('SELECT t.*, u.full_name as operative_name FROM training_records t JOIN users u ON t.user_id = u.id ORDER BY t.expiry_date ASC NULLS LAST');
+    res.json(rows);
+  });
+
+  app.delete('/api/training/:id', authenticate, adminOnly, async (req, res) => {
+    await pool.query('DELETE FROM training_records WHERE id = $1', [req.params.id]);
     res.json({ success: true });
   });
 

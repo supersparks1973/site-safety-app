@@ -179,6 +179,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <button data-page="tower"><span class="nav-icon">🏗️</span>Tower</button>
     <button data-page="mewp"><span class="nav-icon">🔧</span>MEWP</button>
     <button data-page="rescue"><span class="nav-icon">🆘</span>Rescue</button>
+    <button data-page="my-training"><span class="nav-icon">🎓</span>Training</button>
   </nav>
 
   <!-- Bottom Navigation (Admin) -->
@@ -188,6 +189,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <button data-page="closed"><span class="nav-icon">✅</span>Closed</button>
     <button data-page="inspections"><span class="nav-icon">📋</span>Inspections</button>
     <button data-page="rescue-plans"><span class="nav-icon">🆘</span>Rescue</button>
+    <button data-page="training"><span class="nav-icon">🎓</span>Training</button>
     <button data-page="users"><span class="nav-icon">👥</span>Users</button>
   </nav>
 </div>
@@ -444,12 +446,14 @@ function renderPage(page) {
     'tower': renderTowerForm,
     'mewp': renderMEWPForm,
     'rescue': renderRescuePage,
+    'my-training': renderMyTraining,
     // Admin pages
     'dashboard': renderDashboard,
     'reports': renderAdminReports,
     'closed': renderClosedReports,
     'inspections': renderAdminInspections,
     'rescue-plans': renderAdminRescuePlans,
+    'training': renderAdminTraining,
     'users': renderAdminUsers,
   };
   if (pages[page]) pages[page](c);
@@ -847,8 +851,10 @@ async function renderDashboard(c) {
         </div>
       </div>
 
+      <div id="trainingAlerts" style="margin-top:16px"></div>
       <div id="remindersSection" style="margin-top:16px"></div>
     `;
+    loadTrainingAlerts();
     loadReminders();
   } catch { c.innerHTML = '<p>Failed to load dashboard</p>'; }
 }
@@ -881,6 +887,39 @@ async function loadReminders() {
           <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)">
             <div><strong>${r.type}</strong> — ${r.id}</div>
             <div style="font-size:12px;color:var(--danger)">Last: ${r.last}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch {}
+}
+
+async function loadTrainingAlerts() {
+  try {
+    const records = await fetch(API + '/api/training', { headers: headers() }).then(r => r.json());
+    const el = document.getElementById('trainingAlerts');
+    if (!el) return;
+    const now = new Date();
+    const alerts = records.filter(r => {
+      if (!r.expiry_date) return false;
+      const d = Math.ceil((new Date(r.expiry_date) - now) / (1000*60*60*24));
+      return d < 30;
+    }).map(r => {
+      const d = Math.ceil((new Date(r.expiry_date) - now) / (1000*60*60*24));
+      return { ...r, daysLeft: d };
+    });
+
+    if (alerts.length === 0) {
+      el.innerHTML = '<div class="form-section"><h3>🎓 Training Alerts</h3><p style="color:var(--success);font-size:14px">All training qualifications are up to date!</p></div>';
+      return;
+    }
+    el.innerHTML = `
+      <div class="form-section">
+        <h3 style="color:${alerts.some(a=>a.daysLeft<0)?'var(--danger)':'var(--warning)'}">🎓 Training Alerts</h3>
+        ${alerts.map(a => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)">
+            <div><strong>${a.operative_name}</strong> — ${a.course_name}</div>
+            <div style="font-size:12px;color:${a.daysLeft<0?'var(--danger)':'var(--warning)'};font-weight:600">${a.daysLeft < 0 ? 'EXPIRED '+Math.abs(a.daysLeft)+'d ago' : a.daysLeft+'d left'}</div>
           </div>
         `).join('')}
       </div>
@@ -1587,6 +1626,173 @@ async function renderAdminRescuePlans(c) {
       `).join(''));
   } catch { c.innerHTML = '<p>Failed to load rescue plans</p>'; }
 }
+
+// ═══════════════════════════════════════
+// OPERATIVE: MY TRAINING
+// ═══════════════════════════════════════
+async function renderMyTraining(c) {
+  c.innerHTML = '<h2 style="margin-bottom:16px;display:flex;align-items:center;gap:8px">🎓 My Training</h2><p>Loading...</p>';
+  try {
+    const records = await fetch(`${API}/api/training`, { headers: headers() }).then(r => r.json());
+    const myRecords = records.filter(r => r.user_id === state.user.id);
+    c.innerHTML = `
+      <h2 style="margin-bottom:16px">🎓 My Training</h2>
+      ${myRecords.length === 0 ? '<p style="color:var(--text-light)">No training records yet. Your admin will add your qualifications.</p>' :
+      myRecords.map(r => {
+        const exp = r.expiry_date ? new Date(r.expiry_date) : null;
+        const now = new Date();
+        const daysLeft = exp ? Math.ceil((exp - now) / (1000*60*60*24)) : null;
+        const statusClass = !exp ? 'badge-safe' : daysLeft < 0 ? 'badge-unsafe' : daysLeft < 30 ? 'badge-open' : 'badge-safe';
+        const statusText = !exp ? 'No Expiry' : daysLeft < 0 ? 'EXPIRED' : daysLeft < 30 ? 'Expiring Soon' : 'Valid';
+        return `
+          <div class="card">
+            <div class="card-header">
+              <h3>${r.course_name}</h3>
+              <span class="badge ${statusClass}">${statusText}</span>
+            </div>
+            <div class="card-body">
+              <p><strong>Category:</strong> ${r.category}</p>
+              <p><strong>Provider:</strong> ${r.provider || '—'}</p>
+              <p><strong>Completed:</strong> ${r.completion_date} ${r.expiry_date ? `&nbsp;|&nbsp; <strong>Expires:</strong> ${r.expiry_date}` : ''}</p>
+              ${r.card_number ? `<p><strong>Card/Cert No:</strong> ${r.card_number}</p>` : ''}
+              ${daysLeft !== null && daysLeft < 30 && daysLeft >= 0 ? `<p style="color:var(--warning);font-weight:600">⚠️ Expires in ${daysLeft} days</p>` : ''}
+              ${daysLeft !== null && daysLeft < 0 ? `<p style="color:var(--danger);font-weight:600">❌ Expired ${Math.abs(daysLeft)} days ago</p>` : ''}
+            </div>
+          </div>`;
+      }).join('')}
+    `;
+  } catch { c.innerHTML = '<p>Failed to load training records</p>'; }
+}
+
+// ═══════════════════════════════════════
+// ADMIN: TRAINING MATRIX
+// ═══════════════════════════════════════
+async function renderAdminTraining(c) {
+  c.innerHTML = '<h2 style="margin-bottom:16px">🎓 Training Matrix</h2><p>Loading...</p>';
+  try {
+    const [records, users] = await Promise.all([
+      fetch(`${API}/api/training`, { headers: headers() }).then(r => r.json()),
+      fetch(`${API}/api/users`, { headers: headers() }).then(r => r.json())
+    ]);
+
+    // Count expiring and expired
+    const now = new Date();
+    const expired = records.filter(r => r.expiry_date && new Date(r.expiry_date) < now);
+    const expiringSoon = records.filter(r => {
+      if (!r.expiry_date) return false;
+      const d = Math.ceil((new Date(r.expiry_date) - now) / (1000*60*60*24));
+      return d >= 0 && d < 30;
+    });
+
+    c.innerHTML = `
+      <h2 style="margin-bottom:16px">🎓 Training Matrix</h2>
+
+      <div class="stats-grid" style="margin-bottom:16px">
+        <div class="stat-card"><div class="stat-value">${records.length}</div><div class="stat-label">Total Records</div></div>
+        <div class="stat-card danger"><div class="stat-value">${expired.length}</div><div class="stat-label">Expired</div></div>
+        <div class="stat-card warning"><div class="stat-value">${expiringSoon.length}</div><div class="stat-label">Expiring <30 days</div></div>
+        <div class="stat-card"><div class="stat-value">${users.filter(u=>u.role==='operative').length}</div><div class="stat-label">Operatives</div></div>
+      </div>
+
+      <div class="form-section">
+        <h3>➕ Add Training Record</h3>
+        <div class="form-group"><label>Operative</label>
+          <select id="trainUser">
+            ${users.filter(u=>u.role==='operative').map(u=>`<option value="${u.id}">${u.full_name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label>Category</label>
+          <select id="trainCategory">
+            <option>Competency Card</option><option>Safety Training</option><option>Equipment Training</option><option>First Aid</option><option>Working at Height</option><option>Confined Space</option><option>Electrical</option><option>Mechanical</option><option>Other</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Course / Qualification Name</label><input type="text" id="trainCourse" placeholder="e.g. IPAF Operator, CSCS Blue Card, PASMA"></div>
+        <div class="form-group"><label>Training Provider</label><input type="text" id="trainProvider" placeholder="e.g. CITB, IPAF Ltd"></div>
+        <div class="form-group"><label>Card / Certificate Number</label><input type="text" id="trainCardNo" placeholder="e.g. CSCS-12345678"></div>
+        <div class="form-group"><label>Completion Date</label><input type="date" id="trainComplete" value="${today()}"></div>
+        <div class="form-group"><label>Expiry Date (leave blank if none)</label><input type="date" id="trainExpiry"></div>
+        <button class="btn btn-primary btn-sm" onclick="addTrainingRecord()">Add Record</button>
+      </div>
+
+      <div class="tab-bar" style="margin-top:16px">
+        <button class="active" onclick="filterTraining('all',this)">All</button>
+        <button onclick="filterTraining('expired',this)" style="color:var(--danger)">❌ Expired</button>
+        <button onclick="filterTraining('expiring',this)" style="color:var(--warning)">⚠️ Expiring</button>
+      </div>
+
+      <div id="trainingList"></div>
+    `;
+    window._trainingRecords = records;
+    filterTraining('all');
+  } catch { c.innerHTML = '<p>Failed to load training matrix</p>'; }
+}
+
+window.filterTraining = function(filter, btn) {
+  if (btn) {
+    btn.closest('.tab-bar').querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  const el = document.getElementById('trainingList');
+  const now = new Date();
+  let records = window._trainingRecords || [];
+
+  if (filter === 'expired') records = records.filter(r => r.expiry_date && new Date(r.expiry_date) < now);
+  else if (filter === 'expiring') records = records.filter(r => {
+    if (!r.expiry_date) return false;
+    const d = Math.ceil((new Date(r.expiry_date) - now) / (1000*60*60*24));
+    return d >= 0 && d < 30;
+  });
+
+  if (records.length === 0) { el.innerHTML = '<p style="color:var(--text-light);margin-top:12px">No records found.</p>'; return; }
+
+  el.innerHTML = records.map(r => {
+    const exp = r.expiry_date ? new Date(r.expiry_date) : null;
+    const daysLeft = exp ? Math.ceil((exp - now) / (1000*60*60*24)) : null;
+    const statusClass = !exp ? 'badge-safe' : daysLeft < 0 ? 'badge-unsafe' : daysLeft < 30 ? 'badge-open' : 'badge-safe';
+    const statusText = !exp ? 'No Expiry' : daysLeft < 0 ? 'EXPIRED' : daysLeft < 30 ? `${daysLeft}d left` : 'Valid';
+    return `
+      <div class="card">
+        <div class="card-header">
+          <h3>${r.operative_name} — ${r.course_name}</h3>
+          <span class="badge ${statusClass}">${statusText}</span>
+        </div>
+        <div class="card-body">
+          <p><strong>Category:</strong> ${r.category} &nbsp;|&nbsp; <strong>Provider:</strong> ${r.provider || '—'}</p>
+          <p><strong>Completed:</strong> ${r.completion_date} ${r.expiry_date ? `&nbsp;|&nbsp; <strong>Expires:</strong> ${r.expiry_date}` : ''}</p>
+          ${r.card_number ? `<p><strong>Card/Cert:</strong> ${r.card_number}</p>` : ''}
+        </div>
+        <button class="btn btn-outline btn-sm" style="margin-top:8px;color:var(--danger);border-color:var(--danger);width:auto" onclick="deleteTraining(${r.id})">Remove</button>
+      </div>`;
+  }).join('');
+};
+
+window.addTrainingRecord = async function() {
+  const user_id = document.getElementById('trainUser').value;
+  const category = document.getElementById('trainCategory').value;
+  const course_name = document.getElementById('trainCourse').value.trim();
+  const provider = document.getElementById('trainProvider').value.trim();
+  const card_number = document.getElementById('trainCardNo').value.trim();
+  const completion_date = document.getElementById('trainComplete').value;
+  const expiry_date = document.getElementById('trainExpiry').value;
+
+  if (!course_name || !completion_date) { showToast('Please enter course name and completion date', 'error'); return; }
+
+  try {
+    await fetch(`${API}/api/training`, {
+      method: 'POST', headers: headers(),
+      body: JSON.stringify({ user_id, category, course_name, provider, card_number, completion_date, expiry_date })
+    });
+    showToast('Training record added');
+    renderAdminTraining(document.getElementById('appContent'));
+  } catch { showToast('Failed to add record', 'error'); }
+};
+
+window.deleteTraining = async function(id) {
+  if (!confirm('Remove this training record?')) return;
+  await fetch(`${API}/api/training/${id}`, { method: 'DELETE', headers: headers() });
+  showToast('Record removed');
+  renderAdminTraining(document.getElementById('appContent'));
+};
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
