@@ -1305,6 +1305,9 @@ function clearSignature(canvasId) {
 function renderRescuePage(c) {
   c.innerHTML = `
     <h2 style="margin-bottom:16px;display:flex;align-items:center;gap:8px">🆘 Rescue Plans</h2>
+    <div style="margin-bottom:12px">
+      <a href="/ManProjects_Rescue_Plan_Template.docx" download class="btn btn-outline btn-sm" style="width:auto;display:inline-flex;text-decoration:none">📄 Download Word Template</a>
+    </div>
     <div class="tab-bar">
       <button class="active" onclick="showRescueTab('new',this)">📝 New Plan</button>
       <button onclick="showRescueTab('my-plans',this)">📋 My Plans</button>
@@ -1611,7 +1614,8 @@ async function renderAdminRescuePlans(c) {
   c.innerHTML = '<h2 style="margin-bottom:16px">🆘 Rescue Plans</h2><p>Loading...</p>';
   try {
     const plans = await fetch(`${API}/api/rescue-plan`, { headers: headers() }).then(r => r.json());
-    c.innerHTML = `<h2 style="margin-bottom:16px">🆘 Rescue Plans</h2>` +
+    c.innerHTML = `<h2 style="margin-bottom:16px">🆘 Rescue Plans</h2>
+      <div style="margin-bottom:12px"><a href="/ManProjects_Rescue_Plan_Template.docx" download class="btn btn-outline btn-sm" style="width:auto;display:inline-flex;text-decoration:none">📄 Download Word Template</a></div>` +
       (plans.length === 0 ? '<p style="color:var(--text-light)">No rescue plans submitted yet.</p>' :
       plans.map(p => `
         <div class="card" onclick="showRescuePlanDetail(${p.id})" style="cursor:pointer">
