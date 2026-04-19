@@ -81,11 +81,29 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
 /* ── Stats Grid ── */
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
-.stat-card{background:var(--card);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);text-align:center}
-.stat-card .stat-value{font-size:28px;font-weight:700;color:var(--primary)}
-.stat-card .stat-label{font-size:12px;color:var(--text-light);margin-top:4px}
+.stat-card{background:var(--card);border-radius:var(--radius);padding:18px 16px;box-shadow:var(--shadow);text-align:center;border-left:4px solid var(--primary);transition:transform .15s,box-shadow .15s}
+.stat-card:active{transform:scale(.97)}
+.stat-card .stat-value{font-size:30px;font-weight:800;color:var(--primary);letter-spacing:-0.5px}
+.stat-card .stat-label{font-size:11px;color:var(--text-light);margin-top:6px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+.stat-card .stat-icon{font-size:22px;margin-bottom:4px}
+.stat-card.danger{border-left-color:var(--danger)}
 .stat-card.danger .stat-value{color:var(--danger)}
+.stat-card.warning{border-left-color:var(--warning)}
 .stat-card.warning .stat-value{color:var(--warning)}
+.stat-card.success{border-left-color:var(--success)}
+.stat-card.success .stat-value{color:var(--success)}
+
+/* ── Dashboard Banner ── */
+.dash-banner{background:linear-gradient(135deg,#8B1A1A 0%,#B22222 50%,#8B1A1A 100%);border-radius:var(--radius);padding:24px 22px;margin-bottom:20px;color:#fff;display:flex;align-items:center;gap:18px;box-shadow:0 4px 15px rgba(139,26,26,.3)}
+.dash-banner img{height:56px;border-radius:8px;background:#fff;padding:6px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.dash-banner .banner-text h2{font-size:20px;font-weight:700;letter-spacing:0.5px;margin-bottom:2px}
+.dash-banner .banner-text p{font-size:12px;opacity:.85;letter-spacing:1px}
+.dash-banner .banner-date{margin-left:auto;text-align:right;font-size:12px;opacity:.8;line-height:1.6}
+
+/* ── Section Divider ── */
+.dash-section{margin-bottom:20px}
+.dash-section-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:0.5px}
+.dash-section-title::after{content:'';flex:1;height:1px;background:var(--border)}
 
 /* ── Tab bar ── */
 .tab-bar{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
@@ -160,7 +178,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 <div id="appScreen" class="hidden">
   <header class="app-header" style="background:linear-gradient(135deg,#1e293b 0%,#2d3748 100%)">
     <div style="display:flex;align-items:center;gap:10px">
-      <h2 style="font-size:16px"><span style="color:#ccc">ManProjects</span> <span style="font-weight:400;font-size:13px;color:#999">Site Safety</span></h2>
+      <img src="/logo.png" alt="ManProjects" style="height:30px;border-radius:4px;background:rgba(255,255,255,.9);padding:2px 4px">
+      <h2 style="font-size:15px"><span style="color:#fff;font-weight:700">ManProjects</span> <span style="font-weight:400;font-size:12px;color:rgba(255,255,255,.6)">Site Safety</span></h2>
     </div>
     <div class="user-info">
       <span id="syncIndicator" class="sync-indicator">⏳ <span id="syncCount">0</span> pending</span>
@@ -469,18 +488,25 @@ function now() { return new Date().toTimeString().slice(0, 5); }
 // OPERATIVE: HOME
 // ═══════════════════════════════════════
 function renderHome(c) {
+  const d = new Date();
+  const greeting = d.getHours() < 12 ? 'Good morning' : d.getHours() < 17 ? 'Good afternoon' : 'Good evening';
+  const dateStr = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
   c.innerHTML = `
-    <div style="text-align:center;padding:30px 0 20px">
-      <h2 style="font-size:22px;margin-bottom:6px">Hello, ${state.user.full_name}</h2>
-      <p style="color:var(--text-light)">What would you like to report today?</p>
+    <div class="dash-banner" style="margin-bottom:20px">
+      <img src="/logo.png" alt="ManProjects Ltd">
+      <div class="banner-text">
+        <h2>${greeting}, ${state.user.full_name.split(' ')[0]}</h2>
+        <p>${dateStr.toUpperCase()}</p>
+      </div>
     </div>
+    <p style="color:var(--text-light);margin-bottom:14px;font-size:14px;font-weight:600">What would you like to report?</p>
     <div style="display:grid;gap:12px">
-      <button class="btn btn-danger" onclick="navigate('near-miss')" style="padding:20px;font-size:18px">⚠️ Near Miss Report</button>
-      <button class="btn btn-primary" onclick="navigate('ladder')" style="padding:20px;font-size:18px">🪜 Ladder Inspection</button>
-      <button class="btn btn-primary" onclick="navigate('tower')" style="padding:20px;font-size:18px">🏗️ Mobile Tower Inspection</button>
-      <button class="btn btn-primary" onclick="navigate('mewp')" style="padding:20px;font-size:18px">🔧 MEWP Inspection</button>
+      <button class="btn btn-danger" onclick="navigate('near-miss')" style="padding:20px;font-size:18px;border-radius:var(--radius)">⚠️ Near Miss Report</button>
+      <button class="btn btn-primary" onclick="navigate('ladder')" style="padding:20px;font-size:18px;border-radius:var(--radius)">🪜 Ladder Inspection</button>
+      <button class="btn btn-primary" onclick="navigate('tower')" style="padding:20px;font-size:18px;border-radius:var(--radius)">🏗️ Mobile Tower Inspection</button>
+      <button class="btn btn-primary" onclick="navigate('mewp')" style="padding:20px;font-size:18px;border-radius:var(--radius)">🔧 MEWP Inspection</button>
     </div>
-    <div id="myRecent" style="margin-top:30px"></div>
+    <div id="myRecent" style="margin-top:24px"></div>
   `;
   loadMyRecent();
 }
@@ -822,35 +848,59 @@ function setupFormSubmit(formId, endpoint, btnText, sigCanvasId) {
 // ADMIN: DASHBOARD
 // ═══════════════════════════════════════
 async function renderDashboard(c) {
-  c.innerHTML = '<h2 style="margin-bottom:16px">📊 Dashboard</h2><p>Loading...</p>';
+  c.innerHTML = '<div class="dash-banner"><div class="banner-text"><h2>Loading...</h2></div></div>';
   try {
     const stats = await fetch(`${API}/api/stats`, { headers: headers() }).then(r => r.json());
+    const d = new Date();
+    const dateStr = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const timeStr = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
     c.innerHTML = `
-      <h2 style="margin-bottom:16px">📊 Dashboard</h2>
+      <div class="dash-banner">
+        <img src="/logo.png" alt="ManProjects Ltd">
+        <div class="banner-text">
+          <h2>ManProjects Ltd</h2>
+          <p>ELECTRICAL &amp; MECHANICAL BUILDING SERVICES</p>
+        </div>
+        <div class="banner-date">${dateStr}<br><strong>${timeStr}</strong></div>
+      </div>
+
       <div id="trainingAlerts" style="margin-bottom:16px"></div>
       <div id="remindersSection" style="margin-bottom:16px"></div>
-      <div class="stats-grid">
-        <div class="stat-card"><div class="stat-value">${stats.near_miss_total}</div><div class="stat-label">Total Near Misses</div></div>
-        <div class="stat-card warning"><div class="stat-value">${stats.near_miss_open}</div><div class="stat-label">Open Reports</div></div>
-        <div class="stat-card"><div class="stat-value">${stats.near_miss_today}</div><div class="stat-label">Near Misses Today</div></div>
-        <div class="stat-card"><div class="stat-value">${stats.operatives}</div><div class="stat-label">Operatives</div></div>
-      </div>
-      <h3 style="margin-bottom:12px;font-size:16px">Inspections</h3>
-      <div class="stats-grid">
-        <div class="stat-card"><div class="stat-value">${stats.ladder_total}</div><div class="stat-label">Ladder (${stats.ladder_today} today)</div></div>
-        <div class="stat-card"><div class="stat-value">${stats.tower_total}</div><div class="stat-label">Tower (${stats.tower_today} today)</div></div>
-        <div class="stat-card"><div class="stat-value">${stats.mewp_total}</div><div class="stat-label">MEWP (${stats.mewp_today} today)</div></div>
-        <div class="stat-card danger"><div class="stat-value">${stats.unsafe_ladders + stats.unsafe_towers + stats.unsafe_mewps}</div><div class="stat-label">Flagged Unsafe</div></div>
-      </div>
-      <button class="btn btn-outline" onclick="renderDashboard(document.getElementById('appContent'))" style="margin-top:8px">🔄 Refresh</button>
 
-      <div class="form-section" style="margin-top:20px">
-        <h3>📧 Email Digest</h3>
-        <p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Auto-sent daily at 7am and weekly on Mondays (when email is configured). You can also send one now:</p>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-outline btn-sm" onclick="sendDigest('daily')">📧 Send Daily Digest</button>
-          <button class="btn btn-outline btn-sm" onclick="sendDigest('weekly')">📧 Send Weekly Digest</button>
+      <div class="dash-section">
+        <div class="dash-section-title">⚠️ Near Miss Reports</div>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-value">${stats.near_miss_total}</div><div class="stat-label">Total Reports</div></div>
+          <div class="stat-card warning"><div class="stat-icon">📂</div><div class="stat-value">${stats.near_miss_open}</div><div class="stat-label">Open</div></div>
+          <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-value">${stats.near_miss_today}</div><div class="stat-label">Today</div></div>
+          <div class="stat-card success"><div class="stat-icon">👷</div><div class="stat-value">${stats.operatives}</div><div class="stat-label">Operatives</div></div>
         </div>
+      </div>
+
+      <div class="dash-section">
+        <div class="dash-section-title">📋 Equipment Inspections</div>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-icon">🪜</div><div class="stat-value">${stats.ladder_total}</div><div class="stat-label">Ladder${stats.ladder_today ? ' (' + stats.ladder_today + ' today)' : ''}</div></div>
+          <div class="stat-card"><div class="stat-icon">🏗️</div><div class="stat-value">${stats.tower_total}</div><div class="stat-label">Tower${stats.tower_today ? ' (' + stats.tower_today + ' today)' : ''}</div></div>
+          <div class="stat-card"><div class="stat-icon">🔧</div><div class="stat-value">${stats.mewp_total}</div><div class="stat-label">MEWP${stats.mewp_today ? ' (' + stats.mewp_today + ' today)' : ''}</div></div>
+          <div class="stat-card danger"><div class="stat-icon">🚫</div><div class="stat-value">${stats.unsafe_ladders + stats.unsafe_towers + stats.unsafe_mewps}</div><div class="stat-label">Flagged Unsafe</div></div>
+        </div>
+      </div>
+
+      <div class="dash-section">
+        <div class="dash-section-title">📧 Email Digest</div>
+        <div class="form-section" style="margin-bottom:0">
+          <p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Auto-sent daily at 7am and weekly on Mondays when email is configured.</p>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" onclick="sendDigest('daily')">📧 Daily Digest</button>
+            <button class="btn btn-outline btn-sm" onclick="sendDigest('weekly')">📧 Weekly Digest</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:center;margin-top:16px">
+        <button class="btn btn-outline btn-sm" onclick="renderDashboard(document.getElementById('appContent'))" style="width:auto;gap:6px">🔄 Refresh Dashboard</button>
       </div>
     `;
     loadTrainingAlerts();
@@ -876,18 +926,28 @@ async function loadReminders() {
       ...data.overdue_mewps.map(r => ({ id: r.mewp_id, type: '🔧 MEWP', last: r.last_inspected })),
     ];
     if (all.length === 0) {
-      el.innerHTML = '<div class="form-section"><h3>🔔 Inspection Reminders</h3><p style="color:var(--success);font-size:14px">All equipment inspected within the last 7 days — no overdue items!</p></div>';
+      el.innerHTML = `<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:16px 18px;display:flex;align-items:center;gap:12px">
+        <span style="font-size:24px">🔔</span>
+        <div><strong style="color:#2E7D32">Inspections Up to Date</strong><br><span style="font-size:13px;color:#555">All equipment inspected within the last 7 days.</span></div>
+      </div>`;
       return;
     }
     el.innerHTML = `
-      <div class="form-section">
-        <h3 style="color:var(--warning)">🔔 Overdue Inspections (7+ days)</h3>
-        ${all.map(r => `
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)">
-            <div><strong>${r.type}</strong> — ${r.id}</div>
-            <div style="font-size:12px;color:var(--danger)">Last: ${r.last}</div>
-          </div>
-        `).join('')}
+      <div style="background:#FFF3E0;border:2px solid #FF9800;border-radius:10px;padding:0;overflow:hidden">
+        <div style="background:#FF9800;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:700;font-size:15px">🔔 Overdue Inspections (7+ days)</div>
+          <div style="background:rgba(255,255,255,0.25);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700">${all.length}</div>
+        </div>
+        ${all.map(r => {
+          const daysAgo = Math.ceil((new Date() - new Date(r.last)) / (1000*60*60*24));
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #F0F0F0">
+            <div><strong style="font-size:14px">${r.type}</strong><span style="color:#777;margin-left:8px">${r.id}</span></div>
+            <div style="text-align:right">
+              <span style="display:inline-block;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:#E65100;color:#fff">${daysAgo}d OVERDUE</span>
+              <div style="font-size:11px;color:#999;margin-top:3px">Last: ${r.last}</div>
+            </div>
+          </div>`;
+        }).join('')}
       </div>
     `;
   } catch {}
