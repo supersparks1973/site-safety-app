@@ -827,6 +827,8 @@ async function renderDashboard(c) {
     const stats = await fetch(`${API}/api/stats`, { headers: headers() }).then(r => r.json());
     c.innerHTML = `
       <h2 style="margin-bottom:16px">📊 Dashboard</h2>
+      <div id="trainingAlerts" style="margin-bottom:16px"></div>
+      <div id="remindersSection" style="margin-bottom:16px"></div>
       <div class="stats-grid">
         <div class="stat-card"><div class="stat-value">${stats.near_miss_total}</div><div class="stat-label">Total Near Misses</div></div>
         <div class="stat-card warning"><div class="stat-value">${stats.near_miss_open}</div><div class="stat-label">Open Reports</div></div>
@@ -850,9 +852,6 @@ async function renderDashboard(c) {
           <button class="btn btn-outline btn-sm" onclick="sendDigest('weekly')">📧 Send Weekly Digest</button>
         </div>
       </div>
-
-      <div id="trainingAlerts" style="margin-top:16px"></div>
-      <div id="remindersSection" style="margin-top:16px"></div>
     `;
     loadTrainingAlerts();
     loadReminders();
@@ -896,35 +895,78 @@ async function loadReminders() {
 
 async function loadTrainingAlerts() {
   try {
-    const records = await fetch(API + '/api/training', { headers: headers() }).then(r => r.json());
+    const data = await fetch(API + '/api/training-alerts', { headers: headers() }).then(r => r.json());
     const el = document.getElementById('trainingAlerts');
     if (!el) return;
-    const now = new Date();
-    const alerts = records.filter(r => {
-      if (!r.expiry_date) return false;
-      const d = Math.ceil((new Date(r.expiry_date) - now) / (1000*60*60*24));
-      return d < 30;
-    }).map(r => {
-      const d = Math.ceil((new Date(r.expiry_date) - now) / (1000*60*60*24));
-      return { ...r, daysLeft: d };
-    });
 
-    if (alerts.length === 0) {
-      el.innerHTML = '<div class="form-section"><h3>🎓 Training Alerts</h3><p style="color:var(--success);font-size:14px">All training qualifications are up to date!</p></div>';
+    const total = data.expired.length + data.within14.length + data.within30.length;
+
+    if (total === 0) {
+      el.innerHTML = `<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:16px 18px;display:flex;align-items:center;gap:12px">
+        <span style="font-size:24px">✅</span>
+        <div><strong style="color:#2E7D32">Training Up to Date</strong><br><span style="font-size:13px;color:#555">All operatives' training qualifications are current.</span></div>
+      </div>`;
       return;
     }
-    el.innerHTML = `
-      <div class="form-section">
-        <h3 style="color:${alerts.some(a=>a.daysLeft<0)?'var(--danger)':'var(--warning)'}">🎓 Training Alerts</h3>
-        ${alerts.map(a => `
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)">
-            <div><strong>${a.operative_name}</strong> — ${a.course_name}</div>
-            <div style="font-size:12px;color:${a.daysLeft<0?'var(--danger)':'var(--warning)'};font-weight:600">${a.daysLeft < 0 ? 'EXPIRED '+Math.abs(a.daysLeft)+'d ago' : a.daysLeft+'d left'}</div>
+
+    const alertRow = (r, badge, color, text) => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #F0F0F0">
+        <div style="flex:1;min-width:0">
+          <strong style="font-size:14px">${r.operative_name}</strong>
+          <div style="font-size:12px;color:#777;margin-top:2px">${r.course_name}${r.card_number ? ' — ' + r.card_number : ''}</div>
+        </div>
+        <div style="flex-shrink:0;text-align:right">
+          <span style="display:inline-block;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:${color};color:#fff">${text}</span>
+          <div style="font-size:11px;color:#999;margin-top:3px">Expires: ${r.expiry_date}</div>
+        </div>
+      </div>`;
+
+    let html = '';
+
+    if (data.expired.length > 0) {
+      html += `
+        <div style="background:#FFEBEE;border:2px solid #EF5350;border-radius:10px;padding:0;margin-bottom:12px;overflow:hidden">
+          <div style="background:#EF5350;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+            <div style="font-weight:700;font-size:15px">🚨 EXPIRED TRAINING</div>
+            <div style="background:rgba(255,255,255,0.25);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700">${data.expired.length}</div>
           </div>
-        `).join('')}
-      </div>
-    `;
-  } catch {}
+          ${data.expired.map(r => {
+            const d = Math.ceil((new Date() - new Date(r.expiry_date)) / (1000*60*60*24));
+            return alertRow(r, 'EXPIRED', '#C62828', 'EXPIRED ' + d + 'd');
+          }).join('')}
+        </div>`;
+    }
+
+    if (data.within14.length > 0) {
+      html += `
+        <div style="background:#FFF3E0;border:2px solid #FF9800;border-radius:10px;padding:0;margin-bottom:12px;overflow:hidden">
+          <div style="background:#FF9800;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+            <div style="font-weight:700;font-size:15px">⚠️ EXPIRING WITHIN 14 DAYS</div>
+            <div style="background:rgba(255,255,255,0.25);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700">${data.within14.length}</div>
+          </div>
+          ${data.within14.map(r => {
+            const d = Math.ceil((new Date(r.expiry_date) - new Date()) / (1000*60*60*24));
+            return alertRow(r, 'URGENT', '#E65100', d + ' DAYS LEFT');
+          }).join('')}
+        </div>`;
+    }
+
+    if (data.within30.length > 0) {
+      html += `
+        <div style="background:#FFFDE7;border:2px solid #FDD835;border-radius:10px;padding:0;margin-bottom:12px;overflow:hidden">
+          <div style="background:#F9A825;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+            <div style="font-weight:700;font-size:15px">📋 EXPIRING WITHIN 30 DAYS</div>
+            <div style="background:rgba(255,255,255,0.25);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700">${data.within30.length}</div>
+          </div>
+          ${data.within30.map(r => {
+            const d = Math.ceil((new Date(r.expiry_date) - new Date()) / (1000*60*60*24));
+            return alertRow(r, 'WARNING', '#F57F17', d + ' DAYS LEFT');
+          }).join('')}
+        </div>`;
+    }
+
+    el.innerHTML = html;
+  } catch(e) { console.error('Training alerts error:', e); }
 }
 
 // ═══════════════════════════════════════
