@@ -1,7 +1,7 @@
 FROM node:20
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install --production
 COPY . .
 RUN mkdir -p uploads
 EXPOSE 10000
