@@ -1600,11 +1600,30 @@ window.showRescuePlanDetail = async function(id) {
         ${p.signature ? `<div style="margin-top:12px"><strong>Signature:</strong><br><img src="${p.signature}" style="max-width:200px;max-height:80px;border:1px solid var(--border);border-radius:4px;margin-top:4px"></div>` : ''}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
           <button class="btn btn-outline btn-sm" onclick="exportPDF('rescue-plan', ${JSON.stringify(p).replace(/'/g, "\\'").replace(/"/g, '&quot;')})">📄 PDF</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadRescueDocx(${p.id}, '${(p.project_name||'Rescue_Plan').replace(/'/g, "\\'")}')">📝 Word Doc</button>
           <button class="btn btn-outline btn-sm" onclick="this.closest('.modal-overlay').remove()">Close</button>
         </div>
       </div>
     </div>
   `);
+};
+
+window.downloadRescueDocx = async function(id, name) {
+  try {
+    const res = await fetch(`${API}/api/rescue-plan/${id}/docx`, { headers: headers() });
+    if (!res.ok) throw new Error('Download failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Rescue_Plan_${name.replace(/[^a-zA-Z0-9_-]/g, '_')}.docx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert('Failed to download Word document. Please try again.');
+  }
 };
 
 // ═══════════════════════════════════════

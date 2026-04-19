@@ -6,6 +6,9 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
+const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+        Header, Footer, AlignmentType, BorderStyle, WidthType,
+        ShadingType, PageNumber, PageBreak } = require('docx');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -334,6 +337,129 @@ async function startApp() {
       const { rows } = await pool.query('SELECT r.*, u.full_name as submitted_by FROM rescue_plans r JOIN users u ON r.user_id = u.id WHERE r.user_id = $1 ORDER BY r.created_at DESC', [req.user.id]);
       res.json(rows);
     }
+  });
+
+  app.get('/api/rescue-plan/:id/docx', authenticate, async (req, res) => {
+    const { rows } = await pool.query('SELECT r.*, u.full_name as submitted_by FROM rescue_plans r JOIN users u ON r.user_id = u.id WHERE r.id = $1', [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    const p = rows[0];
+    let checklist = {};
+    try { checklist = JSON.parse(p.checklist || '{}'); } catch {}
+
+    const maroon = "8B1A1A";
+    const grey = "4A4A4A";
+    const bdr = { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" };
+    const bds = { top: bdr, bottom: bdr, left: bdr, right: bdr };
+    const cm = { top: 60, bottom: 60, left: 100, right: 100 };
+    const pw = 9360;
+
+    const lbl = (text, w) => new TableCell({ borders: bds, width: { size: w, type: WidthType.DXA }, shading: { fill: "E8E8E8", type: ShadingType.CLEAR }, margins: cm,
+      children: [new Paragraph({ children: [new TextRun({ text, bold: true, font: "Arial", size: 20, color: grey })] })] });
+    const val = (text, w, span) => new TableCell({ borders: bds, width: { size: w, type: WidthType.DXA }, margins: cm, columnSpan: span || 1,
+      children: [new Paragraph({ children: [new TextRun({ text: text || '—', font: "Arial", size: 20 })] })] });
+    const sh = (num, title) => new Paragraph({ spacing: { before: 300, after: 120 },
+      children: [new TextRun({ text: `${num}. ${title}`, bold: true, font: "Arial", size: 24, color: maroon })] });
+    const ci = (key, label) => new Paragraph({ spacing: { before: 40, after: 40 },
+      children: [new TextRun({ text: (checklist[key] === 'Yes' ? '\u2611' : '\u2610') + '  ' + label, font: "Arial", size: 20 })] });
+
+    const doc = new Document({
+      styles: { default: { document: { run: { font: "Arial", size: 22 } } } },
+      sections: [{
+        properties: {
+          page: { size: { width: 11906, height: 16838 }, margin: { top: 1200, right: 1200, bottom: 1200, left: 1200 } }
+        },
+        headers: { default: new Header({ children: [new Paragraph({
+          border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: maroon, space: 4 } },
+          children: [
+            new TextRun({ text: "ManProjects", bold: true, font: "Arial", size: 22, color: grey }),
+            new TextRun({ text: " Ltd", font: "Arial", size: 18, color: "999999" }),
+            new TextRun({ text: "    Electrical and Mechanical Building Services", font: "Arial", size: 14, color: "999999" }),
+          ]
+        })] }) },
+        footers: { default: new Footer({ children: [new Paragraph({
+          alignment: AlignmentType.CENTER,
+          border: { top: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC", space: 4 } },
+          children: [
+            new TextRun({ text: "ManProjects Ltd \u2014 Rescue Plan  |  Page ", font: "Arial", size: 16, color: "999999" }),
+            new TextRun({ children: [PageNumber.CURRENT], font: "Arial", size: 16, color: "999999" }),
+          ]
+        })] }) },
+        children: [
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 0 },
+            children: [new TextRun({ text: "MAN PROJECTS LTD", bold: true, font: "Arial", size: 32, color: maroon })] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80, after: 40 },
+            children: [new TextRun({ text: "RESCUE PLAN / EMERGENCY RESPONSE", bold: true, font: "Arial", size: 24, color: grey })] }),
+
+          sh("1", "PROJECT DETAILS"),
+          new Table({ width: { size: pw, type: WidthType.DXA }, columnWidths: [2200, 2480, 2200, 2480], rows: [
+            new TableRow({ children: [lbl("Client Name", 2200), val(p.client_name, 2480), lbl("Project Name", 2200), val(p.project_name, 2480)] }),
+            new TableRow({ children: [lbl("Location", 2200), val(p.location, 2480), lbl("Operation", 2200), val(p.operation, 2480)] }),
+            new TableRow({ children: [lbl("Project Manager", 2200), val(p.project_manager, 2480), lbl("Date", 2200), val(p.date, 2480)] }),
+            new TableRow({ children: [lbl("Submitted By", 2200), val(p.submitted_by, 7160, 3)] }),
+          ] }),
+
+          sh("2", "PERSONS RESPONSIBLE FOR RESCUE"),
+          new Table({ width: { size: pw, type: WidthType.DXA }, columnWidths: [2200, 2480, 2200, 2480], rows: [
+            new TableRow({ children: [lbl("Rescue Supervisor", 2200), val(p.rescue_supervisor, 2480), lbl("Attendant", 2200), val(p.attendant, 2480)] }),
+            new TableRow({ children: [lbl("Rescue Team", 2200), val(p.rescue_team, 7160, 3)] }),
+          ] }),
+
+          sh("3", "COMMUNICATION & EMERGENCY CONTACTS"),
+          new Table({ width: { size: pw, type: WidthType.DXA }, columnWidths: [2200, 2480, 2200, 2480], rows: [
+            new TableRow({ children: [lbl("Comms Method", 2200), val(p.comms_method, 2480), lbl("Nearest Hospital", 2200), val(p.nearest_hospital, 2480)] }),
+            new TableRow({ children: [lbl("Site Manager", 2200), val(p.em_site_manager_name, 2480), lbl("Phone", 2200), val(p.em_site_manager_phone, 2480)] }),
+            new TableRow({ children: [lbl("First Aider", 2200), val(p.em_first_aider_name, 2480), lbl("Phone", 2200), val(p.em_first_aider_phone, 2480)] }),
+            new TableRow({ children: [lbl("Fire Marshal", 2200), val(p.em_fire_marshal_name, 2480), lbl("Phone", 2200), val(p.em_fire_marshal_phone, 2480)] }),
+          ] }),
+
+          sh("4", "RESCUE PROCEDURE"),
+          new Table({ width: { size: pw, type: WidthType.DXA }, columnWidths: [2200, 7160], rows: [
+            new TableRow({ children: [lbl("Planned Rescue Method", 2200), val(p.rescue_method, 7160, 3)] }),
+            new TableRow({ children: [lbl("Scene Protection", 2200), val(p.scene_protection, 7160, 3)] }),
+          ] }),
+
+          sh("5", "PRE-RESCUE CHECKLIST"),
+          new Table({ width: { size: pw, type: WidthType.DXA }, columnWidths: [pw], rows: [
+            new TableRow({ children: [new TableCell({ borders: bds, width: { size: pw, type: WidthType.DXA }, margins: cm, children: [
+              ci('check_team_briefed', 'Rescue team briefed and competent'),
+              ci('check_equipment_checked', 'Rescue equipment checked and in position'),
+              ci('check_comms_tested', 'Communications tested'),
+              ci('check_first_aid', 'First aid provision confirmed'),
+              ci('check_access_routes', 'Access / egress routes confirmed'),
+              ci('check_emergency_services', 'Emergency services access confirmed'),
+            ] })] })
+          ] }),
+
+          sh("6", "RESCUE EQUIPMENT AVAILABLE"),
+          new Table({ width: { size: pw, type: WidthType.DXA }, columnWidths: [4680, 4680], rows: [
+            new TableRow({ children: [
+              new TableCell({ borders: bds, width: { size: 4680, type: WidthType.DXA }, margins: cm, children: [
+                ci('equip_harness', 'Full body harness'), ci('equip_lanyard', 'Rescue lanyard / rope'),
+                ci('equip_tripod', 'Tripod / davit system'), ci('equip_winch', 'Winch / descent device'),
+              ] }),
+              new TableCell({ borders: bds, width: { size: 4680, type: WidthType.DXA }, margins: cm, children: [
+                ci('equip_first_aid', 'First aid kit'), ci('equip_stretcher', 'Stretcher / spine board'),
+                ci('equip_radio', 'Two-way radios'), ci('equip_gas_monitor', 'Gas monitor'),
+              ] })
+            ] }),
+          ] }),
+
+          ...(p.signature ? [
+            sh("7", "SIGNATURE"),
+            new Paragraph({ children: [new TextRun({ text: "Operative signature captured digitally in the Site Safety App.", font: "Arial", size: 20, color: "888888", italics: true })] }),
+          ] : []),
+
+          new Paragraph({ spacing: { before: 400 }, alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: "ManProjects Ltd \u2014 Rescue Plan \u2014 Confidential", font: "Arial", size: 16, color: "999999" })] }),
+        ]
+      }]
+    });
+
+    const buffer = await Packer.toBuffer(doc);
+    const filename = `Rescue_Plan_${p.project_name.replace(/[^a-zA-Z0-9]/g, '_')}_${p.date}.docx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
   });
 
   app.delete('/api/rescue-plan/:id', authenticate, adminOnly, async (req, res) => {
