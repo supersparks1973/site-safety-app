@@ -179,7 +179,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <button data-page="ladder"><span class="nav-icon">🪜</span>Ladder</button>
     <button data-page="tower"><span class="nav-icon">🏗️</span>Tower</button>
     <button data-page="mewp"><span class="nav-icon">🔧</span>MEWP</button>
-    <button data-page="rescue"><span class="nav-icon">🆘</span>Rescue</button>
     <button data-page="my-training"><span class="nav-icon">🎓</span>Training</button>
   </nav>
 
@@ -446,7 +445,6 @@ function renderPage(page) {
     'ladder': renderLadderForm,
     'tower': renderTowerForm,
     'mewp': renderMEWPForm,
-    'rescue': renderRescuePage,
     'my-training': renderMyTraining,
     // Admin pages
     'dashboard': renderDashboard,
@@ -1660,26 +1658,51 @@ window.downloadRescueDocx = async function(id, name) {
 // ADMIN: RESCUE PLANS
 // ═══════════════════════════════════════
 async function renderAdminRescuePlans(c) {
-  c.innerHTML = '<h2 style="margin-bottom:16px">🆘 Rescue Plans</h2><p>Loading...</p>';
-  try {
-    const plans = await fetch(`${API}/api/rescue-plan`, { headers: headers() }).then(r => r.json());
-    c.innerHTML = `<h2 style="margin-bottom:16px">🆘 Rescue Plans</h2>
-      <div style="margin-bottom:12px"><a href="/ManProjects_Rescue_Plan_Template.docx" download class="btn btn-outline btn-sm" style="width:auto;display:inline-flex;text-decoration:none">📄 Download Word Template</a></div>` +
-      (plans.length === 0 ? '<p style="color:var(--text-light)">No rescue plans submitted yet.</p>' :
-      plans.map(p => `
-        <div class="card" onclick="showRescuePlanDetail(${p.id})" style="cursor:pointer">
-          <div class="card-header">
-            <h3>${p.project_name}</h3>
-            <span class="card-meta">${p.date}</span>
-          </div>
-          <div class="card-body">
-            <p><strong>Client:</strong> ${p.client_name} &nbsp;|&nbsp; <strong>Location:</strong> ${p.location}</p>
-            <p><strong>Submitted by:</strong> ${p.submitted_by} &nbsp;|&nbsp; <strong>Rescue Supervisor:</strong> ${p.rescue_supervisor}</p>
-          </div>
-        </div>
-      `).join(''));
-  } catch { c.innerHTML = '<p>Failed to load rescue plans</p>'; }
+  c.innerHTML = `
+    <h2 style="margin-bottom:16px;display:flex;align-items:center;gap:8px">🆘 Rescue Plans</h2>
+    <div style="margin-bottom:12px">
+      <a href="/ManProjects_Rescue_Plan_Template.docx" download class="btn btn-outline btn-sm" style="width:auto;display:inline-flex;text-decoration:none">📄 Download Word Template</a>
+    </div>
+    <div class="tab-bar" style="display:flex;gap:4px;margin-bottom:16px;overflow-x:auto">
+      <button class="active" onclick="showAdminRescueTab('plans',this)">📋 All Plans</button>
+      <button onclick="showAdminRescueTab('new',this)">📝 New Plan</button>
+      <button onclick="showAdminRescueTab('procedures',this)">🔄 Procedures</button>
+    </div>
+    <div id="adminRescueTabContent"></div>
+  `;
+  showAdminRescueTab('plans');
 }
+
+window.showAdminRescueTab = async function(tab, btn) {
+  if (btn) {
+    btn.closest('.tab-bar').querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  const el = document.getElementById('adminRescueTabContent');
+  if (tab === 'plans') {
+    el.innerHTML = '<p>Loading...</p>';
+    try {
+      const plans = await fetch(`${API}/api/rescue-plan`, { headers: headers() }).then(r => r.json());
+      el.innerHTML = plans.length === 0 ? '<p style="color:var(--text-light)">No rescue plans submitted yet.</p>' :
+        plans.map(p => `
+          <div class="card" onclick="showRescuePlanDetail(${p.id})" style="cursor:pointer">
+            <div class="card-header">
+              <h3>${p.project_name}</h3>
+              <span class="card-meta">${p.date}</span>
+            </div>
+            <div class="card-body">
+              <p><strong>Client:</strong> ${p.client_name} &nbsp;|&nbsp; <strong>Location:</strong> ${p.location}</p>
+              <p><strong>Submitted by:</strong> ${p.submitted_by} &nbsp;|&nbsp; <strong>Rescue Supervisor:</strong> ${p.rescue_supervisor}</p>
+            </div>
+          </div>
+        `).join('');
+    } catch { el.innerHTML = '<p>Failed to load rescue plans</p>'; }
+  } else if (tab === 'new') {
+    renderRescuePlanForm(el);
+  } else if (tab === 'procedures') {
+    renderRescueProcedures(el);
+  }
+};
 
 // ═══════════════════════════════════════
 // OPERATIVE: MY TRAINING
