@@ -1253,7 +1253,7 @@ async function startApp() {
         }
       }
 
-      const doc = new docx.Document({
+      const doc = new Document({
         styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
         sections: [{
           properties: h.pageProps,
@@ -1263,7 +1263,7 @@ async function startApp() {
         }]
       });
 
-      const buf = await docx.Packer.toBuffer(doc);
+      const buf = await Packer.toBuffer(doc);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', `attachment; filename="ManProjects-${tmpl.title.replace(/\s+/g, '-')}.docx"`);
       res.send(buf);
