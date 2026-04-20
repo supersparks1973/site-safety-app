@@ -116,6 +116,20 @@ async function startApp() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  await pool.query(`CREATE TABLE IF NOT EXISTS projects (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    client_name TEXT NOT NULL,
+    site_address TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    start_date TEXT,
+    end_date TEXT,
+    description TEXT,
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   // Add signature column to existing tables if not present
   const migrateSig = async (table) => {
     try { await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS signature TEXT`); } catch(e) {}
@@ -976,6 +990,57 @@ async function startApp() {
         [day14.toISOString().split('T')[0], day30.toISOString().split('T')[0]]);
 
       res.json({ expired, within14, within30 });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ═══════ PROJECTS ═══════
+  // List all projects (admin)
+  app.get('/api/projects', authenticate, adminOnly, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT p.*, u.full_name as created_by_name FROM projects p LEFT JOIN users u ON p.created_by = u.id ORDER BY p.created_at DESC');
+      res.json(rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Get single project
+  app.get('/api/projects/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT p.*, u.full_name as created_by_name FROM projects p LEFT JOIN users u ON p.created_by = u.id WHERE p.id = $1', [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+      res.json(rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Create project
+  app.post('/api/projects', authenticate, adminOnly, async (req, res) => {
+    try {
+      const d = req.body;
+      const { rows } = await pool.query(
+        'INSERT INTO projects (name, client_name, site_address, status, start_date, end_date, description, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
+        [d.name, d.client_name, d.site_address || null, d.status || 'active', d.start_date || null, d.end_date || null, d.description || null, req.user.id]
+      );
+      res.json(rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Update project
+  app.put('/api/projects/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      const d = req.body;
+      const { rows } = await pool.query(
+        'UPDATE projects SET name=$1, client_name=$2, site_address=$3, status=$4, start_date=$5, end_date=$6, description=$7, updated_at=CURRENT_TIMESTAMP WHERE id=$8 RETURNING *',
+        [d.name, d.client_name, d.site_address || null, d.status || 'active', d.start_date || null, d.end_date || null, d.description || null, req.params.id]
+      );
+      if (rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+      res.json(rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Delete project
+  app.delete('/api/projects/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      await pool.query('DELETE FROM projects WHERE id = $1', [req.params.id]);
+      res.json({ message: 'Project deleted' });
     } catch(e) { res.status(500).json({ error: e.message }); }
   });
 

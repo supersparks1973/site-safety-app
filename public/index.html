@@ -1540,22 +1540,215 @@ window.deleteUser = async function(id) {
 // ═══════════════════════════════════════
 // PORTAL: PROJECTS
 // ═══════════════════════════════════════
-function renderProjects(c) {
+let projectsCache = [];
+let projectView = 'list'; // list | add | detail | edit
+
+async function renderProjects(c) {
+  projectView = 'list';
   c.innerHTML = `
-    <div style="margin-bottom:20px">
-      <h2 style="margin-bottom:4px">🏗️ Projects</h2>
-      <p style="color:var(--text-light);font-size:14px">Manage your active and completed projects</p>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+      <div>
+        <h2 style="margin-bottom:4px">🏗️ Projects</h2>
+        <p style="color:var(--text-light);font-size:14px">Manage your active and completed projects</p>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="showProjectForm()">+ New Project</button>
     </div>
-    <div class="card" style="text-align:center;padding:40px 20px">
-      <div style="font-size:48px;margin-bottom:12px">🏗️</div>
-      <h3 style="margin-bottom:8px;font-size:18px">Project Management</h3>
-      <p style="color:var(--text-light);font-size:14px;max-width:400px;margin:0 auto 16px">
-        Track active projects, assign operatives to sites, monitor timelines and link safety reports to specific projects.
-      </p>
-      <span class="badge" style="background:#dbeafe;color:#1e40af;font-size:12px;padding:6px 14px">Coming Soon</span>
+    <div class="tab-bar" id="projectTabs">
+      <button class="active" onclick="filterProjects('all')">All</button>
+      <button onclick="filterProjects('active')">Active</button>
+      <button onclick="filterProjects('completed')">Completed</button>
+      <button onclick="filterProjects('on-hold')">On Hold</button>
+    </div>
+    <div id="projectContent">Loading...</div>
+  `;
+  try {
+    projectsCache = await fetch(API + '/api/projects', { headers: headers() }).then(r => r.json());
+    filterProjects('all');
+  } catch { document.getElementById('projectContent').innerHTML = '<p>Failed to load projects</p>'; }
+}
+
+window.filterProjects = function(status) {
+  // Update tabs
+  document.querySelectorAll('#projectTabs button').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  const filtered = status === 'all' ? projectsCache : projectsCache.filter(p => p.status === status);
+  const el = document.getElementById('projectContent');
+
+  if (filtered.length === 0) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:30px;color:var(--text-light)">
+      <p style="font-size:16px;margin-bottom:8px">No ${status === 'all' ? '' : status + ' '}projects found</p>
+      <p style="font-size:13px">Click <strong>+ New Project</strong> to create one</p>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = filtered.map(p => {
+    const statusColors = {
+      active: 'background:#dcfce7;color:#166534',
+      completed: 'background:#dbeafe;color:#1e40af',
+      'on-hold': 'background:#fef3c7;color:#92400e'
+    };
+    const statusStyle = statusColors[p.status] || 'background:#e2e8f0;color:#475569';
+    return `
+      <div class="card" style="cursor:pointer;transition:transform .1s,box-shadow .1s" onclick="showProjectDetail(${p.id})"
+           onmouseenter="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,.1)'"
+           onmouseleave="this.style.transform='';this.style.boxShadow=''">
+        <div class="card-header">
+          <h3 style="font-size:16px">${p.name}</h3>
+          <span class="badge" style="${statusStyle}">${p.status}</span>
+        </div>
+        <div class="card-body">
+          <p><strong>Client:</strong> ${p.client_name}</p>
+          ${p.site_address ? `<p><strong>Site:</strong> ${p.site_address}</p>` : ''}
+          <div style="display:flex;gap:16px;margin-top:4px;font-size:13px;color:var(--text-light)">
+            ${p.start_date ? `<span>Start: ${p.start_date}</span>` : ''}
+            ${p.end_date ? `<span>End: ${p.end_date}</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+};
+
+window.showProjectForm = function(project) {
+  const isEdit = !!project;
+  const c = document.getElementById('appContent');
+  c.innerHTML = `
+    <div style="margin-bottom:16px">
+      <button class="btn btn-outline btn-sm" onclick="renderProjects(document.getElementById('appContent'))" style="width:auto;margin-bottom:12px">&larr; Back to Projects</button>
+      <h2>${isEdit ? 'Edit Project' : 'New Project'}</h2>
+    </div>
+    <div class="form-section">
+      <h3>📋 Project Details</h3>
+      <div class="form-group"><label>Project Name *</label><input type="text" id="projName" value="${isEdit ? project.name : ''}" placeholder="e.g. City Tower — Electrical Fit-out"></div>
+      <div class="form-group"><label>Client Name *</label><input type="text" id="projClient" value="${isEdit ? project.client_name : ''}" placeholder="e.g. Balfour Beatty"></div>
+      <div class="form-group"><label>Site Address</label><input type="text" id="projAddress" value="${isEdit ? (project.site_address||'') : ''}" placeholder="e.g. 10 High Street, Manchester M1 1AA"></div>
+      <div class="form-group"><label>Status</label>
+        <select id="projStatus">
+          <option value="active" ${isEdit && project.status==='active' ? 'selected' : ''}>Active</option>
+          <option value="on-hold" ${isEdit && project.status==='on-hold' ? 'selected' : ''}>On Hold</option>
+          <option value="completed" ${isEdit && project.status==='completed' ? 'selected' : ''}>Completed</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group"><label>Start Date</label><input type="date" id="projStart" value="${isEdit ? (project.start_date||'') : today()}"></div>
+        <div class="form-group"><label>End Date</label><input type="date" id="projEnd" value="${isEdit ? (project.end_date||'') : ''}"></div>
+      </div>
+      <div class="form-group"><label>Description</label><textarea id="projDesc" placeholder="Brief description of the project scope...">${isEdit ? (project.description||'') : ''}</textarea></div>
+      <button class="btn btn-primary" onclick="${isEdit ? `updateProject(${project.id})` : 'createProject()'}">${isEdit ? 'Save Changes' : 'Create Project'}</button>
     </div>
   `;
-}
+};
+
+window.createProject = async function() {
+  const name = document.getElementById('projName').value.trim();
+  const client_name = document.getElementById('projClient').value.trim();
+  if (!name || !client_name) { showToast('Please enter project name and client', 'error'); return; }
+  try {
+    await fetch(API + '/api/projects', {
+      method: 'POST', headers: headers(),
+      body: JSON.stringify({
+        name, client_name,
+        site_address: document.getElementById('projAddress').value.trim(),
+        status: document.getElementById('projStatus').value,
+        start_date: document.getElementById('projStart').value,
+        end_date: document.getElementById('projEnd').value,
+        description: document.getElementById('projDesc').value.trim()
+      })
+    });
+    showToast('Project created');
+    renderProjects(document.getElementById('appContent'));
+  } catch { showToast('Failed to create project', 'error'); }
+};
+
+window.updateProject = async function(id) {
+  const name = document.getElementById('projName').value.trim();
+  const client_name = document.getElementById('projClient').value.trim();
+  if (!name || !client_name) { showToast('Please enter project name and client', 'error'); return; }
+  try {
+    await fetch(API + '/api/projects/' + id, {
+      method: 'PUT', headers: headers(),
+      body: JSON.stringify({
+        name, client_name,
+        site_address: document.getElementById('projAddress').value.trim(),
+        status: document.getElementById('projStatus').value,
+        start_date: document.getElementById('projStart').value,
+        end_date: document.getElementById('projEnd').value,
+        description: document.getElementById('projDesc').value.trim()
+      })
+    });
+    showToast('Project updated');
+    renderProjects(document.getElementById('appContent'));
+  } catch { showToast('Failed to update project', 'error'); }
+};
+
+window.showProjectDetail = async function(id) {
+  const c = document.getElementById('appContent');
+  c.innerHTML = '<p>Loading...</p>';
+  try {
+    const p = await fetch(API + '/api/projects/' + id, { headers: headers() }).then(r => r.json());
+    const statusColors = {
+      active: 'background:#dcfce7;color:#166534',
+      completed: 'background:#dbeafe;color:#1e40af',
+      'on-hold': 'background:#fef3c7;color:#92400e'
+    };
+    const statusStyle = statusColors[p.status] || 'background:#e2e8f0;color:#475569';
+
+    c.innerHTML = `
+      <button class="btn btn-outline btn-sm" onclick="renderProjects(document.getElementById('appContent'))" style="width:auto;margin-bottom:16px">&larr; Back to Projects</button>
+
+      <div class="card" style="border-left:4px solid var(--primary);margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+          <div>
+            <h2 style="font-size:20px;margin-bottom:4px">${p.name}</h2>
+            <span class="badge" style="${statusStyle};font-size:12px;padding:4px 12px">${p.status}</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" onclick='showProjectForm(${JSON.stringify(p)})'>Edit</button>
+            <button class="btn btn-sm" style="background:var(--danger);color:#fff" onclick="deleteProject(${p.id})">Delete</button>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
+          <div style="padding:12px;background:var(--bg);border-radius:8px">
+            <div style="font-size:11px;text-transform:uppercase;color:var(--text-light);font-weight:700;margin-bottom:4px">Client</div>
+            <div style="font-weight:600">${p.client_name}</div>
+          </div>
+          <div style="padding:12px;background:var(--bg);border-radius:8px">
+            <div style="font-size:11px;text-transform:uppercase;color:var(--text-light);font-weight:700;margin-bottom:4px">Site Address</div>
+            <div style="font-weight:600">${p.site_address || '—'}</div>
+          </div>
+          <div style="padding:12px;background:var(--bg);border-radius:8px">
+            <div style="font-size:11px;text-transform:uppercase;color:var(--text-light);font-weight:700;margin-bottom:4px">Start Date</div>
+            <div style="font-weight:600">${p.start_date || '—'}</div>
+          </div>
+          <div style="padding:12px;background:var(--bg);border-radius:8px">
+            <div style="font-size:11px;text-transform:uppercase;color:var(--text-light);font-weight:700;margin-bottom:4px">End Date</div>
+            <div style="font-weight:600">${p.end_date || '—'}</div>
+          </div>
+        </div>
+
+        ${p.description ? `
+        <div style="margin-top:16px;padding:12px;background:var(--bg);border-radius:8px">
+          <div style="font-size:11px;text-transform:uppercase;color:var(--text-light);font-weight:700;margin-bottom:4px">Description</div>
+          <div style="font-size:14px;line-height:1.5">${p.description}</div>
+        </div>` : ''}
+
+        <div style="margin-top:12px;font-size:12px;color:var(--text-light)">
+          Created ${new Date(p.created_at).toLocaleDateString()} ${p.created_by_name ? 'by ' + p.created_by_name : ''}
+        </div>
+      </div>
+    `;
+  } catch { c.innerHTML = '<p>Failed to load project</p>'; }
+};
+
+window.deleteProject = async function(id) {
+  if (!confirm('Are you sure you want to delete this project? This cannot be undone.')) return;
+  try {
+    await fetch(API + '/api/projects/' + id, { method: 'DELETE', headers: headers() });
+    showToast('Project deleted');
+    renderProjects(document.getElementById('appContent'));
+  } catch { showToast('Failed to delete project', 'error'); }
+};
 
 // ═══════════════════════════════════════
 // PORTAL: DOCUMENT LIBRARY
