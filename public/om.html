@@ -1,0 +1,2188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ManProjects — O&M Manager</title>
+<!-- jsPDF + AutoTable — primary CDN with fallbacks -->
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script>
+if(typeof window.jspdf==='undefined'){
+  document.write('<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"><\/script>');
+}
+</script>
+<script>
+if(typeof window.jspdf==='undefined'){
+  document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>');
+}
+</script>
+<script src="https://unpkg.com/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+<script>
+if(typeof window.jspdf!=='undefined' && typeof window.jspdf.jsPDF.prototype.autoTable==='undefined'){
+  document.write('<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"><\/script>');
+}
+</script>
+<!-- pdf-lib for merging uploaded PDFs into the manual -->
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+if(typeof window.PDFLib==='undefined'){
+  document.write('<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"><\/script>');
+}
+</script>
+<style>
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --primary: #8B1A1A;
+  --primary-light: #B22222;
+  --primary-dark: #1e293b;
+  --accent: #f59e0b;
+  --accent-hover: #d97706;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --bg: #f1f5f9;
+  --card: #ffffff;
+  --border: #e2e8f0;
+  --text: #1e293b;
+  --text-light: #64748b;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05);
+}
+html { font-size: 15px; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* ── Layout ── */
+.app { display: flex; min-height: 100vh; }
+.sidebar { width: 260px; background: var(--primary-dark); color: #fff; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; transition: transform .3s; }
+.sidebar.collapsed { transform: translateX(-260px); }
+.main { flex: 1; margin-left: 260px; transition: margin-left .3s; }
+.sidebar.collapsed + .main { margin-left: 0; }
+
+/* ── Sidebar ── */
+.sidebar-header { padding: 20px; border-bottom: 1px solid rgba(255,255,255,.1); }
+.sidebar-header h1 { font-size: 1.2rem; font-weight: 700; }
+.sidebar-header p { font-size: .75rem; color: rgba(255,255,255,.6); margin-top: 4px; }
+.sidebar-nav { flex: 1; overflow-y: auto; padding: 12px 0; }
+.nav-section { padding: 8px 20px; font-size: .65rem; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,.4); margin-top: 8px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; transition: background .15s; font-size: .9rem; color: rgba(255,255,255,.8); }
+.nav-item:hover { background: rgba(255,255,255,.08); }
+.nav-item.active { background: rgba(255,255,255,.12); color: #fff; border-left: 3px solid var(--accent); }
+.nav-item .icon { width: 20px; text-align: center; font-size: 1rem; }
+.nav-item .badge { margin-left: auto; background: var(--accent); color: var(--primary-dark); font-size: .7rem; padding: 2px 7px; border-radius: 10px; font-weight: 600; }
+
+/* ── Top Bar ── */
+.topbar { background: var(--card); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 50; }
+.topbar .menu-btn { background: none; border: none; font-size: 1.3rem; cursor: pointer; display: none; color: var(--text); }
+.topbar .breadcrumb { font-size: .85rem; color: var(--text-light); }
+.topbar .breadcrumb span { color: var(--text); font-weight: 600; }
+.topbar .spacer { flex: 1; }
+.topbar .user-info { font-size: .85rem; color: var(--text-light); }
+
+/* ── Content ── */
+.content { padding: 24px; max-width: 1400px; }
+
+/* ── Cards ── */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.card-header h2 { font-size: 1rem; font-weight: 600; }
+.card-body { padding: 20px; }
+
+/* ── Buttons ── */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border: none; border-radius: var(--radius); font-size: .85rem; font-weight: 500; cursor: pointer; transition: all .15s; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-light); }
+.btn-accent { background: var(--accent); color: var(--primary-dark); }
+.btn-accent:hover { background: var(--accent-hover); }
+.btn-success { background: var(--success); color: #fff; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-outline:hover { background: var(--bg); }
+.btn-sm { padding: 5px 10px; font-size: .8rem; }
+.btn-lg { padding: 12px 24px; font-size: 1rem; }
+
+/* ── Grid ── */
+.grid { display: grid; gap: 20px; }
+.grid-2 { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.grid-3 { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.grid-4 { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+
+/* ── Stats ── */
+.stat-card { padding: 20px; display: flex; align-items: center; gap: 16px; }
+.stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
+.stat-icon.blue { background: #dbeafe; color: #2563eb; }
+.stat-icon.green { background: #d1fae5; color: #059669; }
+.stat-icon.amber { background: #fef3c7; color: #d97706; }
+.stat-icon.red { background: #fee2e2; color: #dc2626; }
+.stat-info h3 { font-size: 1.5rem; font-weight: 700; }
+.stat-info p { font-size: .8rem; color: var(--text-light); }
+
+/* ── Progress Bar ── */
+.progress-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 4px; transition: width .4s ease; }
+.progress-fill.green { background: var(--success); }
+.progress-fill.amber { background: var(--warning); }
+.progress-fill.red { background: var(--danger); }
+.progress-fill.blue { background: #3b82f6; }
+
+/* ── Table ── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+th { font-weight: 600; color: var(--text-light); font-size: .75rem; text-transform: uppercase; letter-spacing: .5px; background: #f8fafc; }
+tr:hover td { background: #f8fafc; }
+
+/* ── Status badges ── */
+.status { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; font-size: .75rem; font-weight: 500; }
+.status.complete { background: #d1fae5; color: #065f46; }
+.status.in-progress { background: #dbeafe; color: #1e40af; }
+.status.pending { background: #fef3c7; color: #92400e; }
+.status.overdue { background: #fee2e2; color: #991b1b; }
+
+/* ── Modal ── */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.modal-overlay.open { opacity: 1; pointer-events: auto; }
+.modal { background: var(--card); border-radius: 12px; box-shadow: var(--shadow-lg); width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; }
+.modal-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.modal-header h2 { font-size: 1.1rem; }
+.modal-close { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--text-light); }
+.modal-body { padding: 20px; }
+.modal-footer { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ── Forms ── */
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: .85rem; font-weight: 500; margin-bottom: 6px; color: var(--text); }
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+  font-size: .9rem; font-family: inherit; transition: border-color .15s;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+  outline: none; border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(139,26,26,.1);
+}
+.form-row { display: flex; gap: 16px; }
+.form-row .form-group { flex: 1; }
+
+/* ── Upload zone ── */
+.upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 32px; text-align: center; cursor: pointer; transition: all .2s; background: #f8fafc; }
+.upload-zone:hover, .upload-zone.dragover { border-color: var(--primary-light); background: #eff6ff; }
+.upload-zone .icon { font-size: 2.5rem; color: var(--text-light); margin-bottom: 8px; }
+.upload-zone p { color: var(--text-light); font-size: .85rem; }
+.upload-zone .browse { color: var(--primary-light); font-weight: 600; text-decoration: underline; }
+
+/* ── File list ── */
+.file-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; background: #fff; }
+.file-item .file-icon { font-size: 1.5rem; }
+.file-item .file-info { flex: 1; }
+.file-item .file-name { font-size: .85rem; font-weight: 500; }
+.file-item .file-meta { font-size: .75rem; color: var(--text-light); }
+.file-item .file-actions { display: flex; gap: 4px; }
+.file-item .file-actions button { background: none; border: none; cursor: pointer; padding: 4px 6px; border-radius: 4px; font-size: .9rem; }
+.file-item .file-actions button:hover { background: var(--bg); }
+
+/* ── Tabs ── */
+.tabs { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 20px; gap: 0; overflow-x: auto; }
+.tab { padding: 10px 18px; cursor: pointer; font-size: .85rem; font-weight: 500; color: var(--text-light); border-bottom: 2px solid transparent; margin-bottom: -2px; white-space: nowrap; transition: all .15s; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+/* ── Section panels ── */
+.section-panel { display: none; }
+.section-panel.active { display: block; }
+
+/* ── Project card ── */
+.project-card { cursor: pointer; transition: box-shadow .2s, transform .15s; }
+.project-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+.project-card .card-body { padding: 16px 20px; }
+.project-card .project-title { font-size: 1rem; font-weight: 600; margin-bottom: 4px; }
+.project-card .project-client { font-size: .8rem; color: var(--text-light); margin-bottom: 12px; }
+.project-card .project-ref { font-size: .75rem; color: var(--text-light); }
+.project-card .progress-info { display: flex; justify-content: space-between; font-size: .8rem; margin-bottom: 6px; }
+
+/* ── Section checklist ── */
+.checklist-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; cursor: pointer; transition: all .15s; }
+.checklist-item:hover { border-color: var(--primary-light); background: #f8fafc; }
+.checklist-item .check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: .8rem; flex-shrink: 0; }
+.checklist-item.done .check { background: var(--success); border-color: var(--success); color: #fff; }
+.checklist-item .info { flex: 1; }
+.checklist-item .info h4 { font-size: .9rem; font-weight: 500; }
+.checklist-item .info p { font-size: .75rem; color: var(--text-light); margin-top: 2px; }
+.checklist-item .count { font-size: .8rem; color: var(--text-light); background: var(--bg); padding: 3px 10px; border-radius: 12px; }
+
+/* ── Empty state ── */
+.empty-state { text-align: center; padding: 48px 24px; color: var(--text-light); }
+.empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+.empty-state h3 { font-size: 1.1rem; color: var(--text); margin-bottom: 6px; }
+.empty-state p { font-size: .85rem; margin-bottom: 16px; }
+
+/* ── Toast ── */
+.toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
+.toast { padding: 12px 20px; border-radius: var(--radius); color: #fff; font-size: .85rem; box-shadow: var(--shadow-lg); animation: slideIn .3s; }
+.toast.success { background: var(--success); }
+.toast.error { background: var(--danger); }
+.toast.info { background: var(--primary); }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .sidebar { transform: translateX(-260px); }
+  .sidebar.open { transform: translateX(0); }
+  .main { margin-left: 0; }
+  .topbar .menu-btn { display: block; }
+  .form-row { flex-direction: column; gap: 0; }
+  .grid-3, .grid-4 { grid-template-columns: 1fr; }
+}
+
+/* ── Print ── */
+@media print {
+  .sidebar, .topbar, .btn, .upload-zone, .file-actions, .modal-overlay, .toast-container { display: none !important; }
+  .main { margin-left: 0; }
+  .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+}
+
+/* ── Search bar ── */
+.search-bar { position: relative; }
+.search-bar input { padding-left: 36px; }
+.search-bar .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-light); }
+
+/* ── Export panel ── */
+.export-options { display: flex; gap: 12px; flex-wrap: wrap; }
+.export-option { flex: 1; min-width: 150px; padding: 20px; border: 2px solid var(--border); border-radius: var(--radius); text-align: center; cursor: pointer; transition: all .2s; }
+.export-option:hover { border-color: var(--primary-light); background: #eff6ff; }
+.export-option .icon { font-size: 2rem; margin-bottom: 8px; }
+.export-option h4 { font-size: .9rem; margin-bottom: 4px; }
+.export-option p { font-size: .75rem; color: var(--text-light); }
+
+/* ── Notes ── */
+.note-item { padding: 12px; border-left: 3px solid var(--primary-light); background: #f8fafc; margin-bottom: 8px; border-radius: 0 var(--radius) var(--radius) 0; }
+.note-item .note-date { font-size: .7rem; color: var(--text-light); margin-bottom: 4px; }
+.note-item .note-text { font-size: .85rem; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h1>📋 O&M Manager</h1>
+      <p>Operation & Maintenance Manuals</p>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Main</div>
+      <div class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard')">
+        <span class="icon">📊</span> Dashboard
+      </div>
+      <div class="nav-item" data-page="projects" onclick="navigateTo('projects')">
+        <span class="icon">📁</span> Projects
+        <span class="badge" id="projectCount">0</span>
+      </div>
+      <div class="nav-section">Current Project</div>
+      <div class="nav-item" data-page="project-overview" onclick="navigateTo('project-overview')">
+        <span class="icon">📋</span> Overview
+      </div>
+      <div class="nav-item" data-page="documents" onclick="navigateTo('documents')">
+        <span class="icon">📄</span> Documents
+      </div>
+      <div class="nav-item" data-page="equipment" onclick="navigateTo('equipment')">
+        <span class="icon">⚙️</span> Equipment Register
+      </div>
+      <div class="nav-item" data-page="contacts" onclick="navigateTo('contacts')">
+        <span class="icon">👥</span> Contacts & Suppliers
+      </div>
+      <div class="nav-item" data-page="maintenance" onclick="navigateTo('maintenance')">
+        <span class="icon">🔧</span> Maintenance Schedules
+      </div>
+      <div class="nav-item" data-page="export" onclick="navigateTo('export')">
+        <span class="icon">📤</span> Export / Compile
+      </div>
+      <div class="nav-section">Settings</div>
+      <div class="nav-item" data-page="templates" onclick="navigateTo('templates')">
+        <span class="icon">📝</span> Section Templates
+      </div>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+      <div class="breadcrumb" id="breadcrumb">Dashboard</div>
+      <div class="spacer"></div>
+      <div class="user-info" id="currentProjectLabel" style="font-weight:600; color:var(--primary);"></div>
+    </header>
+
+    <div class="content" id="content">
+      <!-- Pages injected by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">Modal</h2>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter"></div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div class="toast-container" id="toasts"></div>
+
+<script>
+// ════════════════════════════════════════════════════
+//  DATA LAYER — all state stored in-memory + localStorage
+// ════════════════════════════════════════════════════
+
+const STORAGE_KEY = 'om_manager_data';
+const DEFAULT_SECTIONS = [
+  { id: 'project_info', name: 'Project Information', description: 'General project details, scope, and introduction', required: true },
+  { id: 'data_sheets', name: 'Data Sheets', description: 'Equipment and product data sheets from manufacturers', required: true },
+  { id: 'drawings', name: 'Drawings', description: 'As-built drawings, schematics, layouts, and diagrams', required: true },
+  { id: 'test_certs', name: 'Test Certificates', description: 'Commissioning test results and completion certificates', required: true },
+  { id: 'calibration_certs', name: 'Calibration Certificates', description: 'Instrument calibration records and certificates', required: true },
+  { id: 'warranties', name: 'Warranties & Guarantees', description: 'Warranty documents, guarantee certificates, and terms', required: true },
+  { id: 'spare_parts', name: 'Spare Parts Lists', description: 'Recommended spare parts and reorder information', required: false },
+  { id: 'maintenance_schedules', name: 'Maintenance Schedules', description: 'Planned preventive maintenance routines and frequencies', required: true },
+  { id: 'operating_procedures', name: 'Operating Procedures', description: 'Start-up, shutdown, and operating instructions for each system', required: true },
+  { id: 'emergency_procedures', name: 'Emergency Procedures', description: 'Emergency shutdown, isolation, and response procedures', required: true },
+  { id: 'health_safety', name: 'Health & Safety', description: 'COSHH data, risk assessments, method statements, and safety information', required: true },
+  { id: 'commissioning', name: 'Commissioning Records', description: 'Commissioning checklists, witness records, and sign-off documents', required: false },
+  { id: 'bms_controls', name: 'BMS / Controls', description: 'Building Management System documentation, points schedules, control strategies', required: false },
+  { id: 'as_installed', name: 'As-Installed Records', description: 'Records of installed equipment, serial numbers, and locations', required: false },
+  { id: 'training_records', name: 'Training Records', description: 'Evidence of operator/user training and competency records', required: false },
+  { id: 'handover_certs', name: 'Handover Certificates', description: 'Practical completion, sectional completion, and handover documentation', required: false },
+];
+
+let state = loadState();
+
+function defaultState() {
+  return { projects: [], currentProjectId: null };
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return defaultState();
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function currentProject() {
+  return state.projects.find(p => p.id === state.currentProjectId) || null;
+}
+
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+function createProject(data) {
+  const project = {
+    id: genId(),
+    name: data.name,
+    client: data.client || '',
+    reference: data.reference || '',
+    address: data.address || '',
+    contractor: data.contractor || '',
+    startDate: data.startDate || '',
+    handoverDate: data.handoverDate || '',
+    description: data.description || '',
+    createdAt: new Date().toISOString(),
+    sections: DEFAULT_SECTIONS.map(s => ({ ...s, documents: [] })),
+    equipment: [],
+    contacts: [],
+    maintenanceItems: [],
+    notes: [],
+  };
+  state.projects.push(project);
+  state.currentProjectId = project.id;
+  saveState();
+  return project;
+}
+
+function deleteProject(id) {
+  state.projects = state.projects.filter(p => p.id !== id);
+  if (state.currentProjectId === id) state.currentProjectId = state.projects[0]?.id || null;
+  saveState();
+}
+
+function getProjectProgress(project) {
+  if (!project) return 0;
+  const required = project.sections.filter(s => s.required);
+  if (required.length === 0) return 100;
+  const done = required.filter(s => s.documents.length > 0).length;
+  return Math.round((done / required.length) * 100);
+}
+
+function getTotalDocs(project) {
+  if (!project) return 0;
+  return project.sections.reduce((sum, s) => sum + s.documents.length, 0);
+}
+
+// ════════════════════════════════════════════════════
+//  UI HELPERS
+// ════════════════════════════════════════════════════
+
+function toast(msg, type='success') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+function openModal(title, bodyHtml, footerHtml) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = bodyHtml;
+  document.getElementById('modalFooter').innerHTML = footerHtml || '';
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1048576).toFixed(1) + ' MB';
+}
+
+function fileIcon(name) {
+  const ext = (name || '').split('.').pop().toLowerCase();
+  const map = { pdf: '📕', doc: '📘', docx: '📘', xls: '📗', xlsx: '📗', dwg: '📐', dxf: '📐', jpg: '🖼️', jpeg: '🖼️', png: '🖼️', zip: '📦', rar: '📦' };
+  return map[ext] || '📄';
+}
+
+// ════════════════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════════════════
+
+let currentPage = 'dashboard';
+
+function navigateTo(page) {
+  currentPage = page;
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
+  updateBreadcrumb(page);
+  renderPage(page);
+  // close mobile sidebar
+  document.getElementById('sidebar').classList.remove('open');
+}
+
+function updateBreadcrumb(page) {
+  const proj = currentProject();
+  const names = {
+    dashboard: 'Dashboard',
+    projects: 'All Projects',
+    'project-overview': `${proj?.name || 'Project'} › <span>Overview</span>`,
+    documents: `${proj?.name || 'Project'} › <span>Documents</span>`,
+    equipment: `${proj?.name || 'Project'} › <span>Equipment Register</span>`,
+    contacts: `${proj?.name || 'Project'} › <span>Contacts & Suppliers</span>`,
+    maintenance: `${proj?.name || 'Project'} › <span>Maintenance Schedules</span>`,
+    export: `${proj?.name || 'Project'} › <span>Export / Compile</span>`,
+    templates: 'Section Templates',
+  };
+  document.getElementById('breadcrumb').innerHTML = names[page] || page;
+  document.getElementById('currentProjectLabel').textContent = proj ? `Project: ${proj.name}` : '';
+}
+
+// ════════════════════════════════════════════════════
+//  PAGE RENDERERS
+// ════════════════════════════════════════════════════
+
+function renderPage(page) {
+  const c = document.getElementById('content');
+  const renderers = {
+    dashboard: renderDashboard,
+    projects: renderProjects,
+    'project-overview': renderProjectOverview,
+    documents: renderDocuments,
+    equipment: renderEquipment,
+    contacts: renderContacts,
+    maintenance: renderMaintenance,
+    export: renderExport,
+    templates: renderTemplates,
+  };
+  (renderers[page] || renderDashboard)(c);
+  document.getElementById('projectCount').textContent = state.projects.length;
+}
+
+// ── Dashboard ──
+function renderDashboard(c) {
+  const total = state.projects.length;
+  const totalDocs = state.projects.reduce((s, p) => s + getTotalDocs(p), 0);
+  const avgProgress = total ? Math.round(state.projects.reduce((s, p) => s + getProjectProgress(p), 0) / total) : 0;
+  const complete = state.projects.filter(p => getProjectProgress(p) === 100).length;
+
+  c.innerHTML = `
+    <div style="margin-bottom:24px">
+      <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:4px">Dashboard</h2>
+      <p style="color:var(--text-light);font-size:.9rem">Overview of all O&M manual projects</p>
+    </div>
+    <div class="grid grid-4" style="margin-bottom:24px">
+      <div class="card stat-card"><div class="stat-icon blue">📁</div><div class="stat-info"><h3>${total}</h3><p>Total Projects</p></div></div>
+      <div class="card stat-card"><div class="stat-icon green">✅</div><div class="stat-info"><h3>${complete}</h3><p>Complete</p></div></div>
+      <div class="card stat-card"><div class="stat-icon amber">📄</div><div class="stat-info"><h3>${totalDocs}</h3><p>Total Documents</p></div></div>
+      <div class="card stat-card"><div class="stat-icon ${avgProgress >= 75 ? 'green' : avgProgress >= 40 ? 'amber' : 'red'}">📈</div><div class="stat-info"><h3>${avgProgress}%</h3><p>Avg. Completion</p></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <h2>Recent Projects</h2>
+        <button class="btn btn-accent" onclick="showNewProjectModal()">+ New Project</button>
+      </div>
+      <div class="card-body">
+        ${total === 0 ? `
+          <div class="empty-state">
+            <div class="icon">📋</div>
+            <h3>No projects yet</h3>
+            <p>Create your first O&M manual project to get started.</p>
+            <button class="btn btn-primary btn-lg" onclick="showNewProjectModal()">+ Create Project</button>
+          </div>
+        ` : `
+          <div class="grid grid-3">
+            ${state.projects.slice().reverse().slice(0, 6).map(p => {
+              const prog = getProjectProgress(p);
+              return `
+                <div class="card project-card" onclick="selectProject('${p.id}')">
+                  <div class="card-body">
+                    <div class="project-title">${esc(p.name)}</div>
+                    <div class="project-client">${esc(p.client || 'No client specified')}</div>
+                    <div class="progress-info"><span>Completion</span><span>${prog}%</span></div>
+                    <div class="progress-bar"><div class="progress-fill ${prog >= 75 ? 'green' : prog >= 40 ? 'amber' : 'red'}" style="width:${prog}%"></div></div>
+                    <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+                      <span class="project-ref">${esc(p.reference || 'No ref')}</span>
+                      <span class="status ${prog === 100 ? 'complete' : prog > 0 ? 'in-progress' : 'pending'}">${prog === 100 ? 'Complete' : prog > 0 ? 'In Progress' : 'Not Started'}</span>
+                    </div>
+                  </div>
+                </div>`;
+            }).join('')}
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+// ── Projects List ──
+function renderProjects(c) {
+  c.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div>
+        <h2 style="font-size:1.3rem;font-weight:700">All Projects</h2>
+        <p style="color:var(--text-light);font-size:.85rem">${state.projects.length} project(s)</p>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div class="search-bar">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="projSearch" placeholder="Search projects..." oninput="filterProjects()" style="padding-left:36px;width:220px">
+        </div>
+        <button class="btn btn-accent" onclick="showNewProjectModal()">+ New Project</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Project Name</th><th>Client</th><th>Reference</th><th>Handover Date</th><th>Documents</th><th>Progress</th><th>Status</th><th></th></tr></thead>
+          <tbody id="projectsTableBody">
+            ${state.projects.length === 0 ? '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-light)">No projects. Click "+ New Project" to create one.</td></tr>' : ''}
+            ${state.projects.map(p => {
+              const prog = getProjectProgress(p);
+              const docs = getTotalDocs(p);
+              return `<tr>
+                <td><a href="#" onclick="selectProject('${p.id}');return false" style="color:var(--primary);font-weight:500;text-decoration:none">${esc(p.name)}</a></td>
+                <td>${esc(p.client || '—')}</td>
+                <td>${esc(p.reference || '—')}</td>
+                <td>${formatDate(p.handoverDate)}</td>
+                <td>${docs}</td>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar" style="width:80px"><div class="progress-fill ${prog >= 75 ? 'green' : prog >= 40 ? 'amber' : 'red'}" style="width:${prog}%"></div></div><span style="font-size:.8rem">${prog}%</span></div></td>
+                <td><span class="status ${prog === 100 ? 'complete' : prog > 0 ? 'in-progress' : 'pending'}">${prog === 100 ? 'Complete' : prog > 0 ? 'In Progress' : 'Pending'}</span></td>
+                <td><button class="btn btn-sm btn-outline" onclick="confirmDeleteProject('${p.id}')">🗑️</button></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function filterProjects() {
+  const q = document.getElementById('projSearch')?.value.toLowerCase() || '';
+  document.querySelectorAll('#projectsTableBody tr').forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+// ── Project Overview ──
+function renderProjectOverview(c) {
+  const p = currentProject();
+  if (!p) { c.innerHTML = noProjectHtml(); return; }
+  const prog = getProjectProgress(p);
+  const docs = getTotalDocs(p);
+  const requiredSections = p.sections.filter(s => s.required);
+  const completeSections = requiredSections.filter(s => s.documents.length > 0).length;
+
+  c.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div>
+        <h2 style="font-size:1.3rem;font-weight:700">${esc(p.name)}</h2>
+        <p style="color:var(--text-light);font-size:.85rem">${esc(p.client)}${p.reference ? ' — ' + esc(p.reference) : ''}</p>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="showEditProjectModal('${p.id}')">✏️ Edit Details</button>
+        <button class="btn btn-primary" onclick="navigateTo('documents')">📄 Manage Documents</button>
+      </div>
+    </div>
+
+    <div class="grid grid-4" style="margin-bottom:24px">
+      <div class="card stat-card"><div class="stat-icon blue">📄</div><div class="stat-info"><h3>${docs}</h3><p>Documents Uploaded</p></div></div>
+      <div class="card stat-card"><div class="stat-icon green">✅</div><div class="stat-info"><h3>${completeSections}/${requiredSections.length}</h3><p>Required Sections</p></div></div>
+      <div class="card stat-card"><div class="stat-icon amber">⚙️</div><div class="stat-info"><h3>${p.equipment.length}</h3><p>Equipment Items</p></div></div>
+      <div class="card stat-card"><div class="stat-icon ${prog >= 75 ? 'green' : prog >= 40 ? 'amber' : 'red'}">📈</div><div class="stat-info"><h3>${prog}%</h3><p>Overall Progress</p></div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div class="card">
+        <div class="card-header"><h2>Project Details</h2></div>
+        <div class="card-body" style="font-size:.85rem">
+          <table style="width:100%">
+            <tr><td style="font-weight:500;width:140px;padding:6px 0">Client</td><td>${esc(p.client || '—')}</td></tr>
+            <tr><td style="font-weight:500;padding:6px 0">Reference</td><td>${esc(p.reference || '—')}</td></tr>
+            <tr><td style="font-weight:500;padding:6px 0">Address</td><td>${esc(p.address || '—')}</td></tr>
+            <tr><td style="font-weight:500;padding:6px 0">Main Contractor</td><td>${esc(p.contractor || '—')}</td></tr>
+            <tr><td style="font-weight:500;padding:6px 0">Start Date</td><td>${formatDate(p.startDate)}</td></tr>
+            <tr><td style="font-weight:500;padding:6px 0">Handover Date</td><td>${formatDate(p.handoverDate)}</td></tr>
+            <tr><td style="font-weight:500;padding:6px 0">Description</td><td>${esc(p.description || '—')}</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Section Checklist</h2></div>
+        <div class="card-body" style="max-height:400px;overflow-y:auto">
+          ${p.sections.map(s => `
+            <div class="checklist-item ${s.documents.length > 0 ? 'done' : ''}" onclick="navigateTo('documents');setTimeout(()=>openSectionTab('${s.id}'),100)">
+              <div class="check">${s.documents.length > 0 ? '✓' : ''}</div>
+              <div class="info">
+                <h4>${esc(s.name)} ${s.required ? '<span style="color:var(--danger);font-size:.7rem">REQUIRED</span>' : ''}</h4>
+                <p>${s.documents.length} document(s)</p>
+              </div>
+              <div class="count">${s.documents.length}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px">
+      <div class="card-header"><h2>Project Notes</h2><button class="btn btn-sm btn-outline" onclick="showAddNoteModal()">+ Add Note</button></div>
+      <div class="card-body">
+        ${p.notes.length === 0 ? '<p style="color:var(--text-light);font-size:.85rem;text-align:center;padding:16px">No notes yet.</p>' :
+          p.notes.slice().reverse().map(n => `
+            <div class="note-item">
+              <div class="note-date">${formatDate(n.date)}</div>
+              <div class="note-text">${esc(n.text)}</div>
+            </div>
+          `).join('')
+        }
+      </div>
+    </div>
+  `;
+}
+
+// ── Documents ──
+function renderDocuments(c) {
+  const p = currentProject();
+  if (!p) { c.innerHTML = noProjectHtml(); return; }
+
+  c.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div>
+        <h2 style="font-size:1.3rem;font-weight:700">Documents</h2>
+        <p style="color:var(--text-light);font-size:.85rem">${esc(p.name)} — ${getTotalDocs(p)} document(s) across ${p.sections.length} sections</p>
+      </div>
+    </div>
+    <div class="tabs" id="docTabs">
+      ${p.sections.map((s, i) => `
+        <div class="tab ${i === 0 ? 'active' : ''}" data-section="${s.id}" onclick="openSectionTab('${s.id}')">${esc(s.name)} <span style="font-size:.7rem;margin-left:4px;color:var(--text-light)">(${s.documents.length})</span></div>
+      `).join('')}
+    </div>
+    <div id="sectionContent"></div>
+  `;
+
+  openSectionTab(p.sections[0].id);
+}
+
+function openSectionTab(sectionId) {
+  const p = currentProject();
+  if (!p) return;
+  document.querySelectorAll('#docTabs .tab').forEach(t => t.classList.toggle('active', t.dataset.section === sectionId));
+  const section = p.sections.find(s => s.id === sectionId);
+  if (!section) return;
+
+  const sc = document.getElementById('sectionContent');
+  sc.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2>${esc(section.name)}</h2>
+          <p style="font-size:.8rem;color:var(--text-light);margin-top:2px">${esc(section.description)}</p>
+        </div>
+        ${section.required ? '<span class="status overdue">REQUIRED</span>' : '<span class="status in-progress">OPTIONAL</span>'}
+      </div>
+      <div class="card-body">
+        <div class="upload-zone" id="uploadZone_${sectionId}"
+          ondragover="event.preventDefault();this.classList.add('dragover')"
+          ondragleave="this.classList.remove('dragover')"
+          ondrop="handleDrop(event,'${sectionId}')"
+          onclick="document.getElementById('fileInput_${sectionId}').click()">
+          <div class="icon">📁</div>
+          <p>Drag & drop files here, or <span class="browse">browse</span></p>
+          <p style="font-size:.75rem;margin-top:4px">Supports PDF, DOC, DWG, JPG, PNG, XLS, and more</p>
+          <input type="file" id="fileInput_${sectionId}" multiple hidden onchange="handleFileSelect(event,'${sectionId}')">
+        </div>
+        <div id="fileList_${sectionId}" style="margin-top:16px">
+          ${section.documents.length === 0 ? '<p style="color:var(--text-light);font-size:.85rem;text-align:center">No documents uploaded to this section yet.</p>' :
+            section.documents.map((d, i) => `
+              <div class="file-item">
+                <div class="file-icon">${fileIcon(d.name)}</div>
+                <div class="file-info">
+                  <div class="file-name">${esc(d.name)}</div>
+                  <div class="file-meta">${formatFileSize(d.size)} — Uploaded ${formatDate(d.uploadedAt)}</div>
+                  ${d.notes ? `<div class="file-meta" style="color:var(--text);margin-top:2px">📝 ${esc(d.notes)}</div>` : ''}
+                </div>
+                <div class="file-actions">
+                  <button title="Add notes" onclick="addDocNote('${sectionId}',${i})">📝</button>
+                  <button title="Remove" onclick="removeDoc('${sectionId}',${i})">🗑️</button>
+                </div>
+              </div>
+            `).join('')
+          }
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function handleDrop(e, sectionId) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('dragover');
+  const files = e.dataTransfer.files;
+  addFiles(files, sectionId);
+}
+
+function handleFileSelect(e, sectionId) {
+  addFiles(e.target.files, sectionId);
+}
+
+function addFiles(files, sectionId) {
+  const p = currentProject();
+  if (!p) return;
+  const section = p.sections.find(s => s.id === sectionId);
+  if (!section) return;
+  for (const f of files) {
+    section.documents.push({
+      name: f.name,
+      size: f.size,
+      type: f.type,
+      uploadedAt: new Date().toISOString(),
+      notes: '',
+      // In a production app, you'd store the file content in IndexedDB or upload to a server
+      dataUrl: null, // placeholder
+    });
+    // Read as data URL for preview capability
+    const reader = new FileReader();
+    const idx = section.documents.length - 1;
+    reader.onload = () => {
+      section.documents[idx].dataUrl = reader.result;
+      saveState();
+    };
+    reader.readAsDataURL(f);
+  }
+  saveState();
+  toast(`${files.length} file(s) added to ${section.name}`);
+  openSectionTab(sectionId);
+}
+
+function removeDoc(sectionId, idx) {
+  const p = currentProject();
+  if (!p) return;
+  const section = p.sections.find(s => s.id === sectionId);
+  if (!section) return;
+  if (!confirm('Remove this document?')) return;
+  section.documents.splice(idx, 1);
+  saveState();
+  openSectionTab(sectionId);
+  toast('Document removed', 'info');
+}
+
+function addDocNote(sectionId, idx) {
+  const p = currentProject();
+  const section = p.sections.find(s => s.id === sectionId);
+  const doc = section.documents[idx];
+  const note = prompt('Enter a note for this document:', doc.notes || '');
+  if (note !== null) {
+    doc.notes = note;
+    saveState();
+    openSectionTab(sectionId);
+  }
+}
+
+// ── Equipment Register ──
+function renderEquipment(c) {
+  const p = currentProject();
+  if (!p) { c.innerHTML = noProjectHtml(); return; }
+
+  c.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div>
+        <h2 style="font-size:1.3rem;font-weight:700">Equipment Register</h2>
+        <p style="color:var(--text-light);font-size:.85rem">${p.equipment.length} item(s) registered</p>
+      </div>
+      <button class="btn btn-accent" onclick="showAddEquipmentModal()">+ Add Equipment</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tag/Ref</th><th>Description</th><th>Manufacturer</th><th>Model</th><th>Serial No.</th><th>Location</th><th>System</th><th></th></tr></thead>
+          <tbody>
+            ${p.equipment.length === 0 ? '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-light)">No equipment registered. Click "+ Add Equipment" to start.</td></tr>' : ''}
+            ${p.equipment.map((eq, i) => `
+              <tr>
+                <td style="font-weight:500">${esc(eq.tag)}</td>
+                <td>${esc(eq.description)}</td>
+                <td>${esc(eq.manufacturer)}</td>
+                <td>${esc(eq.model)}</td>
+                <td>${esc(eq.serialNo)}</td>
+                <td>${esc(eq.location)}</td>
+                <td>${esc(eq.system)}</td>
+                <td>
+                  <button class="btn btn-sm btn-outline" onclick="editEquipment(${i})">✏️</button>
+                  <button class="btn btn-sm btn-outline" onclick="removeEquipment(${i})">🗑️</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function showAddEquipmentModal(editIdx) {
+  const p = currentProject();
+  if (!p) return;
+  const eq = editIdx !== undefined ? p.equipment[editIdx] : {};
+  const isEdit = editIdx !== undefined;
+
+  openModal(isEdit ? 'Edit Equipment' : 'Add Equipment', `
+    <div class="form-row">
+      <div class="form-group"><label>Tag / Reference *</label><input id="eqTag" value="${esc(eq.tag || '')}" placeholder="e.g. AHU-01"></div>
+      <div class="form-group"><label>System</label>
+        <select id="eqSystem">
+          <option value="">Select system...</option>
+          ${['HVAC','Electrical','Plumbing','Fire','BMS','Drainage','Gas','Renewables','Lifts','Other'].map(s => `<option ${eq.system === s ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>Description *</label><input id="eqDesc" value="${esc(eq.description || '')}" placeholder="e.g. Air Handling Unit — Level 3"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Manufacturer</label><input id="eqMfr" value="${esc(eq.manufacturer || '')}"></div>
+      <div class="form-group"><label>Model</label><input id="eqModel" value="${esc(eq.model || '')}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Serial Number</label><input id="eqSerial" value="${esc(eq.serialNo || '')}"></div>
+      <div class="form-group"><label>Location</label><input id="eqLoc" value="${esc(eq.location || '')}" placeholder="e.g. Plant Room 3, Level 3"></div>
+    </div>
+    <div class="form-group"><label>Notes</label><textarea id="eqNotes" rows="2">${esc(eq.notes || '')}</textarea></div>
+  `, `
+    <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="saveEquipment(${isEdit ? editIdx : -1})">${isEdit ? 'Update' : 'Add Equipment'}</button>
+  `);
+}
+
+function saveEquipment(editIdx) {
+  const p = currentProject();
+  const data = {
+    tag: document.getElementById('eqTag').value.trim(),
+    description: document.getElementById('eqDesc').value.trim(),
+    manufacturer: document.getElementById('eqMfr').value.trim(),
+    model: document.getElementById('eqModel').value.trim(),
+    serialNo: document.getElementById('eqSerial').value.trim(),
+    location: document.getElementById('eqLoc').value.trim(),
+    system: document.getElementById('eqSystem').value,
+    notes: document.getElementById('eqNotes').value.trim(),
+  };
+  if (!data.tag || !data.description) { toast('Tag and Description are required', 'error'); return; }
+  if (editIdx >= 0) {
+    p.equipment[editIdx] = data;
+    toast('Equipment updated');
+  } else {
+    p.equipment.push(data);
+    toast('Equipment added');
+  }
+  saveState();
+  closeModal();
+  renderEquipment(document.getElementById('content'));
+}
+
+function editEquipment(i) { showAddEquipmentModal(i); }
+function removeEquipment(i) {
+  if (!confirm('Remove this equipment item?')) return;
+  currentProject().equipment.splice(i, 1);
+  saveState();
+  renderEquipment(document.getElementById('content'));
+  toast('Equipment removed', 'info');
+}
+
+// ── Contacts & Suppliers ──
+function renderContacts(c) {
+  const p = currentProject();
+  if (!p) { c.innerHTML = noProjectHtml(); return; }
+
+  c.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div>
+        <h2 style="font-size:1.3rem;font-weight:700">Contacts & Suppliers</h2>
+        <p style="color:var(--text-light);font-size:.85rem">${p.contacts.length} contact(s)</p>
+      </div>
+      <button class="btn btn-accent" onclick="showAddContactModal()">+ Add Contact</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Company</th><th>Contact Name</th><th>Role / Trade</th><th>Phone</th><th>Email</th><th>Notes</th><th></th></tr></thead>
+          <tbody>
+            ${p.contacts.length === 0 ? '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-light)">No contacts added yet.</td></tr>' : ''}
+            ${p.contacts.map((ct, i) => `
+              <tr>
+                <td style="font-weight:500">${esc(ct.company)}</td>
+                <td>${esc(ct.name)}</td>
+                <td>${esc(ct.role)}</td>
+                <td>${esc(ct.phone)}</td>
+                <td>${esc(ct.email)}</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(ct.notes)}</td>
+                <td><button class="btn btn-sm btn-outline" onclick="removeContact(${i})">🗑️</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function showAddContactModal() {
+  openModal('Add Contact / Supplier', `
+    <div class="form-row">
+      <div class="form-group"><label>Company *</label><input id="ctCompany" placeholder="e.g. Daikin UK"></div>
+      <div class="form-group"><label>Contact Name</label><input id="ctName" placeholder="e.g. John Smith"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Role / Trade</label>
+        <select id="ctRole">
+          <option value="">Select...</option>
+          ${['Main Contractor','M&E Contractor','HVAC Subcontractor','Electrical Subcontractor','Plumbing Subcontractor','Fire Protection','BMS/Controls','Commissioning Engineer','Manufacturer','Supplier','Consultant','Architect','Client','Facilities Manager','Other'].map(r => `<option>${r}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Phone</label><input id="ctPhone" type="tel"></div>
+    </div>
+    <div class="form-group"><label>Email</label><input id="ctEmail" type="email"></div>
+    <div class="form-group"><label>Notes</label><textarea id="ctNotes" rows="2"></textarea></div>
+  `, `
+    <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="saveContact()">Add Contact</button>
+  `);
+}
+
+function saveContact() {
+  const p = currentProject();
+  const data = {
+    company: document.getElementById('ctCompany').value.trim(),
+    name: document.getElementById('ctName').value.trim(),
+    role: document.getElementById('ctRole').value,
+    phone: document.getElementById('ctPhone').value.trim(),
+    email: document.getElementById('ctEmail').value.trim(),
+    notes: document.getElementById('ctNotes').value.trim(),
+  };
+  if (!data.company) { toast('Company name is required', 'error'); return; }
+  p.contacts.push(data);
+  saveState();
+  closeModal();
+  renderContacts(document.getElementById('content'));
+  toast('Contact added');
+}
+
+function removeContact(i) {
+  if (!confirm('Remove this contact?')) return;
+  currentProject().contacts.splice(i, 1);
+  saveState();
+  renderContacts(document.getElementById('content'));
+  toast('Contact removed', 'info');
+}
+
+// ── Maintenance Schedules ──
+function renderMaintenance(c) {
+  const p = currentProject();
+  if (!p) { c.innerHTML = noProjectHtml(); return; }
+
+  c.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div>
+        <h2 style="font-size:1.3rem;font-weight:700">Maintenance Schedules</h2>
+        <p style="color:var(--text-light);font-size:.85rem">Planned preventive maintenance tasks</p>
+      </div>
+      <button class="btn btn-accent" onclick="showAddMaintenanceModal()">+ Add Task</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Equipment</th><th>Task</th><th>Frequency</th><th>Responsibility</th><th>Notes</th><th></th></tr></thead>
+          <tbody>
+            ${p.maintenanceItems.length === 0 ? '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-light)">No maintenance tasks defined. Click "+ Add Task" to start.</td></tr>' : ''}
+            ${p.maintenanceItems.map((m, i) => `
+              <tr>
+                <td style="font-weight:500">${esc(m.equipment)}</td>
+                <td>${esc(m.task)}</td>
+                <td><span class="status in-progress">${esc(m.frequency)}</span></td>
+                <td>${esc(m.responsibility)}</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.notes)}</td>
+                <td><button class="btn btn-sm btn-outline" onclick="removeMaintenance(${i})">🗑️</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function showAddMaintenanceModal() {
+  const p = currentProject();
+  openModal('Add Maintenance Task', `
+    <div class="form-group"><label>Equipment *</label>
+      ${p.equipment.length > 0 ? `
+        <select id="mtEquip">
+          <option value="">Select equipment...</option>
+          ${p.equipment.map(e => `<option value="${esc(e.tag + ' — ' + e.description)}">${esc(e.tag)} — ${esc(e.description)}</option>`).join('')}
+          <option value="__other">Other (type below)</option>
+        </select>
+        <input id="mtEquipOther" placeholder="Or type equipment reference..." style="margin-top:6px;width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius)">
+      ` : `<input id="mtEquipOther" placeholder="Equipment reference">`}
+    </div>
+    <div class="form-group"><label>Task Description *</label><textarea id="mtTask" rows="2" placeholder="e.g. Replace filters, check belt tension, clean coils"></textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label>Frequency *</label>
+        <select id="mtFreq">
+          ${['Weekly','Monthly','Quarterly','6-Monthly','Annually','As Required'].map(f => `<option>${f}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Responsibility</label><input id="mtResp" placeholder="e.g. FM Team / Specialist Contractor"></div>
+    </div>
+    <div class="form-group"><label>Notes</label><textarea id="mtNotes" rows="2"></textarea></div>
+  `, `
+    <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="saveMaintenance()">Add Task</button>
+  `);
+}
+
+function saveMaintenance() {
+  const p = currentProject();
+  const selEl = document.getElementById('mtEquip');
+  let equip = '';
+  if (selEl && selEl.value && selEl.value !== '__other') equip = selEl.value;
+  else equip = document.getElementById('mtEquipOther')?.value.trim() || '';
+  const data = {
+    equipment: equip,
+    task: document.getElementById('mtTask').value.trim(),
+    frequency: document.getElementById('mtFreq').value,
+    responsibility: document.getElementById('mtResp').value.trim(),
+    notes: document.getElementById('mtNotes').value.trim(),
+  };
+  if (!data.equipment || !data.task) { toast('Equipment and Task are required', 'error'); return; }
+  p.maintenanceItems.push(data);
+  saveState();
+  closeModal();
+  renderMaintenance(document.getElementById('content'));
+  toast('Maintenance task added');
+}
+
+function removeMaintenance(i) {
+  if (!confirm('Remove this maintenance task?')) return;
+  currentProject().maintenanceItems.splice(i, 1);
+  saveState();
+  renderMaintenance(document.getElementById('content'));
+  toast('Task removed', 'info');
+}
+
+// ── Export / Compile ──
+function renderExport(c) {
+  const p = currentProject();
+  if (!p) { c.innerHTML = noProjectHtml(); return; }
+  const prog = getProjectProgress(p);
+  const missingSections = p.sections.filter(s => s.required && s.documents.length === 0);
+
+  c.innerHTML = `
+    <div style="margin-bottom:20px">
+      <h2 style="font-size:1.3rem;font-weight:700">Export / Compile O&M Manual</h2>
+      <p style="color:var(--text-light);font-size:.85rem">${esc(p.name)}</p>
+    </div>
+
+    ${missingSections.length > 0 ? `
+      <div class="card" style="margin-bottom:20px;border-left:4px solid var(--warning)">
+        <div class="card-body">
+          <h3 style="font-size:.95rem;color:var(--warning);margin-bottom:8px">⚠️ Missing Required Sections</h3>
+          <p style="font-size:.85rem;margin-bottom:8px">The following required sections have no documents uploaded:</p>
+          <ul style="font-size:.85rem;margin-left:20px;color:var(--text-light)">
+            ${missingSections.map(s => `<li>${esc(s.name)}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    ` : `
+      <div class="card" style="margin-bottom:20px;border-left:4px solid var(--success)">
+        <div class="card-body">
+          <h3 style="font-size:.95rem;color:var(--success)">✅ All required sections have documents</h3>
+        </div>
+      </div>
+    `}
+
+    <div class="card" style="margin-bottom:20px;border:2px solid var(--primary);background:linear-gradient(135deg,#f0f5ff 0%,#e8f0fe 100%)">
+      <div class="card-body" style="display:flex;align-items:center;gap:24px;padding:24px;flex-wrap:wrap">
+        <div style="font-size:3rem">📕</div>
+        <div style="flex:1;min-width:200px">
+          <h2 style="font-size:1.2rem;font-weight:700;color:var(--primary);margin-bottom:4px">Download Complete O&M Manual (PDF)</h2>
+          <p style="font-size:.85rem;color:var(--text-light)">Generates a professional PDF document containing: Cover Page, Table of Contents, Project Details, Document Register with all uploaded file listings, Equipment Schedule, Maintenance Schedule, Contacts & Suppliers, and Project Notes.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+          <button class="btn btn-primary btn-lg" onclick="exportPdfManual()" id="pdfExportBtn" style="font-size:1rem;padding:14px 28px">
+            📥 Download PDF Manual
+          </button>
+          <span style="font-size:.75rem;color:var(--text-light)" id="pdfStatus"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header"><h2>Individual Exports (HTML)</h2></div>
+      <div class="card-body">
+        <div class="export-options">
+          <div class="export-option" onclick="exportCoverPage()">
+            <div class="icon">📄</div>
+            <h4>Cover Page</h4>
+            <p>Download a formatted cover page for the manual</p>
+          </div>
+          <div class="export-option" onclick="exportTableOfContents()">
+            <div class="icon">📑</div>
+            <h4>Table of Contents</h4>
+            <p>Generate a contents page listing all sections</p>
+          </div>
+          <div class="export-option" onclick="exportEquipmentSchedule()">
+            <div class="icon">⚙️</div>
+            <h4>Equipment Schedule</h4>
+            <p>Export the equipment register as a table</p>
+          </div>
+          <div class="export-option" onclick="exportMaintenanceSchedule()">
+            <div class="icon">🔧</div>
+            <h4>Maintenance Schedule</h4>
+            <p>Export all PPM tasks as a schedule</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Full Manual Summary</h2></div>
+      <div class="card-body">
+        <table style="width:100%;font-size:.85rem">
+          <thead><tr><th>Section</th><th>Status</th><th>Documents</th></tr></thead>
+          <tbody>
+            ${p.sections.map(s => `
+              <tr>
+                <td>${esc(s.name)} ${s.required ? '<span style="color:var(--danger);font-size:.7rem">*</span>' : ''}</td>
+                <td><span class="status ${s.documents.length > 0 ? 'complete' : (s.required ? 'overdue' : 'pending')}">${s.documents.length > 0 ? 'Complete' : (s.required ? 'Missing' : 'Optional')}</span></td>
+                <td>${s.documents.length} file(s)</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div style="margin-top:16px;text-align:right">
+          <button class="btn btn-outline" onclick="exportFullSummary()" style="margin-right:8px">📤 Export Summary (HTML)</button>
+          <button class="btn btn-primary btn-lg" onclick="exportPdfManual()">📥 Download PDF Manual</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── Export functions ──
+function exportCoverPage() {
+  const p = currentProject();
+  if (!p) return;
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>O&M Manual — ${esc(p.name)}</title>
+  <style>
+    body{font-family:Arial,sans-serif;margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff}
+    .cover{text-align:center;max-width:600px;padding:60px}
+    h1{font-size:2.2rem;color:#8B1A1A;margin-bottom:8px}
+    h2{font-size:1.4rem;color:#64748b;font-weight:400;margin-bottom:40px}
+    .divider{width:80px;height:3px;background:#f59e0b;margin:0 auto 40px}
+    table{margin:0 auto;text-align:left;font-size:.95rem}
+    td{padding:8px 16px}
+    td:first-child{font-weight:600;color:#8B1A1A}
+  </style></head><body>
+  <div class="cover">
+    <h1>Operation & Maintenance Manual</h1>
+    <h2>${esc(p.name)}</h2>
+    <div class="divider"></div>
+    <table>
+      <tr><td>Client</td><td>${esc(p.client || '—')}</td></tr>
+      <tr><td>Reference</td><td>${esc(p.reference || '—')}</td></tr>
+      <tr><td>Address</td><td>${esc(p.address || '—')}</td></tr>
+      <tr><td>Contractor</td><td>${esc(p.contractor || '—')}</td></tr>
+      <tr><td>Handover Date</td><td>${formatDate(p.handoverDate)}</td></tr>
+    </table>
+    <p style="margin-top:60px;font-size:.8rem;color:#94a3b8">Generated ${new Date().toLocaleDateString('en-GB')}</p>
+  </div></body></html>`;
+  downloadHtml(html, `Cover_Page_${sanitizeFilename(p.name)}.html`);
+  toast('Cover page downloaded');
+}
+
+function exportTableOfContents() {
+  const p = currentProject();
+  if (!p) return;
+  let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Table of Contents</title>
+  <style>body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;padding:20px}h1{color:#8B1A1A;font-size:1.5rem;border-bottom:2px solid #f59e0b;padding-bottom:8px}
+  table{width:100%;border-collapse:collapse;margin-top:20px}th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #e2e8f0}th{background:#f8fafc;font-size:.8rem;text-transform:uppercase;color:#64748b}
+  .status{padding:2px 8px;border-radius:10px;font-size:.75rem}.complete{background:#d1fae5;color:#065f46}.missing{background:#fee2e2;color:#991b1b}.optional{background:#fef3c7;color:#92400e}</style></head><body>
+  <h1>Table of Contents — ${esc(p.name)}</h1>
+  <table><thead><tr><th>#</th><th>Section</th><th>Documents</th><th>Status</th></tr></thead><tbody>`;
+  p.sections.forEach((s, i) => {
+    const status = s.documents.length > 0 ? 'complete' : (s.required ? 'missing' : 'optional');
+    const label = s.documents.length > 0 ? 'Complete' : (s.required ? 'Missing' : 'Optional');
+    html += `<tr><td>${i+1}</td><td>${esc(s.name)}</td><td>${s.documents.length}</td><td><span class="status ${status}">${label}</span></td></tr>`;
+    if (s.documents.length > 0) {
+      s.documents.forEach(d => {
+        html += `<tr><td></td><td style="padding-left:30px;color:#64748b;font-size:.85rem">📄 ${esc(d.name)}</td><td style="color:#64748b;font-size:.85rem">${formatFileSize(d.size)}</td><td></td></tr>`;
+      });
+    }
+  });
+  html += `</tbody></table><p style="margin-top:30px;font-size:.8rem;color:#94a3b8">Generated ${new Date().toLocaleDateString('en-GB')}</p></body></html>`;
+  downloadHtml(html, `ToC_${sanitizeFilename(p.name)}.html`);
+  toast('Table of Contents downloaded');
+}
+
+function exportEquipmentSchedule() {
+  const p = currentProject();
+  if (!p || p.equipment.length === 0) { toast('No equipment to export', 'error'); return; }
+  let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Equipment Schedule</title>
+  <style>body{font-family:Arial,sans-serif;max-width:900px;margin:40px auto;padding:20px}h1{color:#8B1A1A;font-size:1.5rem;border-bottom:2px solid #f59e0b;padding-bottom:8px}
+  table{width:100%;border-collapse:collapse;margin-top:20px;font-size:.85rem}th,td{padding:8px 10px;text-align:left;border:1px solid #e2e8f0}th{background:#8B1A1A;color:#fff;font-size:.75rem;text-transform:uppercase}</style></head><body>
+  <h1>Equipment Schedule — ${esc(p.name)}</h1>
+  <table><thead><tr><th>Tag</th><th>Description</th><th>System</th><th>Manufacturer</th><th>Model</th><th>Serial No.</th><th>Location</th></tr></thead><tbody>`;
+  p.equipment.forEach(eq => {
+    html += `<tr><td>${esc(eq.tag)}</td><td>${esc(eq.description)}</td><td>${esc(eq.system)}</td><td>${esc(eq.manufacturer)}</td><td>${esc(eq.model)}</td><td>${esc(eq.serialNo)}</td><td>${esc(eq.location)}</td></tr>`;
+  });
+  html += `</tbody></table><p style="margin-top:30px;font-size:.8rem;color:#94a3b8">Generated ${new Date().toLocaleDateString('en-GB')}</p></body></html>`;
+  downloadHtml(html, `Equipment_${sanitizeFilename(p.name)}.html`);
+  toast('Equipment schedule downloaded');
+}
+
+function exportMaintenanceSchedule() {
+  const p = currentProject();
+  if (!p || p.maintenanceItems.length === 0) { toast('No maintenance tasks to export', 'error'); return; }
+  let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Maintenance Schedule</title>
+  <style>body{font-family:Arial,sans-serif;max-width:900px;margin:40px auto;padding:20px}h1{color:#8B1A1A;font-size:1.5rem;border-bottom:2px solid #f59e0b;padding-bottom:8px}
+  table{width:100%;border-collapse:collapse;margin-top:20px;font-size:.85rem}th,td{padding:8px 10px;text-align:left;border:1px solid #e2e8f0}th{background:#8B1A1A;color:#fff;font-size:.75rem;text-transform:uppercase}</style></head><body>
+  <h1>Maintenance Schedule — ${esc(p.name)}</h1>
+  <table><thead><tr><th>Equipment</th><th>Task</th><th>Frequency</th><th>Responsibility</th><th>Notes</th></tr></thead><tbody>`;
+  p.maintenanceItems.forEach(m => {
+    html += `<tr><td>${esc(m.equipment)}</td><td>${esc(m.task)}</td><td>${esc(m.frequency)}</td><td>${esc(m.responsibility)}</td><td>${esc(m.notes)}</td></tr>`;
+  });
+  html += `</tbody></table><p style="margin-top:30px;font-size:.8rem;color:#94a3b8">Generated ${new Date().toLocaleDateString('en-GB')}</p></body></html>`;
+  downloadHtml(html, `Maintenance_${sanitizeFilename(p.name)}.html`);
+  toast('Maintenance schedule downloaded');
+}
+
+function exportFullSummary() {
+  const p = currentProject();
+  if (!p) return;
+  const prog = getProjectProgress(p);
+  let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>O&M Manual Summary — ${esc(p.name)}</title>
+  <style>
+    body{font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:40px;color:#1e293b}
+    h1{color:#8B1A1A;font-size:1.8rem;border-bottom:3px solid #f59e0b;padding-bottom:10px}
+    h2{color:#8B1A1A;font-size:1.2rem;margin-top:30px;border-bottom:1px solid #e2e8f0;padding-bottom:6px}
+    table{width:100%;border-collapse:collapse;margin:12px 0;font-size:.85rem}
+    th,td{padding:8px 10px;text-align:left;border:1px solid #e2e8f0}
+    th{background:#8B1A1A;color:#fff;font-size:.75rem;text-transform:uppercase}
+    .info-table td{border:none;border-bottom:1px solid #e2e8f0}.info-table td:first-child{font-weight:600;width:160px;color:#8B1A1A}
+    .complete{color:#065f46;font-weight:500}.missing{color:#991b1b;font-weight:500}.optional{color:#92400e}
+    .progress{background:#e2e8f0;height:20px;border-radius:10px;overflow:hidden;margin:8px 0}
+    .progress-fill{height:100%;background:${prog >= 75 ? '#10b981' : prog >= 40 ? '#f59e0b' : '#ef4444'};border-radius:10px}
+    @media print{body{padding:20px}}
+  </style></head><body>
+  <h1>O&M Manual Summary</h1>
+  <h2>Project Information</h2>
+  <table class="info-table">
+    <tr><td>Project Name</td><td>${esc(p.name)}</td></tr>
+    <tr><td>Client</td><td>${esc(p.client || '—')}</td></tr>
+    <tr><td>Reference</td><td>${esc(p.reference || '—')}</td></tr>
+    <tr><td>Address</td><td>${esc(p.address || '—')}</td></tr>
+    <tr><td>Main Contractor</td><td>${esc(p.contractor || '—')}</td></tr>
+    <tr><td>Start Date</td><td>${formatDate(p.startDate)}</td></tr>
+    <tr><td>Handover Date</td><td>${formatDate(p.handoverDate)}</td></tr>
+    <tr><td>Description</td><td>${esc(p.description || '—')}</td></tr>
+  </table>
+  <h2>Overall Completion: ${prog}%</h2>
+  <div class="progress"><div class="progress-fill" style="width:${prog}%"></div></div>
+  <h2>Document Register</h2>
+  <table><thead><tr><th>#</th><th>Section</th><th>Required</th><th>Documents</th><th>Status</th></tr></thead><tbody>`;
+  p.sections.forEach((s, i) => {
+    const cls = s.documents.length > 0 ? 'complete' : (s.required ? 'missing' : 'optional');
+    const label = s.documents.length > 0 ? 'Complete' : (s.required ? 'MISSING' : 'Optional');
+    html += `<tr><td>${i+1}</td><td>${esc(s.name)}</td><td>${s.required ? 'Yes' : 'No'}</td><td>${s.documents.length}</td><td class="${cls}">${label}</td></tr>`;
+  });
+  html += `</tbody></table>`;
+
+  if (p.equipment.length > 0) {
+    html += `<h2>Equipment Register (${p.equipment.length} items)</h2>
+    <table><thead><tr><th>Tag</th><th>Description</th><th>System</th><th>Manufacturer</th><th>Model</th><th>Serial No.</th><th>Location</th></tr></thead><tbody>`;
+    p.equipment.forEach(eq => {
+      html += `<tr><td>${esc(eq.tag)}</td><td>${esc(eq.description)}</td><td>${esc(eq.system)}</td><td>${esc(eq.manufacturer)}</td><td>${esc(eq.model)}</td><td>${esc(eq.serialNo)}</td><td>${esc(eq.location)}</td></tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+
+  if (p.maintenanceItems.length > 0) {
+    html += `<h2>Maintenance Schedule (${p.maintenanceItems.length} tasks)</h2>
+    <table><thead><tr><th>Equipment</th><th>Task</th><th>Frequency</th><th>Responsibility</th></tr></thead><tbody>`;
+    p.maintenanceItems.forEach(m => {
+      html += `<tr><td>${esc(m.equipment)}</td><td>${esc(m.task)}</td><td>${esc(m.frequency)}</td><td>${esc(m.responsibility)}</td></tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+
+  if (p.contacts.length > 0) {
+    html += `<h2>Contacts & Suppliers (${p.contacts.length})</h2>
+    <table><thead><tr><th>Company</th><th>Contact</th><th>Role</th><th>Phone</th><th>Email</th></tr></thead><tbody>`;
+    p.contacts.forEach(ct => {
+      html += `<tr><td>${esc(ct.company)}</td><td>${esc(ct.name)}</td><td>${esc(ct.role)}</td><td>${esc(ct.phone)}</td><td>${esc(ct.email)}</td></tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+
+  html += `<p style="margin-top:40px;font-size:.8rem;color:#94a3b8;text-align:center">O&M Manual Summary — Generated ${new Date().toLocaleDateString('en-GB')} — O&M Manager</p></body></html>`;
+  downloadHtml(html, `OM_Summary_${sanitizeFilename(p.name)}.html`);
+  toast('Full summary downloaded');
+}
+
+// ── Templates ──
+function renderTemplates(c) {
+  c.innerHTML = `
+    <div style="margin-bottom:20px">
+      <h2 style="font-size:1.3rem;font-weight:700">Section Templates</h2>
+      <p style="color:var(--text-light);font-size:.85rem">These are the default sections included in every new project. Required sections contribute to completion percentage.</p>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        ${DEFAULT_SECTIONS.map(s => `
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid var(--border)">
+            <div style="flex:1">
+              <div style="font-weight:500;font-size:.9rem">${esc(s.name)}</div>
+              <div style="font-size:.8rem;color:var(--text-light)">${esc(s.description)}</div>
+            </div>
+            <span class="status ${s.required ? 'overdue' : 'in-progress'}">${s.required ? 'Required' : 'Optional'}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ════════════════════════════════════════════════════
+//  MODALS & ACTIONS
+// ════════════════════════════════════════════════════
+
+function showNewProjectModal() {
+  openModal('Create New O&M Project', `
+    <div class="form-group"><label>Project Name *</label><input id="npName" placeholder="e.g. Office Block Phase 2 — MEP O&M"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Client</label><input id="npClient" placeholder="e.g. ABC Developments Ltd"></div>
+      <div class="form-group"><label>Project Reference</label><input id="npRef" placeholder="e.g. PRJ-2026-042"></div>
+    </div>
+    <div class="form-group"><label>Site Address</label><input id="npAddr" placeholder="Full site address"></div>
+    <div class="form-group"><label>Main Contractor</label><input id="npContractor" placeholder="e.g. BuildCo Ltd"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Start Date</label><input type="date" id="npStart"></div>
+      <div class="form-group"><label>Handover Date</label><input type="date" id="npHandover"></div>
+    </div>
+    <div class="form-group"><label>Description</label><textarea id="npDesc" rows="3" placeholder="Brief project scope or description..."></textarea></div>
+  `, `
+    <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-accent" onclick="submitNewProject()">Create Project</button>
+  `);
+}
+
+function submitNewProject() {
+  const name = document.getElementById('npName').value.trim();
+  if (!name) { toast('Project name is required', 'error'); return; }
+  createProject({
+    name,
+    client: document.getElementById('npClient').value.trim(),
+    reference: document.getElementById('npRef').value.trim(),
+    address: document.getElementById('npAddr').value.trim(),
+    contractor: document.getElementById('npContractor').value.trim(),
+    startDate: document.getElementById('npStart').value,
+    handoverDate: document.getElementById('npHandover').value,
+    description: document.getElementById('npDesc').value.trim(),
+  });
+  closeModal();
+  toast('Project created successfully');
+  navigateTo('project-overview');
+}
+
+function showEditProjectModal(id) {
+  const p = state.projects.find(pr => pr.id === id);
+  if (!p) return;
+  openModal('Edit Project Details', `
+    <div class="form-group"><label>Project Name *</label><input id="epName" value="${esc(p.name)}"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Client</label><input id="epClient" value="${esc(p.client)}"></div>
+      <div class="form-group"><label>Project Reference</label><input id="epRef" value="${esc(p.reference)}"></div>
+    </div>
+    <div class="form-group"><label>Site Address</label><input id="epAddr" value="${esc(p.address)}"></div>
+    <div class="form-group"><label>Main Contractor</label><input id="epContractor" value="${esc(p.contractor)}"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Start Date</label><input type="date" id="epStart" value="${p.startDate}"></div>
+      <div class="form-group"><label>Handover Date</label><input type="date" id="epHandover" value="${p.handoverDate}"></div>
+    </div>
+    <div class="form-group"><label>Description</label><textarea id="epDesc" rows="3">${esc(p.description)}</textarea></div>
+  `, `
+    <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="submitEditProject('${id}')">Save Changes</button>
+  `);
+}
+
+function submitEditProject(id) {
+  const p = state.projects.find(pr => pr.id === id);
+  if (!p) return;
+  p.name = document.getElementById('epName').value.trim() || p.name;
+  p.client = document.getElementById('epClient').value.trim();
+  p.reference = document.getElementById('epRef').value.trim();
+  p.address = document.getElementById('epAddr').value.trim();
+  p.contractor = document.getElementById('epContractor').value.trim();
+  p.startDate = document.getElementById('epStart').value;
+  p.handoverDate = document.getElementById('epHandover').value;
+  p.description = document.getElementById('epDesc').value.trim();
+  saveState();
+  closeModal();
+  toast('Project updated');
+  navigateTo('project-overview');
+}
+
+function selectProject(id) {
+  state.currentProjectId = id;
+  saveState();
+  navigateTo('project-overview');
+}
+
+function confirmDeleteProject(id) {
+  const p = state.projects.find(pr => pr.id === id);
+  if (!p) return;
+  if (confirm(`Delete project "${p.name}"? This cannot be undone.`)) {
+    deleteProject(id);
+    toast('Project deleted', 'info');
+    navigateTo('projects');
+  }
+}
+
+function showAddNoteModal() {
+  openModal('Add Project Note', `
+    <div class="form-group"><label>Note</label><textarea id="noteText" rows="4" placeholder="Enter note..."></textarea></div>
+  `, `
+    <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="saveNote()">Add Note</button>
+  `);
+}
+
+function saveNote() {
+  const p = currentProject();
+  const text = document.getElementById('noteText').value.trim();
+  if (!text) { toast('Note cannot be empty', 'error'); return; }
+  p.notes.push({ text, date: new Date().toISOString() });
+  saveState();
+  closeModal();
+  toast('Note added');
+  renderProjectOverview(document.getElementById('content'));
+}
+
+// ════════════════════════════════════════════════════
+//  UTILITIES
+// ════════════════════════════════════════════════════
+
+function esc(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+function sanitizeFilename(str) {
+  return (str || 'project').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 40);
+}
+
+function noProjectHtml() {
+  return `<div class="empty-state"><div class="icon">📁</div><h3>No project selected</h3><p>Select a project from the Projects page, or create a new one.</p><button class="btn btn-accent btn-lg" onclick="navigateTo('projects')">Go to Projects</button></div>`;
+}
+
+function downloadHtml(html, filename) {
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ════════════════════════════════════════════════════
+//  PDF MANUAL GENERATION (jsPDF + AutoTable)
+// ════════════════════════════════════════════════════
+
+function exportPdfManual() {
+  const p = currentProject();
+  if (!p) { toast('No project selected', 'error'); return; }
+
+  // Check libraries loaded
+  if (typeof window.jspdf === 'undefined' || typeof window.jspdf.jsPDF === 'undefined') {
+    toast('PDF library (jsPDF) not loaded. Check internet and refresh.', 'error');
+    return;
+  }
+  if (typeof window.PDFLib === 'undefined') {
+    toast('PDF merge library (pdf-lib) not loaded. Check internet and refresh.', 'error');
+    return;
+  }
+
+  const statusEl = document.getElementById('pdfStatus');
+  const btnEl = document.getElementById('pdfExportBtn');
+  if (statusEl) statusEl.textContent = 'Generating PDF manual...';
+  if (btnEl) btnEl.disabled = true;
+
+  // Async generation
+  setTimeout(async () => {
+    try {
+      await _generatePdf(p, statusEl);
+      if (statusEl) statusEl.textContent = 'PDF downloaded successfully.';
+      toast('PDF manual downloaded');
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      if (statusEl) statusEl.textContent = 'Error: ' + err.message;
+      toast('Error generating PDF: ' + err.message, 'error');
+    } finally {
+      if (btnEl) btnEl.disabled = false;
+    }
+  }, 100);
+}
+
+// ── Helper: convert dataURL to Uint8Array ──
+function dataUrlToUint8(dataUrl) {
+  const base64 = dataUrl.split(',')[1];
+  const binary = atob(base64);
+  const arr = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+  return arr;
+}
+
+// ── Helper: detect file type from name ──
+function isImageFile(name) {
+  return /\.(jpg|jpeg|png)$/i.test(name || '');
+}
+function isPdfFile(name) {
+  return /\.pdf$/i.test(name || '');
+}
+
+async function _generatePdf(p, statusEl) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const MARGIN = 20;
+  const CONTENT_W = W - MARGIN * 2;
+  const PRIMARY = [139, 26, 26];
+  const ACCENT = [245, 158, 11];
+  const GREY = [100, 116, 139];
+  const DARK = [30, 41, 59];
+  const WHITE = [255, 255, 255];
+  const SUCCESS = [16, 185, 129];
+  const DANGER = [239, 68, 68];
+
+  const prog = getProjectProgress(p);
+  const totalDocs = getTotalDocs(p);
+  const generated = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+  let pageNum = 0;
+
+  // Track where each section ends (page index) for PDF insertion
+  const sectionEndPages = []; // { sectionIdx, pageAfter }
+
+  function addFooter() {
+    pageNum++;
+    doc.setFontSize(7.5);
+    doc.setTextColor(...GREY);
+    doc.text('O&M Manual - ' + p.name, MARGIN, H - 10);
+    doc.text('Page ' + pageNum, W - MARGIN, H - 10, { align: 'right' });
+    doc.setDrawColor(200, 210, 220);
+    doc.line(MARGIN, H - 14, W - MARGIN, H - 14);
+  }
+
+  function newPage() {
+    doc.addPage();
+    addFooter();
+  }
+
+  function sectionHeading(title, y) {
+    if (y > H - 50) { newPage(); y = MARGIN + 5; }
+    doc.setFontSize(14);
+    doc.setTextColor(...PRIMARY);
+    doc.setFont('helvetica', 'bold');
+    doc.text(title, MARGIN, y);
+    y += 2;
+    doc.setDrawColor(...ACCENT);
+    doc.setLineWidth(0.8);
+    doc.line(MARGIN, y, MARGIN + 50, y);
+    doc.setLineWidth(0.2);
+    return y + 8;
+  }
+
+  function kvLine(label, value, y) {
+    if (y > H - 25) { newPage(); y = MARGIN + 5; }
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...DARK);
+    doc.text(label + ':', MARGIN, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...GREY);
+    doc.text(value || '---', MARGIN + 45, y);
+    return y + 6;
+  }
+
+  // ══════════════════════════════════════════
+  //  PAGE 1 — COVER PAGE
+  // ══════════════════════════════════════════
+  doc.setFillColor(...PRIMARY);
+  doc.rect(0, 0, W, 90, 'F');
+  doc.setFillColor(...ACCENT);
+  doc.rect(0, 90, W, 4, 'F');
+
+  doc.setFontSize(28);
+  doc.setTextColor(...WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Operation & Maintenance', W / 2, 40, { align: 'center' });
+  doc.text('Manual', W / 2, 55, { align: 'center' });
+
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(200, 220, 255);
+  doc.text(p.name, W / 2, 72, { align: 'center' });
+
+  const boxY = 110;
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(220, 230, 240);
+  doc.roundedRect(MARGIN, boxY, CONTENT_W, 100, 3, 3, 'FD');
+
+  let cy = boxY + 14;
+  [['Project', p.name], ['Client', p.client], ['Reference', p.reference],
+   ['Site Address', p.address], ['Main Contractor', p.contractor],
+   ['Project Start', formatDate(p.startDate)], ['Handover Date', formatDate(p.handoverDate)]
+  ].forEach(([label, val]) => {
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...PRIMARY);
+    doc.text(label + ':', MARGIN + 8, cy);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...DARK);
+    doc.text(val || '---', MARGIN + 55, cy);
+    cy += 12;
+  });
+
+  if (p.description) {
+    cy = boxY + 110;
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(...GREY);
+    const descLines = doc.splitTextToSize(p.description, CONTENT_W - 10);
+    doc.text(descLines, MARGIN + 5, cy);
+  }
+
+  doc.setFontSize(8);
+  doc.setTextColor(...GREY);
+  doc.text('Generated: ' + generated, W / 2, H - 20, { align: 'center' });
+  doc.setFillColor(...PRIMARY);
+  doc.rect(0, H - 10, W, 10, 'F');
+  pageNum = 0;
+
+  // ══════════════════════════════════════════
+  //  TABLE OF CONTENTS
+  // ══════════════════════════════════════════
+  newPage();
+  let y = MARGIN + 5;
+  y = sectionHeading('Table of Contents', y);
+
+  const tocItems = [
+    'Project Information',
+    'Document Register',
+    ...p.sections.map((s, i) => '   ' + (i + 1) + '. ' + s.name),
+    'Equipment Register',
+    'Maintenance Schedule',
+    'Contacts & Suppliers',
+    'Project Notes',
+  ];
+
+  doc.setFontSize(9.5);
+  tocItems.forEach(item => {
+    if (y > H - 25) { newPage(); y = MARGIN + 5; }
+    const isIndented = item.startsWith('   ');
+    doc.setFont('helvetica', isIndented ? 'normal' : 'bold');
+    if (isIndented) { doc.setTextColor(...GREY); } else { doc.setTextColor(...DARK); }
+    const x = isIndented ? MARGIN + 6 : MARGIN;
+    doc.text(item.trim(), x, y);
+    if (!isIndented) {
+      doc.setFillColor(200, 210, 220);
+      const startX = x + doc.getTextWidth(item.trim()) + 4;
+      const endX = W - MARGIN - 10;
+      for (let dx = startX; dx < endX; dx += 2.5) {
+        doc.circle(dx, y - 1, 0.3, 'F');
+      }
+    }
+    y += isIndented ? 5.5 : 7;
+  });
+
+  // ══════════════════════════════════════════
+  //  PROJECT INFORMATION
+  // ══════════════════════════════════════════
+  newPage();
+  y = MARGIN + 5;
+  y = sectionHeading('Project Information', y);
+
+  y = kvLine('Project Name', p.name, y);
+  y = kvLine('Client', p.client, y);
+  y = kvLine('Reference', p.reference, y);
+  y = kvLine('Site Address', p.address, y);
+  y = kvLine('Main Contractor', p.contractor, y);
+  y = kvLine('Start Date', formatDate(p.startDate), y);
+  y = kvLine('Handover Date', formatDate(p.handoverDate), y);
+
+  if (p.description) {
+    y += 4;
+    y = kvLine('Description', '', y);
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...DARK);
+    const dLines = doc.splitTextToSize(p.description, CONTENT_W - 10);
+    if (y + dLines.length * 4 > H - 25) { newPage(); y = MARGIN + 5; }
+    doc.text(dLines, MARGIN + 5, y);
+    y += dLines.length * 4 + 6;
+  }
+
+  y += 6;
+  y = sectionHeading('Completion Summary', y);
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...DARK);
+  doc.text('Overall Completion: ' + prog + '%', MARGIN, y);
+  y += 4;
+  doc.setFillColor(226, 232, 240);
+  doc.roundedRect(MARGIN, y, CONTENT_W, 5, 2, 2, 'F');
+  const barColor = prog >= 75 ? SUCCESS : (prog >= 40 ? ACCENT : DANGER);
+  doc.setFillColor(...barColor);
+  if (prog > 0) doc.roundedRect(MARGIN, y, Math.max(4, CONTENT_W * (prog / 100)), 5, 2, 2, 'F');
+  y += 10;
+
+  doc.text('Total Documents: ' + totalDocs, MARGIN, y); y += 5;
+  doc.text('Equipment Items: ' + p.equipment.length, MARGIN, y); y += 5;
+  doc.text('Maintenance Tasks: ' + p.maintenanceItems.length, MARGIN, y); y += 5;
+  doc.text('Contacts/Suppliers: ' + p.contacts.length, MARGIN, y);
+
+  // ══════════════════════════════════════════
+  //  DOCUMENT REGISTER — OVERVIEW TABLE
+  // ══════════════════════════════════════════
+  newPage();
+  y = MARGIN + 5;
+  y = sectionHeading('Document Register', y);
+
+  doc.autoTable({
+    startY: y,
+    head: [['#', 'Section', 'Required', 'Documents', 'Status']],
+    body: p.sections.map((s, i) => [
+      i + 1, s.name, s.required ? 'Yes' : 'No', s.documents.length,
+      s.documents.length > 0 ? 'Complete' : (s.required ? 'MISSING' : 'Optional'),
+    ]),
+    theme: 'grid',
+    headStyles: { fillColor: PRIMARY, fontSize: 8, fontStyle: 'bold', halign: 'left' },
+    bodyStyles: { fontSize: 8, textColor: DARK },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center' },
+      2: { cellWidth: 20, halign: 'center' },
+      3: { cellWidth: 22, halign: 'center' },
+      4: { cellWidth: 24, halign: 'center' },
+    },
+    margin: { left: MARGIN, right: MARGIN },
+    didParseCell: (data) => {
+      if (data.column.index === 4 && data.section === 'body') {
+        const val = data.cell.raw;
+        if (val === 'Complete') data.cell.styles.textColor = [6, 95, 70];
+        else if (val === 'MISSING') { data.cell.styles.textColor = [153, 27, 27]; data.cell.styles.fontStyle = 'bold'; }
+        else data.cell.styles.textColor = [146, 64, 14];
+      }
+    },
+  });
+
+  // ══════════════════════════════════════════
+  //  EACH SECTION — LISTING + EMBEDDED IMAGES
+  // ══════════════════════════════════════════
+  p.sections.forEach((section, sIdx) => {
+    newPage();
+    y = MARGIN + 5;
+
+    // Section number badge
+    doc.setFillColor(...PRIMARY);
+    doc.roundedRect(MARGIN, y - 5, 8, 8, 1, 1, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(...WHITE);
+    doc.setFont('helvetica', 'bold');
+    doc.text(String(sIdx + 1), MARGIN + 4, y, { align: 'center' });
+
+    doc.setFontSize(13);
+    doc.setTextColor(...PRIMARY);
+    doc.text(section.name, MARGIN + 12, y + 1);
+    y += 4;
+    doc.setDrawColor(...ACCENT);
+    doc.setLineWidth(0.6);
+    doc.line(MARGIN, y, W - MARGIN, y);
+    doc.setLineWidth(0.2);
+    y += 5;
+
+    doc.setFontSize(7.5);
+    if (section.required) {
+      doc.setFillColor(254, 226, 226);
+      doc.setTextColor(153, 27, 27);
+      doc.roundedRect(MARGIN, y - 3, 22, 5, 1, 1, 'F');
+      doc.text('REQUIRED', MARGIN + 2, y);
+    } else {
+      doc.setFillColor(219, 234, 254);
+      doc.setTextColor(30, 64, 175);
+      doc.roundedRect(MARGIN, y - 3, 20, 5, 1, 1, 'F');
+      doc.text('OPTIONAL', MARGIN + 2, y);
+    }
+    y += 6;
+
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(...GREY);
+    doc.text(section.description, MARGIN, y);
+    y += 8;
+
+    if (section.documents.length === 0) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(...GREY);
+      doc.text('No documents uploaded to this section.', MARGIN, y);
+    } else {
+      doc.autoTable({
+        startY: y,
+        head: [['#', 'Document Name', 'File Size', 'Date Uploaded', 'Notes']],
+        body: section.documents.map((d, di) => [
+          di + 1, d.name, formatFileSize(d.size), formatDate(d.uploadedAt), d.notes || '---',
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: PRIMARY, fontSize: 7.5, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.5, textColor: DARK },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: { 0: { cellWidth: 8, halign: 'center' }, 2: { cellWidth: 22 }, 3: { cellWidth: 28 } },
+        margin: { left: MARGIN, right: MARGIN },
+      });
+
+      // ── Embed uploaded IMAGES directly after the listing ──
+      section.documents.forEach(d => {
+        if (isImageFile(d.name) && d.dataUrl) {
+          try {
+            newPage();
+            // Title bar
+            doc.setFillColor(248, 250, 252);
+            doc.rect(MARGIN, MARGIN, CONTENT_W, 10, 'F');
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...PRIMARY);
+            doc.text(section.name + ' — ' + d.name, MARGIN + 3, MARGIN + 7);
+
+            // Determine image format
+            const fmt = /\.png$/i.test(d.name) ? 'PNG' : 'JPEG';
+            const imgY = MARGIN + 14;
+            const maxW = CONTENT_W;
+            const maxH = H - imgY - 20; // leave room for footer
+
+            // addImage auto-scales within the given box
+            doc.addImage(d.dataUrl, fmt, MARGIN, imgY, maxW, maxH);
+          } catch (imgErr) {
+            console.warn('Could not embed image ' + d.name + ':', imgErr);
+            // Still continue — just skip this image
+            doc.setFontSize(8);
+            doc.setTextColor(...GREY);
+            doc.text('(Image could not be embedded: ' + d.name + ')', MARGIN, MARGIN + 20);
+          }
+        }
+      });
+    }
+
+    // Record the page number after this section (for PDF insertion later)
+    sectionEndPages.push({
+      sectionIdx: sIdx,
+      sectionName: section.name,
+      pageAfter: doc.internal.getNumberOfPages(),
+      pdfDocs: section.documents.filter(d => isPdfFile(d.name) && d.dataUrl)
+    });
+  });
+
+  // ══════════════════════════════════════════
+  //  EQUIPMENT REGISTER
+  // ══════════════════════════════════════════
+  newPage();
+  y = MARGIN + 5;
+  y = sectionHeading('Equipment Register', y);
+
+  if (p.equipment.length === 0) {
+    doc.setFontSize(9);
+    doc.setTextColor(...GREY);
+    doc.text('No equipment items registered for this project.', MARGIN, y);
+  } else {
+    doc.autoTable({
+      startY: y,
+      head: [['Tag / Ref', 'Description', 'System', 'Manufacturer', 'Model', 'Serial No.', 'Location']],
+      body: p.equipment.map(eq => [eq.tag, eq.description, eq.system, eq.manufacturer, eq.model, eq.serialNo, eq.location]),
+      theme: 'grid',
+      headStyles: { fillColor: PRIMARY, fontSize: 7.5, fontStyle: 'bold' },
+      bodyStyles: { fontSize: 7.5, textColor: DARK },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      margin: { left: MARGIN, right: MARGIN },
+      columnStyles: { 0: { fontStyle: 'bold' } },
+    });
+
+    const eqWithNotes = p.equipment.filter(e => e.notes);
+    if (eqWithNotes.length > 0) {
+      y = (doc.lastAutoTable ? doc.lastAutoTable.finalY : y) + 10;
+      if (y > H - 40) { newPage(); y = MARGIN + 5; }
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...PRIMARY);
+      doc.text('Equipment Notes', MARGIN, y);
+      y += 6;
+      eqWithNotes.forEach(eq => {
+        if (y > H - 25) { newPage(); y = MARGIN + 5; }
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...DARK);
+        doc.text(eq.tag + ':', MARGIN, y);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...GREY);
+        const noteLines = doc.splitTextToSize(eq.notes, CONTENT_W - 40);
+        doc.text(noteLines, MARGIN + 35, y);
+        y += noteLines.length * 4 + 4;
+      });
+    }
+  }
+
+  // ══════════════════════════════════════════
+  //  MAINTENANCE SCHEDULE
+  // ══════════════════════════════════════════
+  newPage();
+  y = MARGIN + 5;
+  y = sectionHeading('Planned Preventive Maintenance Schedule', y);
+
+  if (p.maintenanceItems.length === 0) {
+    doc.setFontSize(9);
+    doc.setTextColor(...GREY);
+    doc.text('No maintenance tasks defined for this project.', MARGIN, y);
+  } else {
+    doc.autoTable({
+      startY: y,
+      head: [['Equipment', 'Task Description', 'Frequency', 'Responsibility', 'Notes']],
+      body: p.maintenanceItems.map(m => [m.equipment, m.task, m.frequency, m.responsibility, m.notes || '---']),
+      theme: 'grid',
+      headStyles: { fillColor: PRIMARY, fontSize: 7.5, fontStyle: 'bold' },
+      bodyStyles: { fontSize: 7.5, textColor: DARK },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      margin: { left: MARGIN, right: MARGIN },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 35 }, 2: { cellWidth: 22, halign: 'center' }, 3: { cellWidth: 30 } },
+    });
+  }
+
+  // ══════════════════════════════════════════
+  //  CONTACTS & SUPPLIERS
+  // ══════════════════════════════════════════
+  newPage();
+  y = MARGIN + 5;
+  y = sectionHeading('Contacts & Suppliers', y);
+
+  if (p.contacts.length === 0) {
+    doc.setFontSize(9);
+    doc.setTextColor(...GREY);
+    doc.text('No contacts or suppliers recorded for this project.', MARGIN, y);
+  } else {
+    doc.autoTable({
+      startY: y,
+      head: [['Company', 'Contact Name', 'Role / Trade', 'Phone', 'Email', 'Notes']],
+      body: p.contacts.map(ct => [ct.company, ct.name, ct.role, ct.phone, ct.email, ct.notes || '---']),
+      theme: 'grid',
+      headStyles: { fillColor: PRIMARY, fontSize: 7.5, fontStyle: 'bold' },
+      bodyStyles: { fontSize: 7.5, textColor: DARK },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      margin: { left: MARGIN, right: MARGIN },
+      columnStyles: { 0: { fontStyle: 'bold' } },
+    });
+  }
+
+  // ══════════════════════════════════════════
+  //  PROJECT NOTES
+  // ══════════════════════════════════════════
+  if (p.notes.length > 0) {
+    newPage();
+    y = MARGIN + 5;
+    y = sectionHeading('Project Notes', y);
+
+    p.notes.slice().reverse().forEach(n => {
+      if (y > H - 30) { newPage(); y = MARGIN + 5; }
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...GREY);
+      doc.text(formatDate(n.date), MARGIN, y);
+      y += 4;
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...DARK);
+      const nLines = doc.splitTextToSize(n.text, CONTENT_W - 5);
+      doc.text(nLines, MARGIN + 2, y);
+      y += nLines.length * 4 + 3;
+      doc.setDrawColor(226, 232, 240);
+      doc.line(MARGIN, y, W - MARGIN, y);
+      y += 5;
+    });
+  }
+
+  // ══════════════════════════════════════════
+  //  END PAGE
+  // ══════════════════════════════════════════
+  newPage();
+  y = H / 2 - 20;
+  doc.setFillColor(...PRIMARY);
+  doc.roundedRect(MARGIN + 20, y - 10, CONTENT_W - 40, 50, 3, 3, 'F');
+  doc.setFontSize(16);
+  doc.setTextColor(...WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.text('End of O&M Manual', W / 2, y + 8, { align: 'center' });
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text(p.name, W / 2, y + 18, { align: 'center' });
+  doc.text('Generated: ' + generated, W / 2, y + 26, { align: 'center' });
+  doc.setFontSize(8);
+  doc.setTextColor(...GREY);
+  doc.text('This document was produced using O&M Manager.', W / 2, y + 50, { align: 'center' });
+
+  // ══════════════════════════════════════════
+  //  PHASE 2 — MERGE UPLOADED PDFs with pdf-lib
+  // ══════════════════════════════════════════
+  const hasPdfUploads = sectionEndPages.some(s => s.pdfDocs.length > 0);
+
+  if (!hasPdfUploads) {
+    // No PDFs to merge — just save directly
+    doc.save('OM_Manual_' + sanitizeFilename(p.name) + '.pdf');
+    return;
+  }
+
+  if (statusEl) statusEl.textContent = 'Merging uploaded documents...';
+
+  // Get jsPDF output as ArrayBuffer
+  const jspdfBytes = doc.output('arraybuffer');
+
+  const { PDFDocument, rgb } = window.PDFLib;
+  const finalPdf = await PDFDocument.load(jspdfBytes);
+
+  // Process sections in REVERSE order so page insertions don't shift earlier indices
+  for (let i = sectionEndPages.length - 1; i >= 0; i--) {
+    const sec = sectionEndPages[i];
+    if (sec.pdfDocs.length === 0) continue;
+
+    let insertAt = sec.pageAfter; // insert after this page index (0-based in pdf-lib)
+
+    // Process each uploaded PDF in this section
+    for (const pdfDoc of sec.pdfDocs) {
+      try {
+        const bytes = dataUrlToUint8(pdfDoc.dataUrl);
+        const uploadedPdf = await PDFDocument.load(bytes, { ignoreEncryption: true });
+        const pageIndices = uploadedPdf.getPageIndices();
+        const copiedPages = await finalPdf.copyPages(uploadedPdf, pageIndices);
+
+        // Insert a separator page before the uploaded PDF pages
+        const sepPage = finalPdf.insertPage(insertAt, [595.28, 841.89]); // A4
+        sepPage.drawRectangle({ x: 0, y: 841.89 - 60, width: 595.28, height: 60, color: rgb(30/255, 58/255, 95/255) });
+        sepPage.drawText('Attached Document', { x: 50, y: 841.89 - 38, size: 18, color: rgb(1, 1, 1) });
+        sepPage.drawText(sec.sectionName + ' — ' + pdfDoc.name, { x: 50, y: 841.89 - 55, size: 10, color: rgb(0.8, 0.86, 1) });
+        sepPage.drawText('File: ' + pdfDoc.name + '   |   Size: ' + formatFileSize(pdfDoc.size) + '   |   Uploaded: ' + formatDate(pdfDoc.uploadedAt), {
+          x: 50, y: 80, size: 8, color: rgb(0.4, 0.46, 0.55)
+        });
+        insertAt++;
+
+        // Insert all pages from the uploaded PDF
+        copiedPages.forEach(pg => {
+          finalPdf.insertPage(insertAt, pg);
+          insertAt++;
+        });
+      } catch (pdfErr) {
+        console.warn('Could not merge PDF ' + pdfDoc.name + ':', pdfErr);
+        // Insert an error note page instead
+        const errPage = finalPdf.insertPage(insertAt, [595.28, 841.89]);
+        errPage.drawText('Could not embed: ' + pdfDoc.name, { x: 50, y: 750, size: 12, color: rgb(0.9, 0.2, 0.2) });
+        errPage.drawText('The file may be encrypted or corrupted.', { x: 50, y: 730, size: 9, color: rgb(0.4, 0.46, 0.55) });
+        insertAt++;
+      }
+    }
+  }
+
+  // Save the final merged PDF
+  const finalBytes = await finalPdf.save();
+  const blob = new Blob([finalBytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'OM_Manual_' + sanitizeFilename(p.name) + '.pdf';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── Init ──
+// If embedded in portal iframe, hide the sidebar and adjust layout
+if(new URLSearchParams(window.location.search).get('embedded')==='1'){
+  document.getElementById('sidebar').style.display='none';
+  document.querySelector('.main').style.marginLeft='0';
+  document.body.style.background='#f1f5f9';
+}
+renderPage('dashboard');
+</script>
+</body>
+</html>

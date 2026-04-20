@@ -1807,19 +1807,25 @@ function renderDocuments(c) {
 // ═══════════════════════════════════════
 function renderOMManager(c) {
   c.innerHTML = `
-    <div style="margin-bottom:20px">
-      <h2 style="margin-bottom:4px">📘 O&amp;M Manager</h2>
-      <p style="color:var(--text-light);font-size:14px">Operation &amp; Maintenance documentation</p>
-    </div>
-    <div class="card" style="text-align:center;padding:40px 20px">
-      <div style="font-size:48px;margin-bottom:12px">📘</div>
-      <h3 style="margin-bottom:8px;font-size:18px">O&amp;M Manager</h3>
-      <p style="color:var(--text-light);font-size:14px;max-width:400px;margin:0 auto 16px">
-        Track O&amp;M manuals per project, build structured handover packs, manage snagging, and organise documentation by discipline.
-      </p>
-      <span class="badge" style="background:#dbeafe;color:#1e40af;font-size:12px;padding:6px 14px">Coming Soon</span>
+    <div style="margin:-16px;margin-bottom:0">
+      <iframe src="/om.html?embedded=1" style="width:100%;border:none;min-height:calc(100vh - 60px);display:block" id="omFrame"
+        onload="this.style.height=this.contentWindow.document.body.scrollHeight+'px'"></iframe>
     </div>
   `;
+  const iframe = document.getElementById('omFrame');
+  const resizeOm = () => {
+    try {
+      const h = iframe.contentWindow.document.body.scrollHeight;
+      iframe.style.height = Math.max(h, 600) + 'px';
+    } catch(e) {}
+  };
+  iframe.addEventListener('load', () => {
+    resizeOm();
+    try {
+      iframe.contentWindow.addEventListener('click', () => setTimeout(resizeOm, 200));
+      iframe.contentWindow.addEventListener('input', () => setTimeout(resizeOm, 200));
+    } catch(e) {}
+  });
 }
 
 // ═══════════════════════════════════════
