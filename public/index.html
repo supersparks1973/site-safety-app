@@ -294,6 +294,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
         <div class="sidebar-section-title">Projects</div>
         <ul class="sidebar-nav">
           <li><a data-page="projects"><span class="nav-icon">🏗️</span>Projects</a></li>
+          <li><a data-page="rfi"><span class="nav-icon">📩</span>RFI Manager</a></li>
           <li><a data-page="documents"><span class="nav-icon">📁</span>Document Library</a></li>
           <li><a data-page="om-manager"><span class="nav-icon">📘</span>O&amp;M Manager</a></li>
         </ul>
@@ -666,6 +667,7 @@ function renderPage(page) {
     'users': renderAdminUsers,
     // Portal modules
     'projects': renderProjects,
+    'rfi': renderRFI,
     'documents': renderDocuments,
     'om-manager': renderOMManager,
     'loto': renderLOTO,
@@ -1752,6 +1754,32 @@ window.deleteProject = async function(id) {
     renderProjects(document.getElementById('appContent'));
   } catch { showToast('Failed to delete project', 'error'); }
 };
+
+// ═══════════════════════════════════════
+// PORTAL: RFI MANAGER
+// ═══════════════════════════════════════
+function renderRFI(c) {
+  c.innerHTML = `
+    <div style="margin:-16px;margin-bottom:0">
+      <iframe src="/rfi.html?embedded=1" style="width:100%;border:none;min-height:calc(100vh - 60px);display:block" id="rfiFrame"
+        onload="this.style.height=this.contentWindow.document.body.scrollHeight+'px'"></iframe>
+    </div>
+  `;
+  const iframe = document.getElementById('rfiFrame');
+  const resizeRfi = () => {
+    try {
+      const h = iframe.contentWindow.document.body.scrollHeight;
+      iframe.style.height = Math.max(h, 600) + 'px';
+    } catch(e) {}
+  };
+  iframe.addEventListener('load', () => {
+    resizeRfi();
+    try {
+      iframe.contentWindow.addEventListener('click', () => setTimeout(resizeRfi, 300));
+      iframe.contentWindow.addEventListener('input', () => setTimeout(resizeRfi, 200));
+    } catch(e) {}
+  });
+}
 
 // ═══════════════════════════════════════
 // PORTAL: LOTO SYSTEM

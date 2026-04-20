@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ManProjects — RFI Management</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --brand:#8B1A1A;--brand2:#B22222;--brand-dark:#6B1414;
+  --ink:#1e293b;--muted:#64748b;--bg:#f1f5f9;--card:#fff;
+  --line:#e2e8f0;--ok:#16a34a;--warn:#f59e0b;--bad:#dc2626;
+  --radius:10px;--shadow:0 1px 3px rgba(0,0,0,.08)
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5}
+header.app{background:linear-gradient(135deg,#1e293b,#2d3748);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+header.app .logo{width:42px;height:42px;background:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+header.app .logo img{max-width:100%;max-height:100%;object-fit:contain}
+header.app h1{font-size:16px;font-weight:700}
+header.app .sub{font-size:11px;opacity:.7;margin-top:2px}
+header.app .doc-meta{margin-left:auto;font-size:11px;text-align:right;opacity:.85}
+
+nav.tabs{background:#fff;border-bottom:1px solid var(--line);padding:0 20px;display:flex;gap:2px;overflow-x:auto}
+nav.tabs button{background:none;border:0;padding:12px 16px;cursor:pointer;font-size:13px;color:var(--muted);font-weight:600;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s}
+nav.tabs button.active{color:var(--brand);border-bottom-color:var(--brand)}
+nav.tabs button:hover{color:var(--brand)}
+
+main{padding:20px;max-width:1200px;margin:0 auto}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card h2{font-size:15px;color:var(--brand);margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid var(--brand);display:flex;align-items:center;justify-content:space-between}
+
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+@media(max-width:700px){.kpi-row{grid-template-columns:1fr 1fr}}
+.kpi{background:#fff;border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:8px;padding:16px;text-align:center}
+.kpi .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px}
+.kpi .value{font-size:30px;font-weight:800;line-height:1}
+.kpi.open{border-left-color:var(--brand)}
+.kpi.open .value{color:var(--brand)}
+.kpi.await{border-left-color:var(--warn)}
+.kpi.await .value{color:var(--warn)}
+.kpi.closed{border-left-color:var(--ok)}
+.kpi.closed .value{color:var(--ok)}
+.kpi.overdue{border-left-color:var(--bad)}
+.kpi.overdue .value{color:var(--bad)}
+
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:700px){.grid-2{grid-template-columns:1fr}}
+
+label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px}
+input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-family:inherit;background:#fff}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(139,26,26,.1)}
+textarea{resize:vertical;min-height:80px}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:0;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-primary{background:var(--brand);color:#fff}
+.btn-primary:hover{background:var(--brand-dark)}
+.btn-success{background:var(--ok);color:#fff}
+.btn-danger{background:var(--bad);color:#fff}
+.btn-outline{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.btn-outline:hover{background:var(--bg)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+
+table.data{width:100%;border-collapse:collapse;font-size:12px}
+table.data th,table.data td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+table.data th{background:#fdf2f2;font-weight:700;color:var(--brand);font-size:11px;text-transform:uppercase;letter-spacing:.3px}
+table.data tr:nth-child(even) td{background:#fafbfd}
+table.data tr:hover td{background:#fff5f5}
+table.data tr.closed-row td{background:#f0fdf4}
+
+.status{display:inline-block;padding:3px 8px;border-radius:11px;font-size:11px;font-weight:700;text-transform:uppercase}
+.s-open{background:#fdf2f2;color:#991b1b}
+.s-awaiting{background:#fef3c7;color:#92400e}
+.s-closed{background:#dcfce7;color:#166534}
+
+.priority{display:inline-block;padding:2px 7px;border-radius:8px;font-size:11px;font-weight:600}
+.p-high{background:#fee2e2;color:#b91c1c}
+.p-medium{background:#fef3c7;color:#a16207}
+.p-low{background:#dbeafe;color:#1e40af}
+
+.filter-bar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end}
+.filter-bar input,.filter-bar select{max-width:200px}
+.filter-bar .form-group{margin-bottom:0}
+
+.form-group{margin-bottom:14px}
+
+.empty{text-align:center;padding:40px;color:var(--muted);font-style:italic}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:#fff;width:100%;max-width:700px;max-height:90vh;overflow-y:auto;border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.2)}
+.modal-head{padding:16px 20px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:space-between;border-radius:12px 12px 0 0}
+.modal-head h3{font-size:15px}
+.modal-body{padding:20px}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+
+.summary-table{width:100%;margin-bottom:16px}
+.summary-table td{padding:6px 10px;border-bottom:1px solid var(--line);font-size:13px}
+.summary-table td:first-child{font-weight:600;color:var(--brand);width:40%}
+
+.overdue-row{background:#fee2e2!important}
+.hidden{display:none!important}
+
+@media print{
+  header.app,nav.tabs,.btn,.filter-bar,.btn-row{display:none!important}
+  main{padding:0;max-width:none}
+  .card{border:0;box-shadow:none;page-break-inside:avoid}
+  .tab-content{display:block!important}
+}
+</style>
+</head>
+<body>
+
+<header class="app">
+  <div class="logo"><img src="/logo.png" alt="MP"></div>
+  <div>
+    <h1>MAN PROJECTS LTD</h1>
+    <div class="sub">RFI Management System — Request for Information</div>
+  </div>
+  <div class="doc-meta">
+    Document No. <b>MP-RFI-001</b> · Rev 02<br>
+    <span id="hdrDate"></span>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="dashboard" class="active">Dashboard</button>
+  <button data-tab="register">RFI Register</button>
+  <button data-tab="new-rfi">New RFI</button>
+  <button data-tab="settings">Settings</button>
+</nav>
+
+<main>
+  <div id="tab-dashboard" class="tab-content active"></div>
+  <div id="tab-register" class="tab-content"></div>
+  <div id="tab-new-rfi" class="tab-content"></div>
+  <div id="tab-settings" class="tab-content"></div>
+</main>
+
+<div id="modalContainer" class="hidden"></div>
+
+<script>
+// ════════════════════════════════════════
+// RFI MANAGEMENT SYSTEM
+// ════════════════════════════════════════
+const LS_KEY = 'rfi_manager_v1';
+
+const DEFAULT_SETTINGS = {
+  clients: ['GSK','Haleon','Anglian Water','Addenbrooke\'s','Stevenage','Ware','Other'],
+  disciplines: ['Electrical','Mechanical','Civils','Controls','General','H&S'],
+  priorities: ['High','Medium','Low'],
+  statuses: ['Open','Awaiting Reply','Closed'],
+  team: ['Ian Pateman','Warren Day','Ian Gipp','Paul','Chris','Sam','Other'],
+  docPrefix: 'MP-RFI',
+  preparedBy: 'Ian Pateman'
+};
+
+let state = load() || { settings: {...DEFAULT_SETTINGS}, rfis: [] };
+
+function load(){ try{ const s=localStorage.getItem(LS_KEY); return s?JSON.parse(s):null; }catch(e){ return null; } }
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+function uid(){ return 'rfi_'+Date.now().toString(36)+Math.floor(Math.random()*999).toString(36); }
+function todayIso(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(d){ if(!d) return ''; try{const x=new Date(d); if(isNaN(x))return d; return x.toLocaleDateString('en-GB');}catch(e){return d;} }
+function escape(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function nextRef(){
+  const year = new Date().getFullYear();
+  const n = state.rfis.filter(r=>r.ref && r.ref.includes(String(year))).length + 1;
+  return `${state.settings.docPrefix}-${year}-${String(n).padStart(3,'0')}`;
+}
+
+function daysBetween(d1,d2){
+  const a=new Date(d1),b=new Date(d2);
+  return Math.floor((b-a)/(1000*60*60*24));
+}
+
+function isOverdue(rfi){
+  if(rfi.status==='Closed') return false;
+  if(!rfi.responseDue) return false;
+  return new Date(rfi.responseDue) < new Date();
+}
+
+function ageDays(rfi){
+  if(!rfi.responseDue) return '';
+  const d = daysBetween(rfi.responseDue, todayIso());
+  if(rfi.status==='Closed') return '';
+  return d > 0 ? d + 'd overdue' : Math.abs(d) + 'd left';
+}
+
+// ── Tab switching ──
+function switchTab(name){
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.toggle('active',t.id==='tab-'+name));
+  window.scrollTo(0,0);
+}
+document.getElementById('tabs').addEventListener('click',e=>{
+  if(e.target.dataset.tab){ switchTab(e.target.dataset.tab); render(); }
+});
+
+// ════════════════════════════════════════
+// RENDERERS
+// ════════════════════════════════════════
+function render(){
+  document.getElementById('hdrDate').textContent = new Date().toLocaleDateString('en-GB');
+  renderDashboard();
+  renderRegister();
+  renderNewRFI();
+  renderSettings();
+}
+
+// ── Dashboard ──
+function renderDashboard(){
+  const el = document.getElementById('tab-dashboard');
+  const open = state.rfis.filter(r=>r.status==='Open').length;
+  const awaiting = state.rfis.filter(r=>r.status==='Awaiting Reply').length;
+  const closed = state.rfis.filter(r=>r.status==='Closed').length;
+  const overdue = state.rfis.filter(r=>isOverdue(r)).length;
+  const total = state.rfis.length;
+
+  // Status summary
+  const pctOpen = total ? Math.round(open/total*100) : 0;
+  const pctAwait = total ? Math.round(awaiting/total*100) : 0;
+  const pctClosed = total ? Math.round(closed/total*100) : 0;
+
+  // Overdue items
+  const overdueRfis = state.rfis.filter(r=>isOverdue(r)).slice(0,8);
+
+  // Priority breakdown
+  const high = state.rfis.filter(r=>r.status!=='Closed'&&r.priority==='High').length;
+  const med = state.rfis.filter(r=>r.status!=='Closed'&&r.priority==='Medium').length;
+  const low = state.rfis.filter(r=>r.status!=='Closed'&&r.priority==='Low').length;
+
+  el.innerHTML = `
+    <div class="kpi-row">
+      <div class="kpi open"><div class="label">Open RFIs</div><div class="value">${open}</div></div>
+      <div class="kpi await"><div class="label">Awaiting Reply</div><div class="value">${awaiting}</div></div>
+      <div class="kpi closed"><div class="label">Closed RFIs</div><div class="value">${closed}</div></div>
+      <div class="kpi overdue"><div class="label">Overdue RFIs</div><div class="value">${overdue}</div></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h2>Status Summary</h2>
+        <table class="summary-table">
+          <tr><td>Open</td><td>${open}</td><td>${pctOpen}%</td></tr>
+          <tr><td>Awaiting Reply</td><td>${awaiting}</td><td>${pctAwait}%</td></tr>
+          <tr><td>Closed</td><td>${closed}</td><td>${pctClosed}%</td></tr>
+          <tr style="font-weight:700;border-top:2px solid var(--brand)"><td>Total</td><td>${total}</td><td>100%</td></tr>
+        </table>
+        <h2 style="margin-top:16px">Active Priority Breakdown</h2>
+        <table class="summary-table">
+          <tr><td><span class="priority p-high">High</span></td><td>${high}</td></tr>
+          <tr><td><span class="priority p-medium">Medium</span></td><td>${med}</td></tr>
+          <tr><td><span class="priority p-low">Low</span></td><td>${low}</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h2>Overdue Actions</h2>
+        ${overdueRfis.length===0?'<div class="empty">No overdue RFIs — all on track!</div>':`
+        <table class="data">
+          <thead><tr><th>Ref</th><th>Project</th><th>Subject</th><th>Due</th><th>Age</th><th>Status</th></tr></thead>
+          <tbody>${overdueRfis.map(r=>`<tr class="overdue-row">
+            <td><b>${escape(r.ref)}</b></td>
+            <td>${escape(r.project||'')}</td>
+            <td>${escape(r.subject||'').substring(0,40)}</td>
+            <td>${fmtDate(r.responseDue)}</td>
+            <td style="color:var(--bad);font-weight:600">${ageDays(r)}</td>
+            <td><span class="status s-${r.status==='Awaiting Reply'?'awaiting':'open'}">${r.status}</span></td>
+          </tr>`).join('')}</tbody>
+        </table>`}
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Quick Actions</h2>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="switchTab('new-rfi');render()">+ New RFI</button>
+        <button class="btn btn-outline" onclick="switchTab('register');render()">View Register</button>
+        <button class="btn btn-outline" onclick="exportRegisterCSV()">⬇ Export CSV</button>
+      </div>
+    </div>
+  `;
+}
+
+// ── Register ──
+let regFilter = {status:'',search:'',priority:'',discipline:''};
+
+function renderRegister(){
+  const el = document.getElementById('tab-register');
+  let filtered = [...state.rfis];
+  if(regFilter.status) filtered = filtered.filter(r=>r.status===regFilter.status);
+  if(regFilter.priority) filtered = filtered.filter(r=>r.priority===regFilter.priority);
+  if(regFilter.discipline) filtered = filtered.filter(r=>r.discipline===regFilter.discipline);
+  if(regFilter.search){
+    const s = regFilter.search.toLowerCase();
+    filtered = filtered.filter(r=>[r.ref,r.project,r.subject,r.raisedBy,r.sentTo].join(' ').toLowerCase().includes(s));
+  }
+  filtered.sort((a,b)=>(b.dateRaised||'').localeCompare(a.dateRaised||''));
+
+  el.innerHTML = `
+    <div class="card">
+      <h2>RFI Register
+        <div style="font-size:12px;font-weight:normal;display:flex;gap:6px">
+          <button class="btn btn-sm btn-primary" onclick="switchTab('new-rfi');render()">+ New RFI</button>
+          <button class="btn btn-sm btn-outline" onclick="exportRegisterCSV()">⬇ CSV</button>
+          <button class="btn btn-sm btn-outline" onclick="window.print()">🖨 Print</button>
+        </div>
+      </h2>
+      <div class="filter-bar">
+        <div class="form-group"><label>Search</label><input placeholder="Ref, project, subject..." value="${escape(regFilter.search)}" oninput="regFilter.search=this.value;renderRegister()"></div>
+        <div class="form-group"><label>Status</label><select onchange="regFilter.status=this.value;renderRegister()">
+          <option value="">All</option>${state.settings.statuses.map(s=>`<option ${regFilter.status===s?'selected':''}>${s}</option>`).join('')}
+        </select></div>
+        <div class="form-group"><label>Priority</label><select onchange="regFilter.priority=this.value;renderRegister()">
+          <option value="">All</option>${state.settings.priorities.map(p=>`<option ${regFilter.priority===p?'selected':''}>${p}</option>`).join('')}
+        </select></div>
+        <div class="form-group"><label>Discipline</label><select onchange="regFilter.discipline=this.value;renderRegister()">
+          <option value="">All</option>${state.settings.disciplines.map(d=>`<option ${regFilter.discipline===d?'selected':''}>${d}</option>`).join('')}
+        </select></div>
+      </div>
+
+      ${filtered.length===0?'<div class="empty">No RFIs match the filter.</div>':`
+      <div style="overflow-x:auto">
+      <table class="data">
+        <thead><tr>
+          <th>RFI No</th><th>Project</th><th>Discipline</th><th>Priority</th>
+          <th>Date Raised</th><th>Subject</th><th>Raised By</th><th>Sent To</th>
+          <th>Response Due</th><th>Status</th><th></th>
+        </tr></thead>
+        <tbody>${filtered.map(r=>{
+          const od = isOverdue(r);
+          const stCls = r.status==='Open'?'s-open':r.status==='Awaiting Reply'?'s-awaiting':'s-closed';
+          const pCls = r.priority==='High'?'p-high':r.priority==='Medium'?'p-medium':'p-low';
+          return `<tr class="${r.status==='Closed'?'closed-row':''}${od?' overdue-row':''}">
+            <td><b>${escape(r.ref)}</b></td>
+            <td>${escape(r.project||'')}</td>
+            <td>${escape(r.discipline||'')}</td>
+            <td><span class="priority ${pCls}">${r.priority||''}</span></td>
+            <td>${fmtDate(r.dateRaised)}</td>
+            <td>${escape(r.subject||'').substring(0,50)}</td>
+            <td>${escape(r.raisedBy||'')}</td>
+            <td>${escape(r.sentTo||'')}</td>
+            <td>${fmtDate(r.responseDue)}${od?'<br><span style="color:var(--bad);font-size:10px;font-weight:700">'+ageDays(r)+'</span>':''}</td>
+            <td><span class="status ${stCls}">${r.status}</span></td>
+            <td style="white-space:nowrap">
+              <button class="btn btn-sm btn-outline" onclick="viewRFI('${r.id}')">View</button>
+              <button class="btn btn-sm btn-outline" onclick="editRFI('${r.id}')">Edit</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteRFI('${r.id}')" style="padding:4px 6px;font-size:11px">🗑</button>
+            </td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>`}
+    </div>
+  `;
+}
+
+// ── New / Edit RFI ──
+let editingRfiId = null;
+
+function renderNewRFI(rfi){
+  const el = document.getElementById('tab-new-rfi');
+  const r = rfi || (editingRfiId ? state.rfis.find(x=>x.id===editingRfiId) : null);
+  const isEdit = !!r;
+
+  el.innerHTML = `
+    <div class="card">
+      <h2>${isEdit?'Edit RFI — '+r.ref:'New RFI'}</h2>
+
+      <div style="font-weight:600;font-size:13px;color:var(--brand);margin-bottom:10px;text-transform:uppercase">Project Details</div>
+      <div class="grid-2">
+        <div class="form-group"><label>Project / Client *</label>
+          <select id="rfiProject">${state.settings.clients.map(c=>`<option ${isEdit&&r.project===c?'selected':''}>${c}</option>`).join('')}</select>
+        </div>
+        <div class="form-group"><label>Discipline</label>
+          <select id="rfiDiscipline">${state.settings.disciplines.map(d=>`<option ${isEdit&&r.discipline===d?'selected':''}>${d}</option>`).join('')}</select>
+        </div>
+        <div class="form-group"><label>Raised By</label>
+          <select id="rfiRaisedBy">${state.settings.team.map(t=>`<option ${isEdit&&r.raisedBy===t?'selected':''}>${t}</option>`).join('')}</select>
+        </div>
+        <div class="form-group"><label>Priority</label>
+          <select id="rfiPriority">${state.settings.priorities.map(p=>`<option ${isEdit&&r.priority===p?'selected':''}>${p}</option>`).join('')}</select>
+        </div>
+        <div class="form-group"><label>Date Raised</label>
+          <input type="date" id="rfiDate" value="${isEdit?r.dateRaised:todayIso()}">
+        </div>
+        <div class="form-group"><label>Sent To</label>
+          <input type="text" id="rfiSentTo" value="${isEdit?escape(r.sentTo||''):''}" placeholder="e.g. Consultant name / Client">
+        </div>
+        <div class="form-group"><label>Response Due</label>
+          <input type="date" id="rfiDue" value="${isEdit?(r.responseDue||''):''}">
+        </div>
+        <div class="form-group"><label>Status</label>
+          <select id="rfiStatus">${state.settings.statuses.map(s=>`<option ${isEdit&&r.status===s?'selected':''}>${s}</option>`).join('')}</select>
+        </div>
+      </div>
+
+      <div style="font-weight:600;font-size:13px;color:var(--brand);margin:16px 0 10px;text-transform:uppercase">Information Request</div>
+      <div class="form-group"><label>Subject / Information Required *</label>
+        <input type="text" id="rfiSubject" value="${isEdit?escape(r.subject||''):''}" placeholder="Brief subject line">
+      </div>
+      <div class="form-group"><label>Full Details</label>
+        <textarea id="rfiDetails" rows="5" placeholder="Enter the full details of the information request here, including drawing references, locations, equipment tags, or technical queries.">${isEdit?escape(r.details||''):''}</textarea>
+      </div>
+
+      <div style="font-weight:600;font-size:13px;color:var(--brand);margin:16px 0 10px;text-transform:uppercase">Response / Close-out</div>
+      <div class="form-group"><label>Response / Close-out Notes</label>
+        <textarea id="rfiResponse" rows="4" placeholder="Enter the response, agreed action, commercial impact, or close-out note here.">${isEdit?escape(r.response||''):''}</textarea>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="${isEdit?`updateRFI('${r.id}')`:'createRFI()'}">${isEdit?'Save Changes':'Create RFI'}</button>
+        ${isEdit?`<button class="btn btn-outline" onclick="editingRfiId=null;switchTab('register');render()">Cancel</button>`:''}
+      </div>
+    </div>
+  `;
+}
+
+function createRFI(){
+  const subject = document.getElementById('rfiSubject').value.trim();
+  if(!subject){ alert('Please enter a subject'); return; }
+  const rfi = {
+    id: uid(),
+    ref: nextRef(),
+    project: document.getElementById('rfiProject').value,
+    discipline: document.getElementById('rfiDiscipline').value,
+    raisedBy: document.getElementById('rfiRaisedBy').value,
+    priority: document.getElementById('rfiPriority').value,
+    dateRaised: document.getElementById('rfiDate').value,
+    sentTo: document.getElementById('rfiSentTo').value.trim(),
+    responseDue: document.getElementById('rfiDue').value,
+    status: document.getElementById('rfiStatus').value,
+    subject: subject,
+    details: document.getElementById('rfiDetails').value.trim(),
+    response: document.getElementById('rfiResponse').value.trim(),
+    createdAt: new Date().toISOString()
+  };
+  state.rfis.push(rfi);
+  save(); render();
+  switchTab('register');
+}
+
+function updateRFI(id){
+  const rfi = state.rfis.find(r=>r.id===id);
+  if(!rfi) return;
+  rfi.project = document.getElementById('rfiProject').value;
+  rfi.discipline = document.getElementById('rfiDiscipline').value;
+  rfi.raisedBy = document.getElementById('rfiRaisedBy').value;
+  rfi.priority = document.getElementById('rfiPriority').value;
+  rfi.dateRaised = document.getElementById('rfiDate').value;
+  rfi.sentTo = document.getElementById('rfiSentTo').value.trim();
+  rfi.responseDue = document.getElementById('rfiDue').value;
+  rfi.status = document.getElementById('rfiStatus').value;
+  rfi.subject = document.getElementById('rfiSubject').value.trim();
+  rfi.details = document.getElementById('rfiDetails').value.trim();
+  rfi.response = document.getElementById('rfiResponse').value.trim();
+  save();
+  editingRfiId = null;
+  render();
+  switchTab('register');
+}
+
+function editRFI(id){
+  editingRfiId = id;
+  render();
+  switchTab('new-rfi');
+}
+
+function deleteRFI(id){
+  if(!confirm('Delete this RFI? This cannot be undone.')) return;
+  state.rfis = state.rfis.filter(r=>r.id!==id);
+  save(); render();
+}
+
+// ── View RFI (Issue Form style) ──
+function viewRFI(id){
+  const r = state.rfis.find(x=>x.id===id);
+  if(!r) return;
+  const stCls = r.status==='Open'?'s-open':r.status==='Awaiting Reply'?'s-awaiting':'s-closed';
+  const pCls = r.priority==='High'?'p-high':r.priority==='Medium'?'p-medium':'p-low';
+
+  const container = document.getElementById('modalContainer');
+  container.classList.remove('hidden');
+  container.innerHTML = `
+    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal" style="max-width:800px">
+        <div class="modal-head">
+          <h3>RFI Issue Form — ${escape(r.ref)}</h3>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff" onclick="printRFI('${r.id}')">🖨 Print</button>
+            <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff" onclick="closeModal()">✕</button>
+          </div>
+        </div>
+        <div class="modal-body" id="rfiPrintArea">
+          <div style="text-align:center;border-bottom:2px solid var(--brand);padding-bottom:12px;margin-bottom:16px">
+            <div style="font-size:11px;font-weight:700;color:var(--brand);letter-spacing:2px">MAN PROJECTS LTD</div>
+            <div style="font-size:18px;font-weight:800;margin-top:4px">REQUEST FOR INFORMATION (ISSUE SHEET)</div>
+          </div>
+
+          <div class="grid-2" style="gap:20px">
+            <div>
+              <div style="font-weight:700;font-size:12px;color:var(--brand);text-transform:uppercase;margin-bottom:8px">Project Details</div>
+              <table class="summary-table">
+                <tr><td>Project / Client</td><td>${escape(r.project)}</td></tr>
+                <tr><td>Discipline</td><td>${escape(r.discipline)}</td></tr>
+                <tr><td>Raised By</td><td>${escape(r.raisedBy)}</td></tr>
+                <tr><td>RFI No.</td><td><b>${escape(r.ref)}</b></td></tr>
+                <tr><td>Priority</td><td><span class="priority ${pCls}">${escape(r.priority)}</span></td></tr>
+                <tr><td>Date Raised</td><td>${fmtDate(r.dateRaised)}</td></tr>
+              </table>
+            </div>
+            <div>
+              <div style="font-weight:700;font-size:12px;color:var(--brand);text-transform:uppercase;margin-bottom:8px">Document Control</div>
+              <table class="summary-table">
+                <tr><td>Document No.</td><td>MP-RFI-001</td></tr>
+                <tr><td>Revision</td><td>02</td></tr>
+                <tr><td>Sent To</td><td>${escape(r.sentTo)}</td></tr>
+                <tr><td>Response Due</td><td>${fmtDate(r.responseDue)}</td></tr>
+                <tr><td>Status</td><td><span class="status ${stCls}">${r.status}</span></td></tr>
+                <tr><td>Prepared By</td><td>${escape(state.settings.preparedBy)}</td></tr>
+              </table>
+            </div>
+          </div>
+
+          <div style="margin-top:20px">
+            <div style="font-weight:700;font-size:12px;color:var(--brand);text-transform:uppercase;margin-bottom:8px;border-bottom:2px solid var(--brand);padding-bottom:4px">Information Request</div>
+            <div style="font-weight:600;margin-bottom:4px">${escape(r.subject)}</div>
+            <div style="background:#f8fafc;border:1px solid var(--line);border-radius:6px;padding:14px;min-height:80px;font-size:13px;white-space:pre-wrap">${escape(r.details||'No details provided.')}</div>
+          </div>
+
+          <div style="margin-top:20px">
+            <div style="font-weight:700;font-size:12px;color:var(--brand);text-transform:uppercase;margin-bottom:8px;border-bottom:2px solid var(--brand);padding-bottom:4px">Response / Close-out</div>
+            <div style="background:#f8fafc;border:1px solid var(--line);border-radius:6px;padding:14px;min-height:80px;font-size:13px;white-space:pre-wrap">${escape(r.response||'Awaiting response.')}</div>
+          </div>
+
+          <div style="margin-top:20px;font-size:11px;color:var(--muted)">
+            <p>1. Issue the form to the consultant / client and record the same reference in the RFI Register.</p>
+            <p>2. Update the Status and Response Due fields to drive the dashboard and overdue reporting.</p>
+            <p>3. Closed RFIs will show green in the register once resolved.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function closeModal(){
+  const c = document.getElementById('modalContainer');
+  c.classList.add('hidden');
+  c.innerHTML='';
+}
+
+function printRFI(id){
+  const area = document.getElementById('rfiPrintArea');
+  if(!area) return;
+  const w = window.open('','','width=800,height=1000');
+  w.document.write(`<html><head><title>RFI Issue Form</title>
+    <style>body{font-family:Arial,sans-serif;padding:20px;font-size:13px;color:#1e293b}
+    table{width:100%;border-collapse:collapse}td{padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:13px}
+    td:first-child{font-weight:600;color:#8B1A1A;width:40%}
+    .status,.priority{display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+    </style></head><body>`);
+  w.document.write(area.innerHTML);
+  w.document.write('</body></html>');
+  w.document.close();
+  w.print();
+}
+
+// ── CSV Export ──
+function exportRegisterCSV(){
+  const headers = ['RFI No','Project','Discipline','Priority','Date Raised','Subject','Raised By','Sent To','Response Due','Status','Response Notes'];
+  const rows = state.rfis.map(r=>[
+    r.ref, r.project, r.discipline, r.priority, r.dateRaised,
+    '"'+String(r.subject||'').replace(/"/g,'""')+'"',
+    r.raisedBy, r.sentTo, r.responseDue, r.status,
+    '"'+String(r.response||'').replace(/"/g,'""')+'"'
+  ]);
+  const csv = [headers.join(','), ...rows.map(r=>r.join(','))].join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `RFI-Register-${todayIso()}.csv`;
+  a.click();
+}
+
+// ── Settings ──
+function renderSettings(){
+  const el = document.getElementById('tab-settings');
+  el.innerHTML = `
+    <div class="card">
+      <h2>RFI Settings</h2>
+      <div class="grid-2">
+        <div class="form-group"><label>Document Prefix</label>
+          <input value="${escape(state.settings.docPrefix)}" oninput="state.settings.docPrefix=this.value;save()">
+        </div>
+        <div class="form-group"><label>Prepared By (Default)</label>
+          <input value="${escape(state.settings.preparedBy)}" oninput="state.settings.preparedBy=this.value;save()">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Dropdown Lists</h2>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Edit the lists used in dropdown menus. One item per line.</p>
+      <div class="grid-2">
+        <div class="form-group"><label>Clients / Projects</label>
+          <textarea rows="6" oninput="state.settings.clients=this.value.split('\\n').filter(Boolean);save()">${state.settings.clients.join('\n')}</textarea>
+        </div>
+        <div class="form-group"><label>Disciplines</label>
+          <textarea rows="6" oninput="state.settings.disciplines=this.value.split('\\n').filter(Boolean);save()">${state.settings.disciplines.join('\n')}</textarea>
+        </div>
+        <div class="form-group"><label>Team Members</label>
+          <textarea rows="6" oninput="state.settings.team=this.value.split('\\n').filter(Boolean);save()">${state.settings.team.join('\n')}</textarea>
+        </div>
+        <div class="form-group"><label>Priorities</label>
+          <textarea rows="4" oninput="state.settings.priorities=this.value.split('\\n').filter(Boolean);save()">${state.settings.priorities.join('\n')}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Data Management</h2>
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="exportBackup()">⬇ Export Backup (JSON)</button>
+        <label class="btn btn-outline" style="cursor:pointer">⬆ Import Backup<input type="file" accept=".json" onchange="importBackup(this)" style="display:none"></label>
+        <button class="btn btn-danger" onclick="resetAll()">Reset All Data</button>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px">Data is stored in your browser's localStorage. Export regularly for a backup.</p>
+    </div>
+  `;
+}
+
+function exportBackup(){
+  const blob = new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `rfi-backup-${todayIso()}.json`;
+  a.click();
+}
+function importBackup(input){
+  const f = input.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const s = JSON.parse(e.target.result);
+      if(!s.settings||!s.rfis) throw new Error('Invalid');
+      if(!confirm('Replace all current data?')) return;
+      state = s; save(); render();
+    }catch(err){ alert('Import failed: '+err.message); }
+  };
+  reader.readAsText(f);
+}
+function resetAll(){
+  if(!confirm('Delete ALL RFI data? This cannot be undone.')) return;
+  localStorage.removeItem(LS_KEY);
+  state = { settings: {...DEFAULT_SETTINGS}, rfis: [] };
+  save(); render();
+}
+
+// ── Embedded mode ──
+if(new URLSearchParams(window.location.search).get('embedded')==='1'){
+  document.querySelector('header.app').style.display='none';
+  document.body.style.background='#f1f5f9';
+}
+
+// ── Boot ──
+render();
+</script>
+</body>
+</html>
