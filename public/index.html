@@ -287,6 +287,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
           <li><a data-page="inspections"><span class="nav-icon">📋</span>Inspections</a></li>
           <li><a data-page="rescue-plans"><span class="nav-icon">🆘</span>Rescue Plans</a></li>
           <li><a data-page="training"><span class="nav-icon">🎓</span>Training</a></li>
+          <li><a data-page="loto"><span class="nav-icon">🔒</span>LOTO System</a></li>
         </ul>
       </div>
       <div class="sidebar-section">
@@ -377,6 +378,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <button data-page="inspections"><span class="nav-icon">📋</span>Inspections</button>
     <button data-page="rescue-plans"><span class="nav-icon">🆘</span>Rescue</button>
     <button data-page="training"><span class="nav-icon">🎓</span>Training</button>
+    <button data-page="loto"><span class="nav-icon">🔒</span>LOTO</button>
     <button data-page="users"><span class="nav-icon">👥</span>Users</button>
   </nav>
 </div>
@@ -666,6 +668,7 @@ function renderPage(page) {
     'projects': renderProjects,
     'documents': renderDocuments,
     'om-manager': renderOMManager,
+    'loto': renderLOTO,
   };
   if (pages[page]) pages[page](c);
 }
@@ -1749,6 +1752,35 @@ window.deleteProject = async function(id) {
     renderProjects(document.getElementById('appContent'));
   } catch { showToast('Failed to delete project', 'error'); }
 };
+
+// ═══════════════════════════════════════
+// PORTAL: LOTO SYSTEM
+// ═══════════════════════════════════════
+function renderLOTO(c) {
+  // Render LOTO system in an iframe that fills the content area
+  c.innerHTML = `
+    <div style="margin:-16px;margin-bottom:0">
+      <iframe src="/loto.html?embedded=1" style="width:100%;border:none;min-height:calc(100vh - 60px);display:block" id="lotoFrame"
+        onload="this.style.height=this.contentWindow.document.body.scrollHeight+'px'"></iframe>
+    </div>
+  `;
+  // Auto-resize iframe to content
+  const iframe = document.getElementById('lotoFrame');
+  const resizeLoto = () => {
+    try {
+      const h = iframe.contentWindow.document.body.scrollHeight;
+      iframe.style.height = Math.max(h, 600) + 'px';
+    } catch(e) {}
+  };
+  iframe.addEventListener('load', () => {
+    resizeLoto();
+    // Also resize on clicks/interactions inside iframe
+    try {
+      iframe.contentWindow.addEventListener('click', () => setTimeout(resizeLoto, 200));
+      iframe.contentWindow.addEventListener('input', () => setTimeout(resizeLoto, 200));
+    } catch(e) {}
+  });
+}
 
 // ═══════════════════════════════════════
 // PORTAL: DOCUMENT LIBRARY

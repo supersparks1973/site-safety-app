@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ManProjects — LOTO System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --brand:#8B1A1A; --brand2:#B22222; --ink:#1a1a1a; --muted:#6b7280;
+  --bg:#f5f7fb; --card:#fff; --line:#e5e7eb; --ok:#16a34a; --warn:#d97706;
+  --bad:#dc2626; --iso:#B22222; --accent:#8B1A1A;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.45}
+header.app{background:var(--brand);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:16px;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+header.app .logo{width:52px;height:52px;background:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--brand);font-weight:900;font-size:11px;text-align:center;padding:4px}
+header.app .logo img{max-width:100%;max-height:100%;object-fit:contain}
+header.app h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.3px}
+header.app .sub{font-size:12px;opacity:.85;margin-top:2px}
+header.app .doc-meta{margin-left:auto;font-size:11px;text-align:right;opacity:.9}
+nav.tabs{background:#fff;border-bottom:1px solid var(--line);padding:0 22px;display:flex;gap:2px;overflow-x:auto}
+nav.tabs button{background:none;border:0;padding:14px 18px;cursor:pointer;font-size:13px;color:var(--muted);font-weight:600;border-bottom:3px solid transparent;white-space:nowrap}
+nav.tabs button.active{color:var(--brand);border-bottom-color:var(--brand)}
+nav.tabs button:hover{color:var(--brand)}
+main{padding:22px;max-width:1400px;margin:0 auto}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:18px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.card h2{margin:0 0 14px;font-size:16px;color:var(--brand);border-bottom:2px solid var(--brand);padding-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.card h3{margin:18px 0 8px;font-size:13px;color:var(--brand);text-transform:uppercase;letter-spacing:.5px}
+.grid{display:grid;gap:12px}
+.grid-2{grid-template-columns:repeat(2,1fr)}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+.grid-4{grid-template-columns:repeat(4,1fr)}
+@media (max-width:800px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr}}
+label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px}
+input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-family:inherit;background:#fff;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(139,26,26,.12)}
+textarea{resize:vertical;min-height:60px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border:0;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;transition:all .15s}
+.btn-primary{background:var(--brand);color:#fff}
+.btn-primary:hover{background:#6B1414}
+.btn-secondary{background:#fff;color:var(--brand);border:1px solid var(--brand)}
+.btn-secondary:hover{background:#fdf2f2}
+.btn-danger{background:var(--bad);color:#fff}
+.btn-danger:hover{background:#991b1b}
+.btn-success{background:var(--ok);color:#fff}
+.btn-success:hover{background:#0f7a37}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+.btn-ghost:hover{background:#f3f4f6}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+table.data{width:100%;border-collapse:collapse;font-size:12px}
+table.data th,table.data td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+table.data th{background:#fdf2f2;font-weight:700;color:var(--brand);font-size:11px;text-transform:uppercase;letter-spacing:.3px}
+table.data tr:nth-child(even) td{background:#fafbfd}
+table.data input,table.data select{padding:4px 6px;font-size:12px;border-color:#e5e7eb;background:transparent}
+table.data input:focus,table.data select:focus{background:#fff}
+.status{display:inline-block;padding:3px 8px;border-radius:11px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.s-pending{background:#fef3c7;color:#92400e}
+.s-requested{background:#dbeafe;color:#1e40af}
+.s-reviewed{background:#e0e7ff;color:#3730a3}
+.s-authorised{background:#cffafe;color:#155e75}
+.s-isolated{background:#fee2e2;color:#991b1b}
+.s-wip{background:#fde68a;color:#78350f}
+.s-ready{background:#bbf7d0;color:#14532d}
+.s-reinstated{background:#d1fae5;color:#065f46}
+.s-closed{background:#e5e7eb;color:#374151}
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px}
+@media (max-width:800px){.kpi-row{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:#fff;border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:8px;padding:16px}
+.kpi .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px}
+.kpi .value{font-size:28px;font-weight:800;color:var(--ink);line-height:1}
+.kpi.pending{border-left-color:var(--warn)}
+.kpi.iso{border-left-color:var(--bad)}
+.kpi.done{border-left-color:var(--ok)}
+.kpi.active{border-left-color:var(--iso)}
+.pill{display:inline-block;padding:2px 8px;background:#fdf2f2;color:var(--brand);border-radius:10px;font-size:11px;font-weight:600;margin-left:6px}
+.sig-box{border:1px dashed #9ca3af;border-radius:6px;background:#fafbfd;margin-top:4px;position:relative;overflow:hidden}
+.sig-box canvas{display:block;width:100%;height:90px;cursor:crosshair;touch-action:none}
+.sig-box .sig-clear{position:absolute;top:4px;right:4px;background:#fff;border:1px solid var(--line);border-radius:4px;font-size:10px;padding:2px 6px;cursor:pointer;color:var(--muted)}
+.sig-box .sig-label{position:absolute;left:8px;top:6px;font-size:10px;color:#9ca3af;pointer-events:none}
+.sig-box.signed .sig-label{display:none}
+.inline-form{display:flex;gap:8px;align-items:flex-end}
+.inline-form > div{flex:1}
+.alert{padding:10px 14px;border-radius:6px;margin-bottom:14px;font-size:13px;border:1px solid transparent}
+.alert-info{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}
+.alert-warn{background:#fffbeb;border-color:#fed7aa;color:#92400e}
+.alert-ok{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+.doc-header{text-align:center;padding-bottom:14px;border-bottom:2px solid var(--brand);margin-bottom:18px}
+.doc-header img{max-height:60px;margin-bottom:6px}
+.doc-header .co{font-size:13px;font-weight:700;color:var(--brand);letter-spacing:2px}
+.doc-header .title{font-size:20px;font-weight:800;margin-top:4px}
+.doc-header .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.tag-red{color:#b91c1c;font-weight:700}
+.tag-yellow{color:#a16207;font-weight:700}
+.tag-blue{color:#1d4ed8;font-weight:700}
+.small{font-size:11px;color:var(--muted)}
+.row-actions{display:flex;gap:4px}
+.icon-btn{background:transparent;border:0;cursor:pointer;font-size:14px;padding:2px 4px;color:var(--muted);border-radius:4px}
+.icon-btn:hover{background:#f3f4f6;color:var(--ink)}
+.empty{text-align:center;padding:40px 20px;color:var(--muted);font-style:italic}
+.request-list{display:grid;gap:10px}
+.request-item{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;grid-template-columns:auto 1fr auto auto;gap:12px;align-items:center;cursor:pointer;transition:all .15s}
+.request-item:hover{border-color:var(--brand);box-shadow:0 2px 6px rgba(139,26,26,.1)}
+.request-item .ref{font-weight:800;color:var(--brand);font-size:14px;font-family:monospace}
+.request-item .info{font-size:12px}
+.request-item .info .proj{font-weight:600;color:var(--ink)}
+.request-item .info .meta{color:var(--muted);font-size:11px}
+.checkbox-row{display:flex;align-items:center;gap:8px;font-size:13px}
+.checkbox-row input[type=checkbox]{width:auto}
+.procedure-step{display:grid;grid-template-columns:36px 1fr 80px 90px;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;margin-bottom:6px;background:#fff;align-items:center}
+.procedure-step .num{width:30px;height:30px;border-radius:50%;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800}
+.procedure-step.done{background:#f0fdf4;border-color:#bbf7d0}
+.procedure-step input[type=text]{padding:4px 6px;font-size:12px}
+.filter-bar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.filter-bar input,.filter-bar select{max-width:220px}
+.hidden{display:none!important}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:900px){.two-col{grid-template-columns:1fr}}
+.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:#fff;width:100%;max-width:1100px;height:92vh;border-radius:10px;box-shadow:0 20px 50px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden}
+.modal-head{padding:12px 18px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.modal-head h3{margin:0;font-size:15px;font-weight:700}
+.modal-head .actions{display:flex;gap:8px}
+.modal-head .btn-primary{background:#fff;color:var(--brand)}
+.modal-head .btn-primary:hover{background:#fdf2f2}
+.modal-head .btn-ghost{background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.3)}
+.modal-head .btn-ghost:hover{background:rgba(255,255,255,.25)}
+.modal-body{flex:1;overflow:auto;background:#eef1f6}
+.modal-body iframe{width:100%;height:100%;border:0;background:#fff}
+.preview-sheet{background:#fff;margin:16px auto;max-width:980px;padding:28px 34px;box-shadow:0 2px 8px rgba(0,0,0,.08);font-size:12px}
+.preview-sheet h4{margin:0 0 12px;color:var(--brand);font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--brand);padding-bottom:6px}
+.preview-sheet table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:11px}
+.preview-sheet th,.preview-sheet td{border:1px solid #d1d5db;padding:6px 8px;text-align:left;vertical-align:top}
+.preview-sheet th{background:#fdf2f2;color:var(--brand);font-weight:700}
+.preview-tabs{background:#fff;border-bottom:1px solid var(--line);padding:0 18px;display:flex;gap:2px}
+.preview-tabs button{background:none;border:0;padding:10px 14px;cursor:pointer;font-size:12px;color:var(--muted);font-weight:600;border-bottom:2px solid transparent}
+.preview-tabs button.active{color:var(--brand);border-bottom-color:var(--brand)}
+@media print{
+  header.app,nav.tabs,.btn-row,.no-print{display:none!important}
+  main{padding:0;max-width:none}
+  .card{border:0;box-shadow:none;page-break-inside:avoid;padding:0;margin-bottom:14px}
+  body{background:#fff;font-size:11px}
+  table.data{font-size:10px}
+  .tab-content{display:block!important}
+  .print-only{display:block!important}
+  .doc-header{display:block!important}
+}
+.print-only{display:none}
+</style>
+</head>
+<body>
+
+<header class="app">
+  <div class="logo" id="hdrLogo"><img src="/logo.png" alt="MP"></div>
+  <div>
+    <h1 id="hdrCompany">MAN PROJECTS LTD</h1>
+    <div class="sub">LOTO Contractor System — Request · Isolation · Close-Out</div>
+  </div>
+  <div class="doc-meta">
+    Document No. <b>MP-LOTO-FRM-001</b> · Rev 1<br>
+    <span id="hdrDate"></span>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="dashboard" class="active">Dashboard</button>
+  <button data-tab="request">New / Current Request</button>
+  <button data-tab="register">Master Register</button>
+  <button data-tab="schedule">DB Schedule</button>
+  <button data-tab="procedure">Isolation Procedure</button>
+  <button data-tab="history">Request History</button>
+  <button data-tab="settings">Settings</button>
+</nav>
+
+<main>
+  <!-- tabs injected here -->
+  <div id="tab-dashboard" class="tab-content active"></div>
+  <div id="tab-request" class="tab-content"></div>
+  <div id="tab-register" class="tab-content"></div>
+  <div id="tab-schedule" class="tab-content"></div>
+  <div id="tab-procedure" class="tab-content"></div>
+  <div id="tab-history" class="tab-content"></div>
+  <div id="tab-settings" class="tab-content"></div>
+</main>
+
+<div id="previewModal" class="hidden"></div>
+
+<script id="seed-data" type="application/json">
+[]
+</script>
+
+<script>
+// ============================================================
+// LOTO Contractor System — single-file web app
+// Storage: localStorage (lightweight, no server required)
+// ============================================================
+const LS_KEY = 'loto_app_template_v1';
+const STATUSES = ['Pending','Requested','Reviewed','Authorised','Isolated','Work In Progress','Ready to Re-energise','Reinstated','Closed'];
+const YESNO = ['Yes','No','N/A'];
+const RISK = ['Low','Medium','High'];
+const WORK_TYPES = ['Electrical','Mechanical','BMS','Confined Space','Other'];
+const DEVICE_TYPES = ['MCB','MCCB','RCBO','Switch Disconnector','Isolator','Contactor','Other'];
+
+const DEFAULT_PROCEDURE = [
+  'Identify correct circuit and verify against drawings, DB schedule and site labelling.',
+  'Inform affected personnel and obtain all required permits to work.',
+  'Switch off connected load where applicable.',
+  'Isolate at source using the correct MCB, MCCB or switch disconnector.',
+  'Apply approved lock-off device and personal lock.',
+  'Attach warning tag with name, company and contact number.',
+  'Prove voltage indicator on proving unit.',
+  'Test L-N, L-E and N-E at point of work and source as required.',
+  'Re-prove tester on proving unit.',
+  'Confirm circuit is dead before commencing works.',
+  'On completion remove tools, replace covers and confirm area is left safe.',
+  'Remove personal locks, reinstate supply in a controlled manner and update register.'
+];
+
+// ---------- state ----------
+let state = load() || freshState();
+
+function freshState(){
+  const seed = JSON.parse(document.getElementById('seed-data').textContent);
+  return {
+    settings:{
+      company:'MAN PROJECTS LTD',
+      logo:'',
+      docPrefix:'MP-LOTO',
+      standardsNote:'All isolations must be carried out in accordance with site permits, approved RAMS, GS38 safe isolation practice and BS 7671:2018+A3:2022.'
+    },
+    boards:{},
+    requests:[],
+    currentRequestId:null
+  };
+}
+
+function load(){
+  try{ const s = localStorage.getItem(LS_KEY); return s?JSON.parse(s):null; }catch(e){ return null; }
+}
+function save(){
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+}
+
+function uid(){ return 'R'+Date.now().toString(36)+Math.floor(Math.random()*999).toString(36); }
+function todayIso(){ return new Date().toISOString().slice(0,10); }
+function nowIso(){ return new Date().toISOString().slice(0,16).replace('T',' '); }
+function fmtDate(d){ if(!d) return ''; try{const x=new Date(d); if(isNaN(x))return d; return x.toLocaleDateString('en-GB');}catch(e){return d;} }
+
+function nextRequestRef(){
+  const year = new Date().getFullYear();
+  const n = state.requests.filter(r=>r.ref && r.ref.includes(year)).length + 1;
+  return `${state.settings.docPrefix}-${year}-${String(n).padStart(3,'0')}`;
+}
+
+function newRequest(){
+  return {
+    id: uid(),
+    ref: nextRequestRef(),
+    createdAt: new Date().toISOString(),
+    status:'Pending',
+    details:{
+      project:'', client:'', requestedBy:'', company:'',
+      contact:'', permitRef:'', dateRequested: todayIso()
+    },
+    isolations:[],
+    risk:{
+      permit:'Yes', notified:'Yes', drawings:'Yes', kit:'Yes',
+      testKit:'Yes', ppe:'Yes', riskLevel:'Low', workType:'Electrical',
+      comments:'As per approved RAMS/PTW. Confirm all operatives briefed, correct proving unit available, and isolation boundary clearly identified before work commences.'
+    },
+    authorisation:{
+      requestedBy:'', requestedDate: todayIso(), requestedSig:'',
+      reviewedBy:'', reviewedDate:'', reviewedSig:'',
+      authorisedBy:'', authorisedDate:'', authorisedSig:'',
+      completedBy:'', completedDate:'', completedSig:'',
+      reinstatedBy:'', reinstatedDate:'', reinstatedSig:'',
+      notes:''
+    },
+    procedure: DEFAULT_PROCEDURE.map(t=>({text:t,done:false,initials:''}))
+  };
+}
+
+function newIsolation(){
+  return {
+    id: uid(),
+    dbRef:'',
+    circuitKey:'', // e.g. 11R
+    description:'', devicePoint:'', deviceType:'MCB',
+    lockNo:'', deadTest:'Pending',
+    status:'Pending', isolatedBy:'', date:'', time:'',
+    reinstatedBy:'', reinstatedDate:''
+  };
+}
+
+function getCurrent(){
+  return state.requests.find(r=>r.id===state.currentRequestId) || null;
+}
+
+// ============================================================
+// RENDERERS
+// ============================================================
+
+function render(){
+  document.getElementById('hdrCompany').textContent = state.settings.company;
+  document.getElementById('hdrDate').textContent = new Date().toLocaleDateString('en-GB');
+  if(state.settings.logo){
+    document.getElementById('hdrLogo').innerHTML = `<img src="${state.settings.logo}" alt="logo">`;
+  }
+  renderDashboard();
+  renderRequest();
+  renderRegister();
+  renderSchedule();
+  renderProcedure();
+  renderHistory();
+  renderSettings();
+}
+
+// ---------- Dashboard ----------
+function renderDashboard(){
+  const all = state.requests.flatMap(r=>r.isolations.map(i=>({...i,_req:r})));
+  const open = all.filter(i=>i.status==='Isolated'||i.status==='Work In Progress'||i.status==='Ready to Re-energise').length;
+  const pending = all.filter(i=>i.status==='Pending'||i.status==='Requested'||i.status==='Reviewed'||i.status==='Authorised').length;
+  const closed = all.filter(i=>i.status==='Closed'||i.status==='Reinstated').length;
+  const totalReq = state.requests.length;
+  const liveReq = state.requests.filter(r=>r.isolations.some(i=>i.status==='Isolated'||i.status==='Work In Progress')).length;
+
+  const recent = [...state.requests].sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).slice(0,6);
+
+  const el = document.getElementById('tab-dashboard');
+  el.innerHTML = `
+    <div class="kpi-row">
+      <div class="kpi iso"><div class="label">Live Isolations</div><div class="value">${open}</div></div>
+      <div class="kpi pending"><div class="label">Pending Actions</div><div class="value">${pending}</div></div>
+      <div class="kpi done"><div class="label">Closed / Reinstated</div><div class="value">${closed}</div></div>
+      <div class="kpi active"><div class="label">Total Requests</div><div class="value">${totalReq}</div></div>
+      <div class="kpi iso"><div class="label">Active Requests</div><div class="value">${liveReq}</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Quick Actions</h2>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="startNewRequest()">+ New LOTO Request</button>
+        <button class="btn btn-secondary" onclick="switchTab('register')">View Master Register</button>
+        <button class="btn btn-secondary" onclick="switchTab('schedule')">Manage DB Schedule</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Recent Requests</h2>
+      ${recent.length===0 ? '<div class="empty">No requests yet. Click "New LOTO Request" to create your first one.</div>' :
+      `<div class="request-list">${recent.map(r=>{
+          const liveIso = r.isolations.filter(i=>i.status==='Isolated').length;
+          const st = liveIso>0?'LIVE':(r.isolations.length>0?'IN PROGRESS':'DRAFT');
+          return `<div class="request-item" onclick="openRequest('${r.id}')">
+            <div class="ref">${r.ref}</div>
+            <div class="info">
+              <div class="proj">${escape(r.details.project||'(no project)')}</div>
+              <div class="meta">Client: ${escape(r.details.client||'—')} · Requested by ${escape(r.details.requestedBy||'—')} · ${r.isolations.length} isolation(s)</div>
+            </div>
+            <div><span class="status ${liveIso>0?'s-isolated':'s-pending'}">${st}</span></div>
+            <div class="small">${fmtDate(r.createdAt)}</div>
+          </div>`;
+        }).join('')}</div>`}
+    </div>
+  `;
+}
+
+function startNewRequest(){
+  const r = newRequest();
+  state.requests.push(r);
+  state.currentRequestId = r.id;
+  save();
+  render();
+  switchTab('request');
+}
+
+function openRequest(id){
+  state.currentRequestId = id;
+  save();
+  render();
+  switchTab('request');
+}
+
+// ---------- Request form ----------
+function renderRequest(){
+  const el = document.getElementById('tab-request');
+  const r = getCurrent();
+  if(!r){
+    el.innerHTML = `<div class="card"><div class="empty">No request selected.<br><br>
+      <button class="btn btn-primary" onclick="startNewRequest()">+ Start New LOTO Request</button>
+      </div></div>`;
+    return;
+  }
+
+  const circuitOptions = Object.keys(state.boards);
+  const currentDbKeys = (key=>{
+    const b = state.boards[key];
+    if(!b) return [];
+    return b.circuits.map(c=>c.key).filter(Boolean);
+  });
+
+  const isoRows = r.isolations.map((iso,i)=>{
+    const board = state.boards[iso.dbRef];
+    const circuit = board?board.circuits.find(c=>c.key===iso.circuitKey):null;
+    const phaseClass = iso.circuitKey.endsWith('R')?'tag-red':iso.circuitKey.endsWith('Y')?'tag-yellow':iso.circuitKey.endsWith('B')?'tag-blue':'';
+    return `<tr>
+      <td style="text-align:center;font-weight:700">${String(i+1).padStart(2,'0')}</td>
+      <td><input list="loto-db-list" value="${escape(iso.dbRef||'')}" placeholder="e.g. DB-EB1M" oninput="updIso('${iso.id}','dbRef',this.value);upd()" style="min-width:90px"></td>
+      <td><input list="loto-circuit-list" value="${escape(iso.circuitKey||'')}" placeholder="e.g. 11R" oninput="updIsoCircuit('${iso.id}',this.value);upd()" style="min-width:80px"></td>
+      <td class="${phaseClass}" style="font-size:11px"><input value="${escape(iso.description || (circuit?circuit.description:'') || '')}" placeholder="Description" oninput="updIso('${iso.id}','description',this.value)" style="min-width:180px">${circuit?'<div class="small" style="margin-top:2px">'+ (circuit.mcbA||'')+'A '+(circuit.mcbType||'')+'</div>':''}</td>
+      <td><input value="${escape(iso.devicePoint||'')}" oninput="updIso('${iso.id}','devicePoint',this.value)"></td>
+      <td><select onchange="updIso('${iso.id}','deviceType',this.value)">${DEVICE_TYPES.map(d=>`<option ${iso.deviceType===d?'selected':''}>${d}</option>`).join('')}</select></td>
+      <td><input value="${escape(iso.lockNo||'LOTO-'+String(i+1).padStart(3,'0'))}" oninput="updIso('${iso.id}','lockNo',this.value)"></td>
+      <td><select onchange="updIso('${iso.id}','deadTest',this.value)"><option>Pending</option><option ${iso.deadTest==='Verified'?'selected':''}>Verified</option><option ${iso.deadTest==='Failed'?'selected':''}>Failed</option><option ${iso.deadTest==='N/A'?'selected':''}>N/A</option></select></td>
+      <td><select onchange="updIso('${iso.id}','status',this.value);upd()">${STATUSES.map(s=>`<option ${iso.status===s?'selected':''}>${s}</option>`).join('')}</select><div style="margin-top:2px"><span class="status s-${iso.status.toLowerCase().replace(/\\s+/g,'').replace('re-energise','ready')}">${iso.status}</span></div></td>
+      <td><input value="${escape(iso.isolatedBy||'')}" oninput="updIso('${iso.id}','isolatedBy',this.value)"></td>
+      <td><input type="date" value="${iso.date||''}" oninput="updIso('${iso.id}','date',this.value)"></td>
+      <td><input type="time" value="${iso.time||''}" oninput="updIso('${iso.id}','time',this.value)"></td>
+      <td class="row-actions"><button class="icon-btn" title="Remove" onclick="removeIso('${iso.id}')">🗑</button></td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+  <div class="card print-only" id="printHeader">
+    <div class="doc-header">
+      ${state.settings.logo?`<img src="${state.settings.logo}">`:''}
+      <div class="co">${escape(state.settings.company)}</div>
+      <div class="title">LOTO CONTRACTOR SYSTEM — REQUEST, ISOLATION &amp; CLOSE-OUT</div>
+      <div class="sub">Document No. MP-LOTO-FRM-001 · Rev 1 · Ref ${r.ref}</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Request <span class="pill">${r.ref}</span>
+      <div class="no-print" style="font-size:12px;font-weight:normal;display:flex;gap:6px">
+        <button class="btn btn-sm btn-primary" onclick="previewPdf('${r.id}')">👁 Preview</button>
+        <button class="btn btn-sm btn-secondary" onclick="exportPdf('${r.id}')">📄 PDF</button>
+        <button class="btn btn-sm btn-secondary" onclick="exportExcel('${r.id}')">📊 Excel</button>
+        <button class="btn btn-sm btn-secondary" onclick="window.print()">🖨 Print</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteRequest('${r.id}')">Delete</button>
+      </div>
+    </h2>
+
+    <h3>1. Request Details</h3>
+    <div class="grid grid-2">
+      <div><label>Project / Site</label><input value="${escape(r.details.project)}" oninput="r().details.project=this.value;upd()"></div>
+      <div><label>Client / Principal Contractor</label><input value="${escape(r.details.client)}" oninput="r().details.client=this.value;upd()"></div>
+      <div><label>Requested By</label><input value="${escape(r.details.requestedBy)}" oninput="r().details.requestedBy=this.value;upd()"></div>
+      <div><label>Company</label><input value="${escape(r.details.company)}" oninput="r().details.company=this.value;upd()"></div>
+      <div><label>Contact Number</label><input value="${escape(r.details.contact)}" oninput="r().details.contact=this.value;upd()"></div>
+      <div><label>Permit / Work Ref</label><input value="${escape(r.details.permitRef)}" oninput="r().details.permitRef=this.value;upd()"></div>
+      <div><label>Date Requested</label><input type="date" value="${r.details.dateRequested||''}" oninput="r().details.dateRequested=this.value;upd()"></div>
+      <div><label>Request No.</label><input value="${r.ref}" readonly style="background:#f3f4f6"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. Isolation Requirements
+      <button class="btn btn-sm btn-primary no-print" onclick="addIso()">+ Add Isolation</button>
+    </h2>
+    ${r.isolations.length===0 ? '<div class="empty">No isolations yet. Click "+ Add Isolation" to begin.</div>' : `
+    <datalist id="loto-db-list">${Object.keys(state.boards).map(k=>`<option value="${escape(k)}">`).join('')}</datalist>
+    <datalist id="loto-circuit-list">${Object.values(state.boards).flatMap(br=>br.circuits).map(c=>`<option value="${escape(c.key||'')}">${escape(c.description||'')}</option>`).join('')}</datalist>
+    <div style="overflow-x:auto">
+    <table class="data">
+      <thead><tr><th>#</th><th>DB</th><th>Circuit / Way</th><th>Description</th><th>Isolation Point</th><th>Device</th><th>Lock No.</th><th>Dead Test</th><th>Status</th><th>Isolated By</th><th>Date</th><th>Time</th><th class="no-print"></th></tr></thead>
+      <tbody>${isoRows}</tbody>
+    </table></div>`}
+  </div>
+
+  <div class="card">
+    <h3>3. Risk Review / Precautions</h3>
+    <div class="grid grid-2">
+      <div><label>Permit to Work Required</label><select onchange="r().risk.permit=this.value;upd()">${YESNO.map(v=>`<option ${r.risk.permit===v?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div><label>Test Equipment / Proving Unit Available</label><select onchange="r().risk.testKit=this.value;upd()">${YESNO.map(v=>`<option ${r.risk.testKit===v?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div><label>Affected Persons Notified</label><select onchange="r().risk.notified=this.value;upd()">${YESNO.map(v=>`<option ${r.risk.notified===v?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div><label>PPE / Access Suitable</label><select onchange="r().risk.ppe=this.value;upd()">${YESNO.map(v=>`<option ${r.risk.ppe===v?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div><label>Drawings / Schedule Checked</label><select onchange="r().risk.drawings=this.value;upd()">${YESNO.map(v=>`<option ${r.risk.drawings===v?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div><label>Isolation Risk Level</label><select onchange="r().risk.riskLevel=this.value;upd()">${RISK.map(v=>`<option ${r.risk.riskLevel===v?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div><label>LOTO Kit Available</label><select onchange="r().risk.kit=this.value;upd()">${YESNO.map(v=>`<option ${r.risk.kit===v?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div><label>Type of Work</label><select onchange="r().risk.workType=this.value;upd()">${WORK_TYPES.map(v=>`<option ${r.risk.workType===v?'selected':''}>${v}</option>`).join('')}</select></div>
+    </div>
+    <div style="margin-top:12px"><label>Additional Controls / Comments</label><textarea oninput="r().risk.comments=this.value;upd()">${escape(r.risk.comments)}</textarea></div>
+  </div>
+
+  <div class="card">
+    <h3>4. Authorisation and Sign-Off Workflow</h3>
+    <div class="two-col">
+      ${sigRow('Requested By','requested',r)}
+      ${sigRow('Reviewed By / Supervisor','reviewed',r)}
+      ${sigRow('Authorised By','authorised',r)}
+      ${sigRow('Work Completed By','completed',r)}
+      ${sigRow('Supply Reinstated By','reinstated',r)}
+    </div>
+    <div style="margin-top:12px"><label>Authorisation Notes</label><textarea oninput="r().authorisation.notes=this.value;upd()">${escape(r.authorisation.notes)}</textarea></div>
+    <div class="alert alert-info" style="margin-top:14px">${escape(state.settings.standardsNote)}</div>
+  </div>
+  `;
+
+  // attach signature pads
+  document.querySelectorAll('.sig-box canvas').forEach(cv=>{
+    const key = cv.dataset.sigkey;
+    const r2 = getCurrent();
+    if(r2.authorisation[key+'Sig']){
+      drawDataUrl(cv, r2.authorisation[key+'Sig']);
+      cv.parentNode.classList.add('signed');
+    }
+    attachPad(cv, dataUrl=>{
+      getCurrent().authorisation[key+'Sig'] = dataUrl;
+      cv.parentNode.classList.add('signed');
+      upd(true);
+    });
+  });
+}
+
+function sigRow(label, k, r){
+  return `<div>
+    <label>${label}</label>
+    <input value="${escape(r.authorisation[k+'By']||'')}" placeholder="Name" oninput="r().authorisation['${k}By']=this.value;upd()">
+    <div style="display:flex;gap:6px;margin-top:4px">
+      <input type="date" style="flex:1" value="${r.authorisation[k+'Date']||''}" oninput="r().authorisation['${k}Date']=this.value;upd()">
+    </div>
+    <div class="sig-box" id="sig-${k}">
+      <span class="sig-label">Sign here</span>
+      <button class="sig-clear no-print" onclick="clearSig('${k}')">clear</button>
+      <canvas data-sigkey="${k}"></canvas>
+    </div>
+  </div>`;
+}
+
+function clearSig(k){
+  const r = getCurrent();
+  r.authorisation[k+'Sig'] = '';
+  upd();
+  render();
+}
+
+// helpers exposed to inline handlers
+function r(){ return getCurrent(); }
+function upd(quiet){ save(); if(!quiet){ renderDashboard(); renderRegister(); renderHistory(); } }
+function updIso(id,field,val){
+  const cur = getCurrent();
+  const iso = cur.isolations.find(i=>i.id===id);
+  if(iso){ iso[field]=val; save(); }
+}
+function updIsoCircuit(id,val){
+  // Updates circuitKey and, if description is still blank AND the key matches a
+  // known circuit in any board, auto-fills the description from the DB schedule.
+  const cur = getCurrent();
+  const iso = cur.isolations.find(i=>i.id===id);
+  if(!iso) return;
+  iso.circuitKey = val;
+  if(!iso.description){
+    for(const br of Object.values(state.boards)){
+      const c = br.circuits.find(x=>x.key===val);
+      if(c && c.description){ iso.description = c.description; break; }
+    }
+  }
+  save();
+}
+function addIso(){
+  const cur = getCurrent();
+  const i = newIsolation();
+  i.lockNo = 'LOTO-'+String(cur.isolations.length+1).padStart(3,'0');
+  cur.isolations.push(i);
+  save(); render();
+}
+function removeIso(id){
+  if(!confirm('Remove this isolation?')) return;
+  const cur = getCurrent();
+  cur.isolations = cur.isolations.filter(i=>i.id!==id);
+  save(); render();
+}
+function deleteRequest(id){
+  if(!confirm('Delete this request and all its isolations? This cannot be undone.')) return;
+  state.requests = state.requests.filter(x=>x.id!==id);
+  if(state.currentRequestId===id) state.currentRequestId = state.requests[0]?state.requests[0].id:null;
+  save(); render();
+  switchTab('dashboard');
+}
+
+// ---------- Master Register ----------
+let regFilter = {status:'',search:''};
+function renderRegister(){
+  const el = document.getElementById('tab-register');
+  const rows = state.requests.flatMap(req=>req.isolations.map(iso=>({iso,req})));
+  const filtered = rows.filter(({iso,req})=>{
+    if(regFilter.status && iso.status!==regFilter.status) return false;
+    if(regFilter.search){
+      const s = regFilter.search.toLowerCase();
+      const board = state.boards[iso.dbRef];
+      const circ = board?board.circuits.find(c=>c.key===iso.circuitKey):null;
+      const blob = [req.ref,req.details.project,req.details.client,iso.circuitKey,iso.description||(circ?circ.description:''),iso.lockNo,iso.isolatedBy].join(' ').toLowerCase();
+      if(!blob.includes(s)) return false;
+    }
+    return true;
+  });
+
+  const pending = rows.filter(({iso})=>iso.status==='Pending'||iso.status==='Requested').length;
+  const isolated = rows.filter(({iso})=>iso.status==='Isolated').length;
+  const closed = rows.filter(({iso})=>iso.status==='Closed'||iso.status==='Reinstated').length;
+
+  el.innerHTML = `
+  <div class="kpi-row">
+    <div class="kpi iso"><div class="label">Isolated</div><div class="value">${isolated}</div></div>
+    <div class="kpi pending"><div class="label">Pending</div><div class="value">${pending}</div></div>
+    <div class="kpi done"><div class="label">Closed</div><div class="value">${closed}</div></div>
+    <div class="kpi active"><div class="label">Total Lines</div><div class="value">${rows.length}</div></div>
+    <div class="kpi"><div class="label">Requests</div><div class="value">${state.requests.length}</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Master LOTO Register
+      <div class="no-print" style="font-size:12px;font-weight:normal;display:flex;gap:6px">
+        <button class="btn btn-sm btn-primary" onclick="previewRegisterPdf()">👁 Preview</button>
+        <button class="btn btn-sm btn-secondary" onclick="exportRegisterPdf()">📄 PDF</button>
+        <button class="btn btn-sm btn-secondary" onclick="exportRegisterExcel()">📊 Excel</button>
+        <button class="btn btn-sm btn-secondary" onclick="window.print()">🖨 Print</button>
+      </div>
+    </h2>
+    <div class="filter-bar no-print">
+      <input placeholder="Search ref, project, circuit, description..." value="${escape(regFilter.search)}" oninput="regFilter.search=this.value;renderRegister()">
+      <select onchange="regFilter.status=this.value;renderRegister()">
+        <option value="">All statuses</option>
+        ${STATUSES.map(s=>`<option ${regFilter.status===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>
+    ${filtered.length===0?'<div class="empty">No isolation records match the filter.</div>':`
+    <div style="overflow-x:auto">
+    <table class="data">
+      <thead><tr>
+        <th>Request Ref</th><th>Project</th><th>Client</th><th>DB</th><th>Circuit</th>
+        <th>Description</th><th>Lock No.</th><th>Status</th><th>Isolated By</th><th>Date</th>
+        <th>Dead Test</th><th>Reinstated By</th>
+      </tr></thead>
+      <tbody>${filtered.map(({iso,req})=>{
+        const board = state.boards[iso.dbRef];
+        const circ = board?board.circuits.find(c=>c.key===iso.circuitKey):null;
+        return `<tr style="cursor:pointer" onclick="openRequest('${req.id}')">
+          <td><b>${req.ref}</b></td>
+          <td>${escape(req.details.project||'')}</td>
+          <td>${escape(req.details.client||'')}</td>
+          <td>${iso.dbRef}</td>
+          <td><b>${iso.circuitKey||''}</b></td>
+          <td>${escape(iso.description||(circ?circ.description:''))}</td>
+          <td>${escape(iso.lockNo||'')}</td>
+          <td><span class="status s-${iso.status.toLowerCase().replace(/\\s+/g,'').replace('re-energise','ready')}">${iso.status}</span></td>
+          <td>${escape(iso.isolatedBy||'')}</td>
+          <td>${fmtDate(iso.date)}</td>
+          <td>${iso.deadTest||''}</td>
+          <td>${escape(iso.reinstatedBy||'')}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`}
+  </div>`;
+}
+
+// ---------- DB Schedule ----------
+let scheduleBoardKey = '';
+function renderSchedule(){
+  const el = document.getElementById('tab-schedule');
+  const boardKeys = Object.keys(state.boards);
+  if(!state.boards[scheduleBoardKey] && boardKeys.length) scheduleBoardKey = boardKeys[0];
+  const b = state.boards[scheduleBoardKey];
+
+  el.innerHTML = `
+  <div class="card">
+    <h2>Distribution Board Schedule
+      <div class="no-print" style="font-size:12px;font-weight:normal;display:flex;gap:6px">
+        <button class="btn btn-sm btn-primary" onclick="addBoard()">+ New DB</button>
+        ${boardKeys.length>1?`<button class="btn btn-sm btn-danger" onclick="deleteBoard()">Delete DB</button>`:''}
+      </div>
+    </h2>
+    <div class="filter-bar">
+      <select onchange="scheduleBoardKey=this.value;renderSchedule()" style="max-width:260px">
+        ${boardKeys.map(k=>`<option ${scheduleBoardKey===k?'selected':''}>${k}</option>`).join('')}
+      </select>
+    </div>
+    ${b?`
+    <div class="grid grid-3">
+      <div><label>DB Ref</label><input value="${escape(b.ref)}" oninput="state.boards['${scheduleBoardKey}'].ref=this.value;save()"></div>
+      <div><label>Location</label><input value="${escape(b.location||'')}" oninput="state.boards['${scheduleBoardKey}'].location=this.value;save()"></div>
+      <div><label>Fed From</label><input value="${escape(b.fedFrom||'')}" oninput="state.boards['${scheduleBoardKey}'].fedFrom=this.value;save()"></div>
+      <div><label>Manufacturer</label><input value="${escape(b.manufacturer||'')}" oninput="state.boards['${scheduleBoardKey}'].manufacturer=this.value;save()"></div>
+      <div><label>Board Size / Rating</label><input value="${escape(b.size||'')}" oninput="state.boards['${scheduleBoardKey}'].size=this.value;save()"></div>
+      <div><label>PFC / Zdb</label><input value="${escape(b.pfc||'')}" oninput="state.boards['${scheduleBoardKey}'].pfc=this.value;save()"></div>
+    </div>
+    <h3>Circuits <button class="btn btn-sm btn-secondary" onclick="addCircuit()">+ Circuit</button></h3>
+    <div style="overflow-x:auto">
+    <table class="data">
+      <thead><tr><th>Key</th><th>Circuit</th><th>Phase</th><th>MCB (A)</th><th>Type</th><th>Description</th><th>Cable</th><th>Size</th><th>CPC</th><th></th></tr></thead>
+      <tbody>${b.circuits.map((c,i)=>`<tr>
+        <td><b>${c.key||''}</b></td>
+        <td><input value="${escape(c.circuit||'')}" oninput="updateCircuit(${i},'circuit',this.value)" style="width:50px"></td>
+        <td><input value="${escape(c.phase||'')}" oninput="updateCircuit(${i},'phase',this.value)" style="width:40px"></td>
+        <td><input value="${escape(String(c.mcbA||''))}" oninput="updateCircuit(${i},'mcbA',this.value)" style="width:50px"></td>
+        <td><input value="${escape(c.mcbType||'')}" oninput="updateCircuit(${i},'mcbType',this.value)" style="width:70px"></td>
+        <td><input value="${escape(c.description||'')}" oninput="updateCircuit(${i},'description',this.value)"></td>
+        <td><input value="${escape(c.cableType||'')}" oninput="updateCircuit(${i},'cableType',this.value)" style="width:100px"></td>
+        <td><input value="${escape(String(c.cableSize||''))}" oninput="updateCircuit(${i},'cableSize',this.value)" style="width:60px"></td>
+        <td><input value="${escape(String(c.cpcSize||''))}" oninput="updateCircuit(${i},'cpcSize',this.value)" style="width:60px"></td>
+        <td><button class="icon-btn" onclick="removeCircuit(${i})">🗑</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+    `:'<div class="empty">No boards configured.</div>'}
+  </div>`;
+}
+function updateCircuit(idx,field,val){
+  state.boards[scheduleBoardKey].circuits[idx][field] = val;
+  // rebuild key from circuit+phase
+  const c = state.boards[scheduleBoardKey].circuits[idx];
+  c.key = (c.circuit||'')+(c.phase||'');
+  save();
+  // re-render only key cell for speed; simpler to just renderSchedule
+}
+function addCircuit(){
+  state.boards[scheduleBoardKey].circuits.push({circuit:'',phase:'',mcbA:'',mcbType:'',description:'',cableType:'',cableSize:'',cpcSize:'',key:''});
+  save(); renderSchedule();
+}
+function removeCircuit(i){
+  if(!confirm('Remove this circuit?')) return;
+  state.boards[scheduleBoardKey].circuits.splice(i,1);
+  save(); renderSchedule();
+}
+function addBoard(){
+  const name = prompt('New DB reference (e.g. DB-EB2M):');
+  if(!name) return;
+  if(state.boards[name]){ alert('Board already exists'); return; }
+  state.boards[name] = {ref:name,location:'',fedFrom:'',manufacturer:'',size:'',pfc:'',circuits:[]};
+  scheduleBoardKey = name;
+  save(); renderSchedule();
+}
+function deleteBoard(){
+  if(Object.keys(state.boards).length<=1) return;
+  if(!confirm('Delete this board and all its circuits?')) return;
+  delete state.boards[scheduleBoardKey];
+  scheduleBoardKey = Object.keys(state.boards)[0];
+  save(); renderSchedule();
+}
+
+// ---------- Procedure ----------
+function renderProcedure(){
+  const el = document.getElementById('tab-procedure');
+  const r = getCurrent();
+  if(!r){
+    el.innerHTML = `<div class="card"><div class="empty">No active request. <a href="#" onclick="switchTab('request');return false">Select or start a request</a> to track procedure steps.</div></div>`;
+    return;
+  }
+  el.innerHTML = `
+  <div class="card">
+    <h2>Electrical Isolation Procedure <span class="pill">${r.ref}</span>
+      <div class="no-print" style="font-size:12px;font-weight:normal"><button class="btn btn-sm btn-secondary" onclick="window.print()">🖨 Print</button></div>
+    </h2>
+    <div class="alert alert-info">Follow this sequence for safe electrical isolation before commencing work. Tick each step as completed; initial where required.</div>
+    ${r.procedure.map((s,i)=>`
+      <div class="procedure-step ${s.done?'done':''}">
+        <div class="num">${i+1}</div>
+        <div>${escape(s.text)}</div>
+        <div class="checkbox-row"><input type="checkbox" ${s.done?'checked':''} onchange="r().procedure[${i}].done=this.checked;upd();renderProcedure()"> <span>Done</span></div>
+        <div><input placeholder="Initials" value="${escape(s.initials||'')}" oninput="r().procedure[${i}].initials=this.value;upd()"></div>
+      </div>`).join('')}
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="resetProcedure()">Reset steps</button>
+    </div>
+  </div>`;
+}
+function resetProcedure(){
+  if(!confirm('Reset all procedure steps?')) return;
+  getCurrent().procedure = DEFAULT_PROCEDURE.map(t=>({text:t,done:false,initials:''}));
+  upd(); renderProcedure();
+}
+
+// ---------- History ----------
+function renderHistory(){
+  const el = document.getElementById('tab-history');
+  const list = [...state.requests].sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  el.innerHTML = `
+  <div class="card">
+    <h2>Request History (${list.length})</h2>
+    ${list.length===0?'<div class="empty">No requests yet.</div>':`
+    <table class="data">
+      <thead><tr><th>Ref</th><th>Created</th><th>Project</th><th>Client</th><th>Isolations</th><th>Status Summary</th><th></th></tr></thead>
+      <tbody>${list.map(r=>{
+        const iso = r.isolations.filter(i=>i.status==='Isolated').length;
+        const cl = r.isolations.filter(i=>i.status==='Closed'||i.status==='Reinstated').length;
+        return `<tr>
+          <td><b>${r.ref}</b></td>
+          <td>${fmtDate(r.createdAt)}</td>
+          <td>${escape(r.details.project||'')}</td>
+          <td>${escape(r.details.client||'')}</td>
+          <td>${r.isolations.length}</td>
+          <td><span class="status s-isolated">${iso} live</span> <span class="status s-closed">${cl} closed</span></td>
+          <td><button class="btn btn-sm btn-secondary" onclick="openRequest('${r.id}')">Open</button> <button class="btn btn-sm btn-primary" onclick="previewPdf('${r.id}')">👁 Preview</button> <button class="btn btn-sm btn-secondary" onclick="exportPdf('${r.id}')">PDF</button></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`}
+  </div>`;
+}
+
+// ---------- Settings ----------
+function renderSettings(){
+  const el = document.getElementById('tab-settings');
+  el.innerHTML = `
+  <div class="card">
+    <h2>Company & Document Settings</h2>
+    <div class="grid grid-2">
+      <div><label>Company Name</label><input value="${escape(state.settings.company)}" oninput="state.settings.company=this.value;save();render()"></div>
+      <div><label>Document Reference Prefix</label><input value="${escape(state.settings.docPrefix)}" oninput="state.settings.docPrefix=this.value;save()"></div>
+    </div>
+    <div style="margin-top:12px"><label>Standards Note (printed on every request)</label><textarea oninput="state.settings.standardsNote=this.value;save()">${escape(state.settings.standardsNote)}</textarea></div>
+    <h3>Company Logo</h3>
+    <div class="inline-form">
+      <div><label>Upload logo (PNG/JPG)</label><input type="file" accept="image/*" onchange="uploadLogo(this)"></div>
+      <div>${state.settings.logo?`<img src="${state.settings.logo}" style="max-height:60px;border:1px solid var(--line);padding:4px;border-radius:6px;background:#fff"><br><button class="btn btn-sm btn-ghost" onclick="state.settings.logo='';save();render()">Remove logo</button>`:'<span class="small">No logo uploaded</span>'}</div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Data Management</h2>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="exportBackup()">⬇ Export full backup (JSON)</button>
+      <label class="btn btn-secondary" style="cursor:pointer">⬆ Import backup<input type="file" accept=".json" onchange="importBackup(this)" style="display:none"></label>
+      <button class="btn btn-danger" onclick="resetAll()">Reset all data</button>
+    </div>
+    <p class="small">Data is stored locally in your browser (localStorage). Use Export regularly if you want a copy, or to move the data to another device.</p>
+  </div>`;
+}
+function uploadLogo(input){
+  const f = input.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = e=>{ state.settings.logo = e.target.result; save(); render(); };
+  reader.readAsDataURL(f);
+}
+function exportBackup(){
+  const blob = new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `loto-backup-${todayIso()}.json`;
+  a.click();
+}
+function importBackup(input){
+  const f = input.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const s = JSON.parse(e.target.result);
+      if(!s.settings||!s.requests||!s.boards) throw new Error('Invalid file');
+      if(!confirm('This will replace all current data. Continue?')) return;
+      state = s; save(); render();
+      alert('Import complete.');
+    }catch(err){ alert('Import failed: '+err.message); }
+  };
+  reader.readAsText(f);
+}
+function resetAll(){
+  if(!confirm('Delete ALL data and restore defaults? This cannot be undone.')) return;
+  localStorage.removeItem(LS_KEY);
+  state = freshState(); save(); render();
+}
+
+// ---------- signature pad ----------
+function attachPad(canvas, onChange){
+  const ctx = canvas.getContext && canvas.getContext('2d');
+  if(!ctx) return; // canvas unavailable (e.g. headless test env)
+  function resize(){
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width*2; canvas.height = rect.height*2;
+    ctx.scale(2,2);
+    ctx.lineWidth = 1.8; ctx.lineCap='round'; ctx.strokeStyle='#8B1A1A';
+  }
+  resize();
+  let drawing=false,last=null;
+  function pos(e){
+    const rect = canvas.getBoundingClientRect();
+    const t = e.touches?e.touches[0]:e;
+    return {x:t.clientX-rect.left, y:t.clientY-rect.top};
+  }
+  function start(e){e.preventDefault();drawing=true;last=pos(e);}
+  function move(e){
+    if(!drawing) return; e.preventDefault();
+    const p = pos(e);
+    ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke();
+    last = p;
+  }
+  function end(){
+    if(!drawing) return;
+    drawing=false;
+    onChange(canvas.toDataURL('image/png'));
+  }
+  canvas.addEventListener('mousedown',start); canvas.addEventListener('mousemove',move);
+  canvas.addEventListener('mouseup',end); canvas.addEventListener('mouseleave',end);
+  canvas.addEventListener('touchstart',start); canvas.addEventListener('touchmove',move);
+  canvas.addEventListener('touchend',end);
+}
+function drawDataUrl(canvas, url){
+  const ctx = canvas.getContext && canvas.getContext('2d');
+  if(!ctx) return;
+  const img = new Image();
+  img.onload = ()=>{
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width*2; canvas.height = rect.height*2;
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  };
+  img.src = url;
+}
+
+// ---------- util ----------
+function escape(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function switchTab(name){
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.toggle('active', t.id==='tab-'+name));
+  window.scrollTo(0,0);
+}
+document.getElementById('tabs').addEventListener('click', e=>{
+  if(e.target.dataset.tab) switchTab(e.target.dataset.tab);
+});
+
+// ============================================================
+// EXPORTS — PDF
+// ============================================================
+function buildRequestPdf(req){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'pt',format:'a4'});
+  const W = doc.internal.pageSize.getWidth();
+  let y = 40;
+
+  // header
+  if(state.settings.logo){
+    try{ doc.addImage(state.settings.logo,'PNG',40,y,60,40); }catch(e){}
+  }
+  doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.setTextColor(139,26,26);
+  doc.text(state.settings.company, W/2, y+16, {align:'center'});
+  doc.setFontSize(11);
+  doc.text('LOTO CONTRACTOR SYSTEM — REQUEST, ISOLATION & CLOSE-OUT', W/2, y+32, {align:'center'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text(`Document No. MP-LOTO-FRM-001 · Rev 1 · Ref ${req.ref} · Printed ${new Date().toLocaleDateString('en-GB')}`, W/2, y+46, {align:'center'});
+  y += 60;
+  doc.setDrawColor(139,26,26); doc.setLineWidth(1.2); doc.line(40,y,W-40,y); y += 14;
+
+  // Section 1
+  doc.setTextColor(139,26,26); doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('1. REQUEST DETAILS', 40, y); y+=4;
+  doc.autoTable({
+    startY:y+2,
+    theme:'grid',
+    styles:{fontSize:9,cellPadding:4},
+    headStyles:{fillColor:[139,26,26]},
+    body:[
+      ['Project / Site', req.details.project||'', 'Request No.', req.ref],
+      ['Client / Principal', req.details.client||'', 'Date Requested', fmtDate(req.details.dateRequested)],
+      ['Requested By', req.details.requestedBy||'', 'Company', req.details.company||''],
+      ['Contact Number', req.details.contact||'', 'Permit / Work Ref', req.details.permitRef||'']
+    ],
+    columnStyles:{0:{fontStyle:'bold',fillColor:[253,242,242],cellWidth:100},2:{fontStyle:'bold',fillColor:[253,242,242],cellWidth:100}}
+  });
+  y = doc.lastAutoTable.finalY + 14;
+
+  // Section 2 - isolations
+  doc.setTextColor(139,26,26); doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('2. ISOLATION REQUIREMENTS', 40, y);
+  if(req.isolations.length===0){
+    doc.setFont('helvetica','italic'); doc.setTextColor(120); doc.setFontSize(9);
+    doc.text('No isolations logged.', 40, y+16);
+    y += 24;
+  } else {
+    doc.autoTable({
+      startY:y+4, theme:'grid',
+      styles:{fontSize:8, cellPadding:3, overflow:'linebreak'},
+      headStyles:{fillColor:[139,26,26]},
+      head:[['#','DB','Circuit','Description','Device','Lock','Dead Test','Status','By','Date']],
+      body: req.isolations.map((iso,i)=>{
+        const b = state.boards[iso.dbRef];
+        const c = b?b.circuits.find(x=>x.key===iso.circuitKey):null;
+        return [String(i+1).padStart(2,'0'), iso.dbRef, iso.circuitKey, iso.description||(c?c.description:'')||'', iso.deviceType||'', iso.lockNo||'', iso.deadTest||'', iso.status, iso.isolatedBy||'', fmtDate(iso.date)];
+      })
+    });
+    y = doc.lastAutoTable.finalY + 14;
+  }
+
+  // Section 3 - risk
+  if(y > 700){ doc.addPage(); y = 40; }
+  doc.setTextColor(139,26,26); doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('3. RISK REVIEW / PRECAUTIONS', 40, y);
+  doc.autoTable({
+    startY:y+4, theme:'grid',
+    styles:{fontSize:9,cellPadding:4},
+    headStyles:{fillColor:[139,26,26]},
+    body:[
+      ['Permit to Work', req.risk.permit, 'Test Equipment', req.risk.testKit],
+      ['Affected Notified', req.risk.notified, 'PPE / Access', req.risk.ppe],
+      ['Drawings Checked', req.risk.drawings, 'Risk Level', req.risk.riskLevel],
+      ['LOTO Kit', req.risk.kit, 'Work Type', req.risk.workType]
+    ],
+    columnStyles:{0:{fontStyle:'bold',fillColor:[253,242,242]},2:{fontStyle:'bold',fillColor:[253,242,242]}}
+  });
+  y = doc.lastAutoTable.finalY + 6;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(40);
+  doc.text('Additional Controls / Comments:', 40, y); y += 10;
+  const commentLines = doc.splitTextToSize(req.risk.comments||'-', W-80);
+  doc.text(commentLines, 40, y); y += commentLines.length*11 + 10;
+
+  // Section 4 - signatures
+  if(y > 640){ doc.addPage(); y = 40; }
+  doc.setTextColor(139,26,26); doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('4. AUTHORISATION AND SIGN-OFF', 40, y); y += 8;
+  const roles = [
+    ['Requested By','requested'],['Reviewed By','reviewed'],['Authorised By','authorised'],
+    ['Work Completed By','completed'],['Supply Reinstated By','reinstated']
+  ];
+  const sigRowsPdf = roles.map(([lbl,k])=>[
+    lbl, req.authorisation[k+'By']||'', fmtDate(req.authorisation[k+'Date'])||'', ''
+  ]);
+  doc.autoTable({
+    startY:y+4,theme:'grid',
+    styles:{fontSize:9, cellPadding:4, minCellHeight:48},
+    headStyles:{fillColor:[139,26,26]},
+    head:[['Role','Name','Date','Signature']],
+    body: sigRowsPdf,
+    columnStyles:{0:{fontStyle:'bold',fillColor:[253,242,242],cellWidth:110},3:{cellWidth:140}},
+    didDrawCell: (data)=>{
+      if(data.section==='body' && data.column.index===3){
+        const role = roles[data.row.index][1];
+        const sig = req.authorisation[role+'Sig'];
+        if(sig){
+          try{ doc.addImage(sig,'PNG',data.cell.x+3,data.cell.y+3,data.cell.width-6,data.cell.height-6); }catch(e){}
+        }
+      }
+    }
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  if(req.authorisation.notes){
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(139,26,26);
+    doc.text('Authorisation Notes:',40,y); y+=10;
+    doc.setFont('helvetica','normal'); doc.setTextColor(40);
+    const nl = doc.splitTextToSize(req.authorisation.notes, W-80);
+    doc.text(nl, 40, y); y += nl.length*11 + 6;
+  }
+
+  doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(100);
+  const sn = doc.splitTextToSize(state.settings.standardsNote||'', W-80);
+  doc.text(sn, 40, y); y += sn.length*10 + 4;
+
+  // Footer
+  const pages = doc.internal.getNumberOfPages();
+  for(let p=1;p<=pages;p++){
+    doc.setPage(p);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120);
+    doc.text(`${state.settings.company} · LOTO Request ${req.ref}`, 40, 825);
+    doc.text(`Page ${p} / ${pages}`, W-40, 825, {align:'right'});
+  }
+
+  return doc;
+}
+
+function exportPdf(id){
+  const req = state.requests.find(r=>r.id===id);
+  if(!req){ alert('Request not found'); return; }
+  const doc = buildRequestPdf(req);
+  doc.save(`LOTO-${req.ref}.pdf`);
+}
+
+function previewPdf(id){
+  const req = state.requests.find(r=>r.id===id);
+  if(!req){ alert('Request not found'); return; }
+  const doc = buildRequestPdf(req);
+  const url = doc.output('bloburl');
+  openPreview(`PDF Preview — LOTO Request ${req.ref}`, {iframeUrl:url}, [
+    {label:'⬇ Download PDF', primary:true, onClick:()=>doc.save(`LOTO-${req.ref}.pdf`)},
+    {label:'📊 Preview Excel', onClick:()=>previewExcel(id)}
+  ]);
+}
+
+function buildRegisterPdf(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'pt',format:'a4',orientation:'landscape'});
+  const W = doc.internal.pageSize.getWidth();
+  let y = 40;
+  if(state.settings.logo){ try{ doc.addImage(state.settings.logo,'PNG',40,y,60,40); }catch(e){} }
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(139,26,26);
+  doc.text(state.settings.company, W/2, y+16, {align:'center'});
+  doc.setFontSize(11);
+  doc.text('MASTER LOTO REGISTER', W/2, y+32, {align:'center'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(80);
+  doc.text(`Document MP-LOTO-001 · Printed ${new Date().toLocaleDateString('en-GB')}`, W/2, y+46, {align:'center'});
+  y += 60;
+  const rows = state.requests.flatMap(req=>req.isolations.map(iso=>{
+    const b = state.boards[iso.dbRef];
+    const c = b?b.circuits.find(x=>x.key===iso.circuitKey):null;
+    return [req.ref, req.details.project||'', req.details.client||'', iso.dbRef, iso.circuitKey||'', iso.description||(c?c.description:'')||'', iso.lockNo||'', iso.status, iso.isolatedBy||'', fmtDate(iso.date), iso.deadTest||'', iso.reinstatedBy||''];
+  }));
+  doc.autoTable({
+    startY:y, theme:'grid', styles:{fontSize:7,cellPadding:3},
+    headStyles:{fillColor:[139,26,26]},
+    head:[['Req Ref','Project','Client','DB','Circuit','Description','Lock','Status','Isolated By','Date','Dead Test','Reinstated By']],
+    body: rows.length?rows:[['(no isolations logged)','','','','','','','','','','','']]
+  });
+  const pages = doc.internal.getNumberOfPages();
+  for(let p=1;p<=pages;p++){
+    doc.setPage(p);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120);
+    doc.text(`${state.settings.company} · Master LOTO Register`, 40, 580);
+    doc.text(`Page ${p} / ${pages}`, W-40, 580, {align:'right'});
+  }
+  return doc;
+}
+
+function exportRegisterPdf(){
+  const doc = buildRegisterPdf();
+  doc.save(`LOTO-Master-Register-${todayIso()}.pdf`);
+}
+
+function previewRegisterPdf(){
+  const doc = buildRegisterPdf();
+  const url = doc.output('bloburl');
+  openPreview('PDF Preview — Master LOTO Register', {iframeUrl:url}, [
+    {label:'⬇ Download PDF', primary:true, onClick:()=>doc.save(`LOTO-Master-Register-${todayIso()}.pdf`)},
+    {label:'📊 Preview Excel', onClick:()=>previewRegisterExcel()}
+  ]);
+}
+
+// ============================================================
+// EXPORTS — EXCEL
+// ============================================================
+function exportExcel(id){
+  const req = state.requests.find(r=>r.id===id);
+  if(!req){ alert('Request not found'); return; }
+  const wb = XLSX.utils.book_new();
+
+  const rows1 = [
+    [state.settings.company],
+    ['LOTO CONTRACTOR SYSTEM - REQUEST, ISOLATION AND CLOSE-OUT'],
+    ['Document No.','MP-LOTO-FRM-001','Rev 1','Request Ref',req.ref],
+    [],
+    ['1. REQUEST DETAILS'],
+    ['Project / Site',req.details.project,'Request No.',req.ref],
+    ['Client / Principal Contractor',req.details.client,'Date Requested',fmtDate(req.details.dateRequested)],
+    ['Requested By',req.details.requestedBy,'Company',req.details.company],
+    ['Contact Number',req.details.contact,'Permit / Work Ref',req.details.permitRef],
+    [],
+    ['2. ISOLATION REQUIREMENTS'],
+    ['#','DB','Circuit','Description','Isolation Point','Device','Lock No.','Dead Test','Status','Isolated By','Date','Time'],
+    ...req.isolations.map((iso,i)=>{
+      const b = state.boards[iso.dbRef];
+      const c = b?b.circuits.find(x=>x.key===iso.circuitKey):null;
+      return [i+1, iso.dbRef, iso.circuitKey, iso.description||(c?c.description:''), iso.devicePoint, iso.deviceType, iso.lockNo, iso.deadTest, iso.status, iso.isolatedBy, fmtDate(iso.date), iso.time];
+    }),
+    [],
+    ['3. RISK REVIEW / PRECAUTIONS'],
+    ['Permit to Work',req.risk.permit,'Test Equipment',req.risk.testKit],
+    ['Affected Notified',req.risk.notified,'PPE / Access',req.risk.ppe],
+    ['Drawings Checked',req.risk.drawings,'Risk Level',req.risk.riskLevel],
+    ['LOTO Kit',req.risk.kit,'Work Type',req.risk.workType],
+    ['Additional Controls',req.risk.comments],
+    [],
+    ['4. AUTHORISATION'],
+    ['Role','Name','Date'],
+    ['Requested By',req.authorisation.requestedBy,fmtDate(req.authorisation.requestedDate)],
+    ['Reviewed By',req.authorisation.reviewedBy,fmtDate(req.authorisation.reviewedDate)],
+    ['Authorised By',req.authorisation.authorisedBy,fmtDate(req.authorisation.authorisedDate)],
+    ['Work Completed By',req.authorisation.completedBy,fmtDate(req.authorisation.completedDate)],
+    ['Supply Reinstated By',req.authorisation.reinstatedBy,fmtDate(req.authorisation.reinstatedDate)],
+    ['Notes',req.authorisation.notes],
+    [],
+    [state.settings.standardsNote]
+  ];
+  const ws1 = XLSX.utils.aoa_to_sheet(rows1);
+  ws1['!cols'] = [{wch:22},{wch:28},{wch:22},{wch:28},{wch:18},{wch:12},{wch:14},{wch:14},{wch:14},{wch:14},{wch:12},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'LOTO Request');
+
+  const procRows = [
+    ['Electrical Isolation Procedure'],
+    ['Step','Action','Done','Initials'],
+    ...req.procedure.map((s,i)=>[i+1,s.text,s.done?'Yes':'',s.initials||''])
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(procRows);
+  ws2['!cols'] = [{wch:6},{wch:70},{wch:8},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Procedure');
+
+  // DB schedule for boards referenced
+  const usedBoards = [...new Set(req.isolations.map(i=>i.dbRef))].filter(k=>state.boards[k]);
+  usedBoards.forEach(k=>{
+    const b = state.boards[k];
+    const rows = [
+      [state.settings.company,'',b.ref],
+      ['Location',b.location,'Fed From',b.fedFrom],
+      ['Manufacturer',b.manufacturer,'Board Size',b.size,'PFC',b.pfc],
+      [],
+      ['Circuit','Phase','MCB (A)','Type','Description','Cable','Size','CPC','Key'],
+      ...b.circuits.map(c=>[c.circuit,c.phase,c.mcbA,c.mcbType,c.description,c.cableType,c.cableSize,c.cpcSize,c.key])
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols']=[{wch:10},{wch:8},{wch:10},{wch:12},{wch:50},{wch:16},{wch:10},{wch:10},{wch:10}];
+    XLSX.utils.book_append_sheet(wb, ws, ('DB-'+k).slice(0,31));
+  });
+
+  XLSX.writeFile(wb, `LOTO-${req.ref}.xlsx`);
+}
+
+function exportRegisterExcel(){
+  const wb = XLSX.utils.book_new();
+  const rows = [
+    [state.settings.company],
+    ['MASTER LOTO REGISTER'],
+    ['Document No.','MP-LOTO-001','Printed',new Date().toLocaleDateString('en-GB')],
+    [],
+    ['Request Ref','Project','Client','DB','Circuit','Description','Lock No.','Status','Isolated By','Date','Time','Dead Test','Reinstated By'],
+    ...state.requests.flatMap(req=>req.isolations.map(iso=>{
+      const b = state.boards[iso.dbRef];
+      const c = b?b.circuits.find(x=>x.key===iso.circuitKey):null;
+      return [req.ref, req.details.project, req.details.client, iso.dbRef, iso.circuitKey, iso.description||(c?c.description:''), iso.lockNo, iso.status, iso.isolatedBy, fmtDate(iso.date), iso.time, iso.deadTest, iso.reinstatedBy];
+    }))
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:20},{wch:24},{wch:22},{wch:12},{wch:10},{wch:44},{wch:12},{wch:16},{wch:16},{wch:12},{wch:10},{wch:12},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Master Register');
+  XLSX.writeFile(wb, `LOTO-Master-Register-${todayIso()}.xlsx`);
+}
+
+// ============================================================
+// PREVIEW MODAL
+// ============================================================
+function openPreview(title, content, actions){
+  const modal = document.getElementById('previewModal');
+  const actionsHtml = (actions||[]).map((a,i)=>
+    `<button class="btn ${a.primary?'btn-primary':'btn-ghost'}" data-act="${i}">${escape(a.label)}</button>`
+  ).join('');
+  let body = '';
+  if(content.iframeUrl){
+    body = `<iframe src="${content.iframeUrl}" title="preview"></iframe>`;
+  } else if(content.html){
+    body = content.html;
+  }
+  modal.innerHTML = `
+    <div class="modal-overlay">
+      <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal-head">
+          <h3>${escape(title)}</h3>
+          <div class="actions">
+            ${actionsHtml}
+            <button class="btn btn-ghost" data-close>✕ Close</button>
+          </div>
+        </div>
+        ${content.tabs ? content.tabs : ''}
+        <div class="modal-body">${body}</div>
+      </div>
+    </div>`;
+  modal.classList.remove('hidden');
+  // wire actions
+  modal.querySelectorAll('[data-act]').forEach(btn=>{
+    btn.addEventListener('click', ()=> actions[parseInt(btn.dataset.act)].onClick());
+  });
+  modal.querySelector('[data-close]').addEventListener('click', closePreview);
+  // close on backdrop click
+  modal.querySelector('.modal-overlay').addEventListener('click', e=>{
+    if(e.target.classList.contains('modal-overlay')) closePreview();
+  });
+  // ESC to close
+  document.addEventListener('keydown', escClosePreview);
+}
+function escClosePreview(e){ if(e.key==='Escape') closePreview(); }
+function closePreview(){
+  const m = document.getElementById('previewModal');
+  m.classList.add('hidden'); m.innerHTML='';
+  document.removeEventListener('keydown', escClosePreview);
+}
+
+// Excel preview — render the data as HTML tables (matches what .xlsx will contain)
+function previewExcel(id){
+  const req = state.requests.find(r=>r.id===id);
+  if(!req){ alert('Request not found'); return; }
+  const b = (key)=>state.boards[key];
+  const circDesc = (iso)=>{ if(iso.description) return iso.description; const br = b(iso.dbRef); const c = br?br.circuits.find(x=>x.key===iso.circuitKey):null; return c?c.description:''; };
+
+  const html = `
+    <div class="preview-sheet">
+      <h4>LOTO Request · ${escape(req.ref)} · Sheet: "LOTO Request"</h4>
+      <table><tr><th colspan="4">${escape(state.settings.company)}</th></tr>
+      <tr><th colspan="4">LOTO CONTRACTOR SYSTEM – REQUEST, ISOLATION AND CLOSE-OUT</th></tr>
+      <tr><td><b>Document No.</b></td><td>MP-LOTO-FRM-001</td><td><b>Rev</b></td><td>1</td></tr></table>
+
+      <h4>1. Request Details</h4>
+      <table>
+        <tr><td><b>Project / Site</b></td><td>${escape(req.details.project)}</td><td><b>Request No.</b></td><td>${escape(req.ref)}</td></tr>
+        <tr><td><b>Client / Principal</b></td><td>${escape(req.details.client)}</td><td><b>Date Requested</b></td><td>${fmtDate(req.details.dateRequested)}</td></tr>
+        <tr><td><b>Requested By</b></td><td>${escape(req.details.requestedBy)}</td><td><b>Company</b></td><td>${escape(req.details.company)}</td></tr>
+        <tr><td><b>Contact</b></td><td>${escape(req.details.contact)}</td><td><b>Permit / Work Ref</b></td><td>${escape(req.details.permitRef)}</td></tr>
+      </table>
+
+      <h4>2. Isolation Requirements</h4>
+      <table>
+        <thead><tr><th>#</th><th>DB</th><th>Circuit</th><th>Description</th><th>Isolation Point</th><th>Device</th><th>Lock</th><th>Dead Test</th><th>Status</th><th>Isolated By</th><th>Date</th><th>Time</th></tr></thead>
+        <tbody>${req.isolations.length?req.isolations.map((iso,i)=>`<tr>
+          <td>${i+1}</td><td>${iso.dbRef}</td><td><b>${iso.circuitKey||''}</b></td>
+          <td>${escape(circDesc(iso))}</td><td>${escape(iso.devicePoint||'')}</td>
+          <td>${iso.deviceType||''}</td><td>${escape(iso.lockNo||'')}</td>
+          <td>${iso.deadTest||''}</td><td>${iso.status}</td>
+          <td>${escape(iso.isolatedBy||'')}</td><td>${fmtDate(iso.date)}</td><td>${iso.time||''}</td>
+        </tr>`).join(''):'<tr><td colspan="12" style="text-align:center;color:#6b7280;font-style:italic">No isolations logged</td></tr>'}</tbody>
+      </table>
+
+      <h4>3. Risk Review / Precautions</h4>
+      <table>
+        <tr><td><b>Permit to Work</b></td><td>${req.risk.permit}</td><td><b>Test Equipment</b></td><td>${req.risk.testKit}</td></tr>
+        <tr><td><b>Affected Notified</b></td><td>${req.risk.notified}</td><td><b>PPE / Access</b></td><td>${req.risk.ppe}</td></tr>
+        <tr><td><b>Drawings Checked</b></td><td>${req.risk.drawings}</td><td><b>Risk Level</b></td><td>${req.risk.riskLevel}</td></tr>
+        <tr><td><b>LOTO Kit</b></td><td>${req.risk.kit}</td><td><b>Work Type</b></td><td>${req.risk.workType}</td></tr>
+        <tr><td><b>Additional Controls</b></td><td colspan="3">${escape(req.risk.comments)}</td></tr>
+      </table>
+
+      <h4>4. Authorisation</h4>
+      <table>
+        <thead><tr><th>Role</th><th>Name</th><th>Date</th><th>Signature</th></tr></thead>
+        <tbody>
+          ${[['Requested By','requested'],['Reviewed By','reviewed'],['Authorised By','authorised'],['Work Completed By','completed'],['Supply Reinstated By','reinstated']].map(([lbl,k])=>`
+            <tr><td><b>${lbl}</b></td>
+            <td>${escape(req.authorisation[k+'By']||'')}</td>
+            <td>${fmtDate(req.authorisation[k+'Date'])}</td>
+            <td>${req.authorisation[k+'Sig']?`<img src="${req.authorisation[k+'Sig']}" style="max-height:40px">`:'<span style="color:#9ca3af">—</span>'}</td></tr>`).join('')}
+        </tbody>
+      </table>
+      <p style="font-style:italic;color:#6b7280">${escape(state.settings.standardsNote)}</p>
+    </div>
+
+    <div class="preview-sheet">
+      <h4>Sheet: "Procedure"</h4>
+      <table>
+        <thead><tr><th style="width:40px">Step</th><th>Action</th><th style="width:50px">Done</th><th style="width:70px">Initials</th></tr></thead>
+        <tbody>${req.procedure.map((s,i)=>`<tr><td>${i+1}</td><td>${escape(s.text)}</td><td>${s.done?'Yes':''}</td><td>${escape(s.initials||'')}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>
+  `;
+
+  openPreview(`Excel Preview — LOTO Request ${req.ref}`, {html}, [
+    {label:'⬇ Download Excel', primary:true, onClick:()=>{ closePreview(); exportExcel(id); }},
+    {label:'📄 Preview PDF', onClick:()=>{ closePreview(); previewPdf(id); }}
+  ]);
+}
+
+function previewRegisterExcel(){
+  const rows = state.requests.flatMap(req=>req.isolations.map(iso=>{
+    const b = state.boards[iso.dbRef];
+    const c = b?b.circuits.find(x=>x.key===iso.circuitKey):null;
+    return {req, iso, desc: iso.description||(c?c.description:'')};
+  }));
+  const html = `
+    <div class="preview-sheet">
+      <h4>Master LOTO Register · Sheet: "Master Register"</h4>
+      <table>
+        <tr><th colspan="6">${escape(state.settings.company)}</th></tr>
+        <tr><th colspan="6">MASTER LOTO REGISTER</th></tr>
+        <tr><td><b>Document No.</b></td><td>MP-LOTO-001</td><td><b>Printed</b></td><td colspan="3">${new Date().toLocaleDateString('en-GB')}</td></tr>
+      </table>
+      <table>
+        <thead><tr><th>Req Ref</th><th>Project</th><th>Client</th><th>DB</th><th>Circuit</th><th>Description</th><th>Lock</th><th>Status</th><th>Isolated By</th><th>Date</th><th>Dead Test</th></tr></thead>
+        <tbody>${rows.length?rows.map(({req,iso,desc})=>`<tr>
+          <td><b>${escape(req.ref)}</b></td>
+          <td>${escape(req.details.project||'')}</td>
+          <td>${escape(req.details.client||'')}</td>
+          <td>${iso.dbRef}</td>
+          <td><b>${iso.circuitKey||''}</b></td>
+          <td>${escape(desc)}</td>
+          <td>${escape(iso.lockNo||'')}</td>
+          <td>${iso.status}</td>
+          <td>${escape(iso.isolatedBy||'')}</td>
+          <td>${fmtDate(iso.date)}</td>
+          <td>${iso.deadTest||''}</td>
+        </tr>`).join(''):'<tr><td colspan="11" style="text-align:center;color:#6b7280;font-style:italic">No isolations logged</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+  openPreview('Excel Preview — Master LOTO Register', {html}, [
+    {label:'⬇ Download Excel', primary:true, onClick:()=>{ closePreview(); exportRegisterExcel(); }},
+    {label:'📄 Preview PDF', onClick:()=>{ closePreview(); previewRegisterPdf(); }}
+  ]);
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+// If embedded in portal iframe, hide the app header to avoid duplication
+if(new URLSearchParams(window.location.search).get('embedded')==='1'){
+  document.querySelector('header.app').style.display='none';
+  document.body.style.background='#f1f5f9';
+}
+render();
+</script>
+</body>
+</html>
