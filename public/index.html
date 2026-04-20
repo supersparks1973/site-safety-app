@@ -400,6 +400,12 @@ function headers() {
   return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.token}` };
 }
 
+// HTML escape helper
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 // Intercept all API fetches — auto-logout on 401
 const _originalFetch = window.fetch;
 window.fetch = async function(url, options) {
