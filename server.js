@@ -1048,39 +1048,38 @@ async function startApp() {
       const t = rows[0];
       const attendees = typeof t.attendees === 'string' ? JSON.parse(t.attendees) : (t.attendees || []);
       const h = docxHelpers();
+      const halfW = h.pw / 2;
       const doc = new docx.Document({
         styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
         sections: [{
           properties: h.pageProps,
-          headers: { default: h.mkHeader('Toolbox Talk Record') },
-          footers: { default: h.mkFooter() },
+          headers: h.mkHeader('Toolbox Talk Record'),
+          footers: h.mkFooter('Toolbox Talk Record'),
           children: [
-            h.sectionHeader('TOOLBOX TALK RECORD'),
-            new docx.Table({ width: { size: 100, type: docx.WidthType.PERCENTAGE }, rows: [
-              new docx.TableRow({ children: [h.label('Topic'), h.value(t.topic || '')] }),
-              new docx.TableRow({ children: [h.label('Date'), h.value(t.talk_date || '')] }),
-              new docx.TableRow({ children: [h.label('Presenter'), h.value(t.presenter || '')] }),
-              new docx.TableRow({ children: [h.label('Site / Project'), h.value(t.site_project || '')] }),
-            ], borders: h.borders }),
-            new docx.Paragraph({ spacing: { before: 200 } }),
-            h.sectionHeader('TALK CONTENT'),
-            new docx.Paragraph({ text: t.content || 'No content recorded.', spacing: { after: 200 }, style: 'Normal' }),
-            new docx.Paragraph({ spacing: { before: 200 } }),
-            h.sectionHeader('ATTENDEES'),
-            new docx.Table({ width: { size: 100, type: docx.WidthType.PERCENTAGE }, rows: [
-              new docx.TableRow({ children: [
-                h.label('#'), h.label('Name'), h.label('Signed')
-              ] }),
-              ...attendees.map((a, i) => new docx.TableRow({ children: [
-                h.value(String(i + 1)),
-                h.value(a.name || ''),
-                h.value(a.signed ? '✓' : '')
+            h.sh('TOOLBOX TALK RECORD'),
+            new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
+              new TableRow({ children: [h.lbl('Topic', halfW), h.val(t.topic || '', halfW)] }),
+              new TableRow({ children: [h.lbl('Date', halfW), h.val(t.talk_date ? new Date(t.talk_date).toLocaleDateString('en-GB') : '', halfW)] }),
+              new TableRow({ children: [h.lbl('Presenter', halfW), h.val(t.presenter || '', halfW)] }),
+              new TableRow({ children: [h.lbl('Site / Project', halfW), h.val(t.site_project || '', halfW)] }),
+            ] }),
+            new Paragraph({ spacing: { before: 200 } }),
+            h.sh('TALK CONTENT'),
+            new Paragraph({ children: [new TextRun({ text: t.content || 'No content recorded.', font: 'Arial', size: 20 })], spacing: { after: 200 } }),
+            new Paragraph({ spacing: { before: 200 } }),
+            h.sh('ATTENDEES'),
+            new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
+              new TableRow({ children: [h.lbl('#', 1000), h.lbl('Name', 5000), h.lbl('Signed', 3360)] }),
+              ...attendees.map((a, i) => new TableRow({ children: [
+                h.val(String(i + 1), 1000),
+                h.val(typeof a === 'string' ? a : (a.name || ''), 5000),
+                h.val(a.signed ? '✓' : '', 3360)
               ] }))
-            ], borders: h.borders }),
+            ] }),
             ...(t.notes ? [
-              new docx.Paragraph({ spacing: { before: 200 } }),
-              h.sectionHeader('NOTES'),
-              new docx.Paragraph({ text: t.notes, spacing: { after: 200 } })
+              new Paragraph({ spacing: { before: 200 } }),
+              h.sh('NOTES'),
+              new Paragraph({ children: [new TextRun({ text: t.notes, font: 'Arial', size: 20 })], spacing: { after: 200 } })
             ] : [])
           ]
         }]
