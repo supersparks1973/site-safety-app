@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.1 - Portal + LOTO + O&M + RFI -->
+<!-- v3.2 - Portal + LOTO + O&M + RFI + Toolbox Talks -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -288,6 +288,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
           <li><a data-page="rescue-plans"><span class="nav-icon">🆘</span>Rescue Plans</a></li>
           <li><a data-page="training"><span class="nav-icon">🎓</span>Training</a></li>
           <li><a data-page="loto"><span class="nav-icon">🔒</span>LOTO System</a></li>
+          <li><a data-page="toolbox-talks"><span class="nav-icon">📢</span>Toolbox Talks</a></li>
         </ul>
       </div>
       <div class="sidebar-section">
@@ -666,6 +667,7 @@ function renderPage(page) {
     'documents': renderDocuments,
     'om-manager': renderOMManager,
     'loto': renderLOTO,
+    'toolbox-talks': renderToolboxTalks,
   };
   if (pages[page]) pages[page](c);
 }
@@ -1804,6 +1806,357 @@ function renderLOTO(c) {
     } catch(e) {}
   });
 }
+
+// ═══════════════════════════════════════
+// PORTAL: TOOLBOX TALKS
+// ═══════════════════════════════════════
+const TOOLBOX_LIBRARY = [
+  { topic: 'Working at Height', content: 'Key points:\n• Always use appropriate fall protection (harness, guardrails, safety nets)\n• Inspect all equipment before use — ladders, scaffolding, MEWPs\n• Maintain 3 points of contact on ladders at all times\n• Never work at height in adverse weather conditions\n• Ensure edge protection is in place and secure\n• Report any defects immediately and do not use defective equipment\n• Only trained and competent persons to work at height\n• Follow the hierarchy: avoid, prevent, minimise consequences' },
+  { topic: 'Manual Handling', content: 'Key points:\n• Plan the lift — assess the load, route, and destination\n• Use TILE: Task, Individual, Load, Environment\n• Keep the load close to your body, bend your knees not your back\n• Avoid twisting — move your feet to turn\n• Use mechanical aids where possible (trolleys, hoists, pallet trucks)\n• Know your limits — ask for help with heavy or awkward loads\n• Report any musculoskeletal pain or discomfort early\n• Take regular breaks during repetitive manual handling tasks' },
+  { topic: 'Electrical Safety', content: 'Key points:\n• Always isolate and prove dead before working on electrical systems\n• Use appropriate lock-out/tag-out (LOTO) procedures\n• Only competent persons to carry out electrical work\n• Inspect tools and leads before use — look for damage, fraying, burns\n• Use 110V tools on site where possible\n• Keep electrical panels and switchgear clear of obstructions\n• Report any electrical faults, sparking, or burning smells immediately\n• Be aware of overhead and underground cables\n• RCDs must be tested before each use' },
+  { topic: 'Fire Safety', content: 'Key points:\n• Know the location of fire exits, assembly points, and extinguishers\n• Keep fire routes clear at all times\n• Hot work requires a permit and fire watch\n• Store flammable materials in designated areas away from ignition sources\n• No smoking except in designated areas\n• Report any fire hazards immediately\n• Know how to raise the alarm and the evacuation procedure\n• Fire extinguisher types: Water (red), Foam (cream), CO2 (black), Powder (blue)' },
+  { topic: 'PPE Requirements', content: 'Key points:\n• PPE is the last line of defence — always follow the hierarchy of controls\n• Minimum PPE on site: hard hat, hi-vis vest, safety boots, safety glasses\n• Additional PPE as required by risk assessment (gloves, ear defenders, RPE)\n• Inspect PPE before each use and replace if damaged\n• PPE must fit properly — ill-fitting PPE does not protect\n• Store PPE correctly when not in use\n• Report any PPE defects or shortages to your supervisor\n• Never modify or alter PPE' },
+  { topic: 'Confined Space Entry', content: 'Key points:\n• Never enter a confined space without a valid permit to work\n• Atmospheric testing must be carried out before and during entry\n• A trained standby person must be present at all times\n• Ensure rescue equipment and procedures are in place before entry\n• Ventilate the space before and during work\n• Use appropriate RPE if required\n• Communication must be maintained between entrant and standby\n• Only trained and competent persons to enter confined spaces' },
+  { topic: 'Asbestos Awareness', content: 'Key points:\n• Asbestos can be found in buildings built before 2000\n• Common locations: insulation, ceiling tiles, floor tiles, pipe lagging, gaskets\n• DO NOT disturb suspected asbestos-containing materials (ACMs)\n• If you discover suspected ACMs: STOP work, SEAL off the area, REPORT it\n• Only licensed contractors can remove asbestos\n• Check the asbestos register/survey before starting any work\n• Asbestos fibres are invisible — you cannot see, smell, or taste them\n• Exposure can cause mesothelioma, asbestosis, and lung cancer' },
+  { topic: 'COSHH — Hazardous Substances', content: 'Key points:\n• COSHH = Control of Substances Hazardous to Health\n• Read the Safety Data Sheet (SDS) before using any chemical\n• Follow COSHH assessments for all hazardous substances\n• Use the least hazardous substance that will do the job\n• Wear specified PPE — gloves, goggles, RPE as required\n• Store chemicals correctly — upright, in ventilated areas, away from incompatibles\n• Know the first aid measures for substances you are using\n• Report any spills, leaks, or exposure incidents immediately' },
+  { topic: 'Slips, Trips and Falls', content: 'Key points:\n• Slips, trips and falls are the most common cause of workplace injury\n• Keep walkways, stairways, and work areas clear and tidy\n• Clean up spills immediately\n• Report uneven surfaces, loose cables, and poor lighting\n• Use handrails on stairs and steps\n• Wear appropriate footwear with good grip\n• Take care in wet or icy conditions — use grit/salt where needed\n• Good housekeeping prevents most slips, trips and falls' },
+  { topic: 'Permit to Work Systems', content: 'Key points:\n• Permits are required for high-risk activities: hot work, confined space, electrical isolation, working at height, excavation\n• A permit is NOT just a form — it is a managed system of work\n• Read and understand the permit before starting work\n• Check all controls are in place as specified on the permit\n• The permit must be signed by an authorised person\n• Work must stop if conditions change from those on the permit\n• Close out the permit when work is complete\n• Permits have an expiry time — do not work beyond it' },
+  { topic: 'Noise at Work', content: 'Key points:\n• Prolonged exposure to loud noise causes permanent hearing damage\n• Action levels: 80dB — provide hearing protection; 85dB — enforce hearing protection\n• Use engineering controls first (barriers, silencers, distance)\n• Hearing protection zones must be signed and enforced\n• Choose the right hearing protection for the noise level\n• Remove hearing protection only when outside the noisy area\n• Report any ringing in ears (tinnitus) or hearing difficulties\n• Regular hearing checks for exposed workers' },
+  { topic: 'Scaffold Safety', content: 'Key points:\n• Only use scaffolding that has been inspected and tagged (green tag = safe)\n• Never alter scaffolding — only trained scaffolders may modify it\n• Check for a valid inspection tag before use (inspected within 7 days)\n• Ensure all platforms have guardrails, mid-rails, and toe boards\n• Do not overload scaffolding — check the safe working load\n• Access scaffolding via internal ladders only — never climb the outside\n• Report any damage, missing components, or concerns immediately\n• Scaffolding must be re-inspected after adverse weather' },
+];
+
+let tbTalksView = 'list'; // 'list', 'library', 'record', 'detail'
+let tbTalksData = [];
+let tbTalkSelected = null;
+
+async function renderToolboxTalks(c) {
+  c.innerHTML = `
+    <div style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <h2 style="margin-bottom:4px">📢 Toolbox Talks</h2>
+        <p style="color:var(--text-light);font-size:14px">Pre-built talk library, record talks, and track attendance</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary" onclick="tbTalksView='library';renderToolboxTalks(document.getElementById('appContent'))">📚 Talk Library</button>
+        <button class="btn btn-primary" onclick="tbTalksView='record';tbTalkSelected=null;renderToolboxTalks(document.getElementById('appContent'))">➕ Record Talk</button>
+      </div>
+    </div>
+    <div id="tbContent"></div>
+  `;
+  const container = document.getElementById('tbContent');
+
+  if (tbTalksView === 'library') {
+    renderTBLibrary(container);
+  } else if (tbTalksView === 'record') {
+    await renderTBRecordForm(container);
+  } else if (tbTalksView === 'detail') {
+    await renderTBDetail(container);
+  } else {
+    await renderTBList(container);
+  }
+}
+
+async function renderTBList(container) {
+  try {
+    const res = await fetch(`${API}/api/toolbox-talks`, { headers: headers() });
+    tbTalksData = await res.json();
+  } catch(e) { tbTalksData = []; }
+
+  if (tbTalksData.length === 0) {
+    container.innerHTML = `
+      <div class="card" style="text-align:center;padding:40px 20px">
+        <div style="font-size:48px;margin-bottom:16px">📢</div>
+        <h3>No Toolbox Talks Recorded Yet</h3>
+        <p style="color:var(--text-light);margin:12px 0 20px">Use the <strong>Talk Library</strong> to pick a topic or <strong>Record Talk</strong> to log one.</p>
+        <button class="btn btn-primary" onclick="tbTalksView='library';renderToolboxTalks(document.getElementById('appContent'))">📚 Browse Talk Library</button>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="card" style="overflow-x:auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Topic</th>
+            <th>Presenter</th>
+            <th>Site / Project</th>
+            <th>Attendees</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tbTalksData.map(t => {
+            const att = typeof t.attendees === 'string' ? JSON.parse(t.attendees) : (t.attendees || []);
+            return `<tr>
+              <td>${t.talk_date ? new Date(t.talk_date).toLocaleDateString('en-GB') : '—'}</td>
+              <td><strong>${esc(t.topic)}</strong></td>
+              <td>${esc(t.presenter || '—')}</td>
+              <td>${esc(t.site_project || '—')}</td>
+              <td>${att.length} attendee${att.length !== 1 ? 's' : ''}</td>
+              <td style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="tbViewTalk(${t.id})">View</button>
+                <a href="${API}/api/toolbox-talks/${t.id}/docx" class="btn btn-secondary" style="font-size:12px;padding:4px 10px;text-decoration:none" target="_blank">📄 Word</a>
+                ${state.user.role === 'admin' ? `<button class="btn" style="font-size:12px;padding:4px 10px;background:#dc2626;color:#fff" onclick="tbDeleteTalk(${t.id})">Delete</button>` : ''}
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderTBLibrary(container) {
+  container.innerHTML = `
+    <div style="margin-bottom:16px">
+      <button class="btn btn-secondary" onclick="tbTalksView='list';renderToolboxTalks(document.getElementById('appContent'))">← Back to Talks</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+      ${TOOLBOX_LIBRARY.map((t, i) => `
+        <div class="card" style="cursor:pointer;transition:box-shadow .2s" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.15)'" onmouseout="this.style.boxShadow=''">
+          <h3 style="margin-bottom:8px;color:#8B1A1A">${esc(t.topic)}</h3>
+          <p style="font-size:13px;color:var(--text-light);white-space:pre-line;margin-bottom:16px;max-height:120px;overflow:hidden">${esc(t.content)}</p>
+          <button class="btn btn-primary" style="width:100%" onclick="tbUseLibraryTalk(${i})">Use This Talk</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+window.tbUseLibraryTalk = function(idx) {
+  tbTalkSelected = TOOLBOX_LIBRARY[idx];
+  tbTalksView = 'record';
+  renderToolboxTalks(document.getElementById('appContent'));
+};
+
+async function renderTBRecordForm(container) {
+  // Fetch users for attendee checkboxes
+  let users = [];
+  try {
+    const res = await fetch(`${API}/api/users`, { headers: headers() });
+    users = await res.json();
+  } catch(e) {}
+
+  const prefill = tbTalkSelected || {};
+  const today = new Date().toISOString().split('T')[0];
+
+  container.innerHTML = `
+    <div style="margin-bottom:16px">
+      <button class="btn btn-secondary" onclick="tbTalksView='list';renderToolboxTalks(document.getElementById('appContent'))">← Back to Talks</button>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:16px">${prefill.topic ? '📢 Record: ' + esc(prefill.topic) : '📢 Record a Toolbox Talk'}</h3>
+      <form id="tbRecordForm" onsubmit="tbSaveTalk(event)">
+        <div class="form-group">
+          <label>Topic *</label>
+          <input type="text" id="tbTopic" value="${esc(prefill.topic || '')}" required class="form-control" placeholder="e.g. Working at Height">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label>Presenter *</label>
+            <input type="text" id="tbPresenter" value="${esc(state.user.full_name || '')}" required class="form-control">
+          </div>
+          <div class="form-group">
+            <label>Site / Project</label>
+            <input type="text" id="tbSite" class="form-control" placeholder="e.g. GSK Ware">
+          </div>
+          <div class="form-group">
+            <label>Date *</label>
+            <input type="date" id="tbDate" value="${today}" required class="form-control">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Talk Content</label>
+          <textarea id="tbContent2" rows="8" class="form-control" style="white-space:pre-wrap;font-size:13px" placeholder="Key points covered...">${esc(prefill.content || '')}</textarea>
+        </div>
+
+        <div class="form-group">
+          <label style="margin-bottom:8px;display:block">Attendee Sign-In</label>
+          <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" class="btn btn-secondary" style="font-size:12px" onclick="tbSelectAllAttendees()">Select All</button>
+            <button type="button" class="btn btn-secondary" style="font-size:12px" onclick="tbDeselectAllAttendees()">Deselect All</button>
+          </div>
+          <div id="tbAttendees" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
+            ${users.map(u => `
+              <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:14px;transition:background .15s"
+                     onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+                <input type="checkbox" name="attendee" value="${esc(u.full_name)}" style="width:18px;height:18px;accent-color:#8B1A1A">
+                <span>${esc(u.full_name)}</span>
+                <span style="color:var(--text-light);font-size:12px;margin-left:auto">${esc(u.role)}</span>
+              </label>
+            `).join('')}
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+            <input type="text" id="tbCustomAttendee" class="form-control" placeholder="Add non-registered attendee" style="flex:1;max-width:300px">
+            <button type="button" class="btn btn-secondary" style="font-size:13px" onclick="tbAddCustomAttendee()">+ Add</button>
+          </div>
+          <div id="tbCustomAttendees" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+
+        <div class="form-group">
+          <label>Additional Notes</label>
+          <textarea id="tbNotes" rows="3" class="form-control" placeholder="Any follow-up actions, observations..."></textarea>
+        </div>
+
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+          <button type="button" class="btn btn-secondary" onclick="tbTalksView='list';renderToolboxTalks(document.getElementById('appContent'))">Cancel</button>
+          <button type="submit" class="btn btn-primary">💾 Save Toolbox Talk</button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+window.tbSelectAllAttendees = function() {
+  document.querySelectorAll('#tbAttendees input[type=checkbox]').forEach(cb => cb.checked = true);
+};
+window.tbDeselectAllAttendees = function() {
+  document.querySelectorAll('#tbAttendees input[type=checkbox]').forEach(cb => cb.checked = false);
+};
+
+let tbCustomAttendees = [];
+window.tbAddCustomAttendee = function() {
+  const input = document.getElementById('tbCustomAttendee');
+  const name = input.value.trim();
+  if (!name) return;
+  tbCustomAttendees.push(name);
+  input.value = '';
+  const container = document.getElementById('tbCustomAttendees');
+  container.innerHTML = tbCustomAttendees.map((n, i) => `
+    <span style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:20px;padding:4px 12px;font-size:13px;display:flex;align-items:center;gap:6px">
+      ${esc(n)} <button type="button" onclick="tbRemoveCustomAttendee(${i})" style="background:none;border:none;cursor:pointer;font-size:14px;color:#94a3b8">&times;</button>
+    </span>
+  `).join('');
+};
+window.tbRemoveCustomAttendee = function(idx) {
+  tbCustomAttendees.splice(idx, 1);
+  tbAddCustomAttendee.call(null); // re-render (won't add blank)
+  // Re-render custom attendees
+  const container = document.getElementById('tbCustomAttendees');
+  container.innerHTML = tbCustomAttendees.map((n, i) => `
+    <span style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:20px;padding:4px 12px;font-size:13px;display:flex;align-items:center;gap:6px">
+      ${esc(n)} <button type="button" onclick="tbRemoveCustomAttendee(${i})" style="background:none;border:none;cursor:pointer;font-size:14px;color:#94a3b8">&times;</button>
+    </span>
+  `).join('');
+};
+
+window.tbSaveTalk = async function(e) {
+  e.preventDefault();
+  const checkedNames = Array.from(document.querySelectorAll('#tbAttendees input[type=checkbox]:checked')).map(cb => cb.value);
+  const allAttendees = [...checkedNames, ...tbCustomAttendees].map(name => ({ name, signed: true }));
+
+  const body = {
+    topic: document.getElementById('tbTopic').value.trim(),
+    content: document.getElementById('tbContent2').value.trim(),
+    presenter: document.getElementById('tbPresenter').value.trim(),
+    site_project: document.getElementById('tbSite').value.trim(),
+    talk_date: document.getElementById('tbDate').value,
+    attendees: allAttendees,
+    notes: document.getElementById('tbNotes').value.trim(),
+  };
+
+  try {
+    const res = await fetch(`${API}/api/toolbox-talks`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error('Failed to save');
+    tbCustomAttendees = [];
+    tbTalkSelected = null;
+    tbTalksView = 'list';
+    renderToolboxTalks(document.getElementById('appContent'));
+  } catch(err) {
+    alert('Error saving talk: ' + err.message);
+  }
+};
+
+window.tbViewTalk = async function(id) {
+  tbTalksView = 'detail';
+  tbTalkSelected = { id };
+  renderToolboxTalks(document.getElementById('appContent'));
+};
+
+async function renderTBDetail(container) {
+  let talk;
+  try {
+    const res = await fetch(`${API}/api/toolbox-talks/${tbTalkSelected.id}`, { headers: headers() });
+    talk = await res.json();
+  } catch(e) { container.innerHTML = '<p>Error loading talk.</p>'; return; }
+
+  const attendees = typeof talk.attendees === 'string' ? JSON.parse(talk.attendees) : (talk.attendees || []);
+
+  container.innerHTML = `
+    <div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-secondary" onclick="tbTalksView='list';renderToolboxTalks(document.getElementById('appContent'))">← Back to Talks</button>
+      <a href="${API}/api/toolbox-talks/${talk.id}/docx" class="btn btn-primary" style="text-decoration:none" target="_blank">📄 Download Word Doc</a>
+      ${state.user.role === 'admin' ? `<button class="btn" style="background:#dc2626;color:#fff" onclick="tbDeleteTalk(${talk.id})">🗑 Delete</button>` : ''}
+    </div>
+    <div class="card">
+      <h2 style="color:#8B1A1A;margin-bottom:16px">${esc(talk.topic)}</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px">
+        <div>
+          <div style="font-size:12px;color:var(--text-light);text-transform:uppercase;margin-bottom:4px">Presenter</div>
+          <div style="font-weight:600">${esc(talk.presenter || '—')}</div>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--text-light);text-transform:uppercase;margin-bottom:4px">Date</div>
+          <div style="font-weight:600">${talk.talk_date ? new Date(talk.talk_date).toLocaleDateString('en-GB') : '—'}</div>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--text-light);text-transform:uppercase;margin-bottom:4px">Site / Project</div>
+          <div style="font-weight:600">${esc(talk.site_project || '—')}</div>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--text-light);text-transform:uppercase;margin-bottom:4px">Recorded By</div>
+          <div style="font-weight:600">${esc(talk.created_by_name || '—')}</div>
+        </div>
+      </div>
+
+      ${talk.content ? `
+        <div style="margin-bottom:20px">
+          <h3 style="margin-bottom:8px">Talk Content</h3>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;white-space:pre-line;font-size:14px;line-height:1.6">${esc(talk.content)}</div>
+        </div>
+      ` : ''}
+
+      <div style="margin-bottom:20px">
+        <h3 style="margin-bottom:8px">Attendees (${attendees.length})</h3>
+        ${attendees.length > 0 ? `
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
+            ${attendees.map(a => `
+              <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc">
+                <span style="color:#16a34a;font-size:18px">✓</span>
+                <span style="font-size:14px">${esc(typeof a === 'string' ? a : a.name)}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : '<p style="color:var(--text-light)">No attendees recorded.</p>'}
+      </div>
+
+      ${talk.notes ? `
+        <div>
+          <h3 style="margin-bottom:8px">Additional Notes</h3>
+          <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:16px;font-size:14px;white-space:pre-line">${esc(talk.notes)}</div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+window.tbDeleteTalk = async function(id) {
+  if (!confirm('Delete this toolbox talk record?')) return;
+  try {
+    await fetch(`${API}/api/toolbox-talks/${id}`, { method: 'DELETE', headers: headers() });
+    tbTalksView = 'list';
+    renderToolboxTalks(document.getElementById('appContent'));
+  } catch(e) {
+    alert('Error deleting talk: ' + e.message);
+  }
+};
 
 // ═══════════════════════════════════════
 // PORTAL: DOCUMENT LIBRARY

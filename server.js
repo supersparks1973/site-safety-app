@@ -130,6 +130,19 @@ async function startApp() {
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  await pool.query(`CREATE TABLE IF NOT EXISTS toolbox_talks (
+    id SERIAL PRIMARY KEY,
+    topic TEXT NOT NULL,
+    content TEXT,
+    presenter TEXT NOT NULL,
+    site_project TEXT,
+    talk_date TEXT NOT NULL,
+    attendees TEXT,
+    notes TEXT,
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   // Add signature column to existing tables if not present
   const migrateSig = async (table) => {
     try { await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS signature TEXT`); } catch(e) {}
@@ -991,6 +1004,92 @@ async function startApp() {
 
       res.json({ expired, within14, within30 });
     } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ═══════ TOOLBOX TALKS ═══════
+  app.get('/api/toolbox-talks', authenticate, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT t.*, u.full_name as created_by_name FROM toolbox_talks t LEFT JOIN users u ON t.created_by = u.id ORDER BY t.talk_date DESC, t.created_at DESC');
+      res.json(rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get('/api/toolbox-talks/:id', authenticate, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT t.*, u.full_name as created_by_name FROM toolbox_talks t LEFT JOIN users u ON t.created_by = u.id WHERE t.id = $1', [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+      res.json(rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post('/api/toolbox-talks', authenticate, async (req, res) => {
+    try {
+      const d = req.body;
+      const { rows } = await pool.query(
+        'INSERT INTO toolbox_talks (topic, content, presenter, site_project, talk_date, attendees, notes, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
+        [d.topic, d.content || null, d.presenter, d.site_project || null, d.talk_date, JSON.stringify(d.attendees || []), d.notes || null, req.user.id]
+      );
+      res.json(rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete('/api/toolbox-talks/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      await pool.query('DELETE FROM toolbox_talks WHERE id = $1', [req.params.id]);
+      res.json({ message: 'Deleted' });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Toolbox Talk Word Doc export
+  app.get('/api/toolbox-talks/:id/docx', authenticate, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT t.*, u.full_name as created_by_name FROM toolbox_talks t LEFT JOIN users u ON t.created_by = u.id WHERE t.id = $1', [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+      const t = rows[0];
+      const attendees = typeof t.attendees === 'string' ? JSON.parse(t.attendees) : (t.attendees || []);
+      const h = docxHelpers();
+      const doc = new docx.Document({
+        styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
+        sections: [{
+          properties: h.pageProps,
+          headers: { default: h.mkHeader('Toolbox Talk Record') },
+          footers: { default: h.mkFooter() },
+          children: [
+            h.sectionHeader('TOOLBOX TALK RECORD'),
+            new docx.Table({ width: { size: 100, type: docx.WidthType.PERCENTAGE }, rows: [
+              new docx.TableRow({ children: [h.label('Topic'), h.value(t.topic || '')] }),
+              new docx.TableRow({ children: [h.label('Date'), h.value(t.talk_date || '')] }),
+              new docx.TableRow({ children: [h.label('Presenter'), h.value(t.presenter || '')] }),
+              new docx.TableRow({ children: [h.label('Site / Project'), h.value(t.site_project || '')] }),
+            ], borders: h.borders }),
+            new docx.Paragraph({ spacing: { before: 200 } }),
+            h.sectionHeader('TALK CONTENT'),
+            new docx.Paragraph({ text: t.content || 'No content recorded.', spacing: { after: 200 }, style: 'Normal' }),
+            new docx.Paragraph({ spacing: { before: 200 } }),
+            h.sectionHeader('ATTENDEES'),
+            new docx.Table({ width: { size: 100, type: docx.WidthType.PERCENTAGE }, rows: [
+              new docx.TableRow({ children: [
+                h.label('#'), h.label('Name'), h.label('Signed')
+              ] }),
+              ...attendees.map((a, i) => new docx.TableRow({ children: [
+                h.value(String(i + 1)),
+                h.value(a.name || ''),
+                h.value(a.signed ? '✓' : '')
+              ] }))
+            ], borders: h.borders }),
+            ...(t.notes ? [
+              new docx.Paragraph({ spacing: { before: 200 } }),
+              h.sectionHeader('NOTES'),
+              new docx.Paragraph({ text: t.notes, spacing: { after: 200 } })
+            ] : [])
+          ]
+        }]
+      });
+      const buf = await docx.Packer.toBuffer(doc);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="Toolbox-Talk-${t.id}.docx"`);
+      res.send(buf);
+    } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
   });
 
   // ═══════ PROJECTS ═══════
