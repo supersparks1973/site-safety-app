@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.6 - training matrix -->
+<!-- v3.0 - ManProjects Portal -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1e293b">
-<title>ManProjects Ltd — Site Safety</title>
+<title>ManProjects Ltd — Portal</title>
 <link rel="manifest" href="/manifest.json">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -188,9 +188,47 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .tm-legend{display:flex;gap:10px;flex-wrap:wrap;padding:10px 14px;font-size:11px;align-items:center;background:#fafafa;border-top:1px solid var(--border)}
 .tm-legend .tm-badge{font-size:9px;padding:2px 7px}
 
+/* ── Sidebar (Desktop Portal) ── */
+.sidebar{display:none}
+.sidebar-overlay{display:none}
+
 @media(min-width:768px){
   .stats-grid{grid-template-columns:repeat(4,1fr)}
-  .app-content{padding:24px;padding-bottom:160px}
+
+  /* Hide bottom nav on desktop */
+  .bottom-nav{display:none!important}
+
+  /* Show sidebar */
+  .sidebar{display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;width:240px;background:linear-gradient(180deg,#1e293b 0%,#0f172a 100%);color:#fff;z-index:110;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .sidebar-brand{padding:20px 18px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:10px}
+  .sidebar-brand img{height:34px;border-radius:6px;background:rgba(255,255,255,.9);padding:3px 5px}
+  .sidebar-brand h1{font-size:15px;font-weight:700;line-height:1.2}
+  .sidebar-brand h1 small{display:block;font-size:10px;font-weight:400;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+
+  .sidebar-section{padding:14px 0 4px}
+  .sidebar-section-title{padding:0 18px 6px;font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:rgba(255,255,255,.35);font-weight:700}
+  .sidebar-nav{list-style:none;padding:0;margin:0}
+  .sidebar-nav li a{display:flex;align-items:center;gap:10px;padding:9px 18px;color:rgba(255,255,255,.65);text-decoration:none;font-size:13px;font-weight:500;transition:all .15s;border-left:3px solid transparent;cursor:pointer}
+  .sidebar-nav li a:hover{background:rgba(255,255,255,.06);color:#fff}
+  .sidebar-nav li a.active{background:rgba(139,26,26,.3);color:#fff;border-left-color:var(--primary);font-weight:600}
+  .sidebar-nav li a .nav-icon{font-size:16px;width:22px;text-align:center;flex-shrink:0}
+  .sidebar-nav li a .nav-badge{margin-left:auto;background:var(--danger);color:#fff;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700}
+
+  .sidebar-footer{margin-top:auto;padding:14px 18px;border-top:1px solid rgba(255,255,255,.08);font-size:12px}
+  .sidebar-footer .sidebar-user{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .sidebar-footer .sidebar-user-avatar{width:32px;height:32px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff}
+  .sidebar-footer .sidebar-user-name{color:rgba(255,255,255,.8);font-weight:600;font-size:13px}
+  .sidebar-footer .sidebar-user-role{color:rgba(255,255,255,.4);font-size:11px;text-transform:uppercase}
+  .sidebar-footer button{background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.6);font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer;width:100%;transition:all .15s;font-weight:500}
+  .sidebar-footer button:hover{background:rgba(255,255,255,.14);color:#fff}
+
+  /* Shift main content for sidebar */
+  .app-header{margin-left:240px}
+  .app-content{margin-left:240px;max-width:900px;padding:24px 28px;padding-bottom:40px}
+}
+
+@media(min-width:1200px){
+  .app-content{max-width:1000px}
 }
 </style>
 </head>
@@ -225,10 +263,90 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
 <!-- ═══════ MAIN APP ═══════ -->
 <div id="appScreen" class="hidden">
+
+  <!-- ═══════ SIDEBAR (Desktop) ═══════ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="/logo.png" alt="ManProjects">
+      <h1>ManProjects<small>Portal</small></h1>
+    </div>
+
+    <!-- Admin sidebar nav -->
+    <div id="sidebarAdminNav">
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Overview</div>
+        <ul class="sidebar-nav">
+          <li><a data-page="dashboard" class="active"><span class="nav-icon">📊</span>Dashboard</a></li>
+        </ul>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Safety &amp; Inspections</div>
+        <ul class="sidebar-nav">
+          <li><a data-page="reports"><span class="nav-icon">⚠️</span>Open Reports</a></li>
+          <li><a data-page="closed"><span class="nav-icon">✅</span>Closed Reports</a></li>
+          <li><a data-page="inspections"><span class="nav-icon">📋</span>Inspections</a></li>
+          <li><a data-page="rescue-plans"><span class="nav-icon">🆘</span>Rescue Plans</a></li>
+          <li><a data-page="training"><span class="nav-icon">🎓</span>Training</a></li>
+        </ul>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Projects</div>
+        <ul class="sidebar-nav">
+          <li><a data-page="projects"><span class="nav-icon">🏗️</span>Projects</a></li>
+          <li><a data-page="documents"><span class="nav-icon">📁</span>Document Library</a></li>
+          <li><a data-page="om-manager"><span class="nav-icon">📘</span>O&amp;M Manager</a></li>
+        </ul>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Admin</div>
+        <ul class="sidebar-nav">
+          <li><a data-page="users"><span class="nav-icon">👥</span>Users</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Operative sidebar nav -->
+    <div id="sidebarOpNav" class="hidden">
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Overview</div>
+        <ul class="sidebar-nav">
+          <li><a data-page="home" class="active"><span class="nav-icon">🏠</span>Home</a></li>
+        </ul>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Report &amp; Inspect</div>
+        <ul class="sidebar-nav">
+          <li><a data-page="near-miss"><span class="nav-icon">⚠️</span>Near Miss</a></li>
+          <li><a data-page="ladder"><span class="nav-icon">🪜</span>Ladder Inspection</a></li>
+          <li><a data-page="tower"><span class="nav-icon">🏗️</span>Tower Inspection</a></li>
+          <li><a data-page="mewp"><span class="nav-icon">🔧</span>MEWP Inspection</a></li>
+        </ul>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">My Records</div>
+        <ul class="sidebar-nav">
+          <li><a data-page="my-training"><span class="nav-icon">🎓</span>Training</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-user-avatar" id="sidebarAvatar">A</div>
+        <div>
+          <div class="sidebar-user-name" id="sidebarName">User</div>
+          <div class="sidebar-user-role" id="sidebarRole">operative</div>
+        </div>
+      </div>
+      <button onclick="logout()">Sign Out</button>
+    </div>
+  </aside>
+
   <header class="app-header" style="background:linear-gradient(135deg,#1e293b 0%,#2d3748 100%)">
     <div style="display:flex;align-items:center;gap:10px">
-      <img src="/logo.png" alt="ManProjects" style="height:30px;border-radius:4px;background:rgba(255,255,255,.9);padding:2px 4px">
-      <h2 style="font-size:15px"><span style="color:#fff;font-weight:700">ManProjects</span> <span style="font-weight:400;font-size:12px;color:rgba(255,255,255,.6)">Site Safety</span></h2>
+      <button class="header-btn sidebar-toggle" id="sidebarToggle" style="display:none;font-size:22px" onclick="toggleMobileSidebar()">☰</button>
+      <img src="/logo.png" alt="ManProjects" style="height:30px;border-radius:4px;background:rgba(255,255,255,.9);padding:2px 4px" class="mobile-logo">
+      <h2 style="font-size:15px"><span style="color:#fff;font-weight:700">ManProjects</span> <span style="font-weight:400;font-size:12px;color:rgba(255,255,255,.6)">Portal</span></h2>
     </div>
     <div class="user-info">
       <span id="syncIndicator" class="sync-indicator">⏳ <span id="syncCount">0</span> pending</span>
@@ -435,7 +553,7 @@ async function login() {
   }
 }
 
-document.getElementById('logoutBtn').addEventListener('click', () => {
+function logout() {
   state.token = null;
   state.user = null;
   localStorage.removeItem('token');
@@ -445,7 +563,8 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
   document.getElementById('loginUser').value = '';
   document.getElementById('loginPass').value = '';
   document.getElementById('loginError').classList.add('hidden');
-});
+}
+document.getElementById('logoutBtn').addEventListener('click', logout);
 
 // ═══════════════════════════════════════
 // INIT APP
@@ -455,15 +574,32 @@ function showApp() {
   document.getElementById('appScreen').classList.remove('hidden');
   document.getElementById('userBadge').textContent = state.user.role;
 
+  // Sidebar user info
+  const name = state.user.name || state.user.username || 'User';
+  document.getElementById('sidebarName').textContent = name;
+  document.getElementById('sidebarRole').textContent = state.user.role;
+  document.getElementById('sidebarAvatar').textContent = name.charAt(0).toUpperCase();
+
   if (state.user.role === 'admin') {
     document.getElementById('adminNav').classList.remove('hidden');
     document.getElementById('operativeNav').classList.add('hidden');
+    document.getElementById('sidebarAdminNav').classList.remove('hidden');
+    document.getElementById('sidebarOpNav').classList.add('hidden');
     navigate('dashboard');
   } else {
     document.getElementById('operativeNav').classList.remove('hidden');
     document.getElementById('adminNav').classList.add('hidden');
+    document.getElementById('sidebarAdminNav').classList.add('hidden');
+    document.getElementById('sidebarOpNav').classList.remove('hidden');
     navigate('home');
   }
+  // Wire up sidebar nav clicks
+  document.querySelectorAll('.sidebar-nav a[data-page]').forEach(a => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      navigate(a.dataset.page);
+    });
+  });
   updateSyncIndicator();
   updateOnlineStatus();
 }
@@ -501,7 +637,10 @@ document.querySelectorAll('.bottom-nav button').forEach(btn => {
 
 function navigate(page) {
   state.currentPage = page;
+  // Update bottom nav (mobile)
   document.querySelectorAll('.bottom-nav button').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+  // Update sidebar nav (desktop)
+  document.querySelectorAll('.sidebar-nav a[data-page]').forEach(a => a.classList.toggle('active', a.dataset.page === page));
   renderPage(page);
 }
 
@@ -523,6 +662,10 @@ function renderPage(page) {
     'rescue-plans': renderAdminRescuePlans,
     'training': renderAdminTraining,
     'users': renderAdminUsers,
+    // Portal modules
+    'projects': renderProjects,
+    'documents': renderDocuments,
+    'om-manager': renderOMManager,
   };
   if (pages[page]) pages[page](c);
 }
@@ -929,6 +1072,9 @@ async function renderDashboard(c) {
           <div class="quick-action" onclick="navigate('reports')"><span class="qa-icon">⚠️</span><span class="qa-label">Open Reports</span></div>
           <div class="quick-action" onclick="navigate('inspections')"><span class="qa-icon">📋</span><span class="qa-label">Inspections</span></div>
           <div class="quick-action" onclick="navigate('training')"><span class="qa-icon">🎓</span><span class="qa-label">Training</span></div>
+          <div class="quick-action" onclick="navigate('projects')"><span class="qa-icon">🏗️</span><span class="qa-label">Projects</span></div>
+          <div class="quick-action" onclick="navigate('documents')"><span class="qa-icon">📁</span><span class="qa-label">Documents</span></div>
+          <div class="quick-action" onclick="navigate('om-manager')"><span class="qa-icon">📘</span><span class="qa-label">O&amp;M</span></div>
         </div>
       </div>
 
@@ -1390,6 +1536,66 @@ window.deleteUser = async function(id) {
   showToast('User removed');
   renderAdminUsers(document.getElementById('appContent'));
 };
+
+// ═══════════════════════════════════════
+// PORTAL: PROJECTS
+// ═══════════════════════════════════════
+function renderProjects(c) {
+  c.innerHTML = `
+    <div style="margin-bottom:20px">
+      <h2 style="margin-bottom:4px">🏗️ Projects</h2>
+      <p style="color:var(--text-light);font-size:14px">Manage your active and completed projects</p>
+    </div>
+    <div class="card" style="text-align:center;padding:40px 20px">
+      <div style="font-size:48px;margin-bottom:12px">🏗️</div>
+      <h3 style="margin-bottom:8px;font-size:18px">Project Management</h3>
+      <p style="color:var(--text-light);font-size:14px;max-width:400px;margin:0 auto 16px">
+        Track active projects, assign operatives to sites, monitor timelines and link safety reports to specific projects.
+      </p>
+      <span class="badge" style="background:#dbeafe;color:#1e40af;font-size:12px;padding:6px 14px">Coming Soon</span>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════
+// PORTAL: DOCUMENT LIBRARY
+// ═══════════════════════════════════════
+function renderDocuments(c) {
+  c.innerHTML = `
+    <div style="margin-bottom:20px">
+      <h2 style="margin-bottom:4px">📁 Document Library</h2>
+      <p style="color:var(--text-light);font-size:14px">Central store for all project documents</p>
+    </div>
+    <div class="card" style="text-align:center;padding:40px 20px">
+      <div style="font-size:48px;margin-bottom:12px">📁</div>
+      <h3 style="margin-bottom:8px;font-size:18px">Document Library</h3>
+      <p style="color:var(--text-light);font-size:14px;max-width:400px;margin:0 auto 16px">
+        Upload and organise method statements, RAMS, drawings, certificates, and more — all categorised by project and discipline.
+      </p>
+      <span class="badge" style="background:#dbeafe;color:#1e40af;font-size:12px;padding:6px 14px">Coming Soon</span>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════
+// PORTAL: O&M MANAGER
+// ═══════════════════════════════════════
+function renderOMManager(c) {
+  c.innerHTML = `
+    <div style="margin-bottom:20px">
+      <h2 style="margin-bottom:4px">📘 O&amp;M Manager</h2>
+      <p style="color:var(--text-light);font-size:14px">Operation &amp; Maintenance documentation</p>
+    </div>
+    <div class="card" style="text-align:center;padding:40px 20px">
+      <div style="font-size:48px;margin-bottom:12px">📘</div>
+      <h3 style="margin-bottom:8px;font-size:18px">O&amp;M Manager</h3>
+      <p style="color:var(--text-light);font-size:14px;max-width:400px;margin:0 auto 16px">
+        Track O&amp;M manuals per project, build structured handover packs, manage snagging, and organise documentation by discipline.
+      </p>
+      <span class="badge" style="background:#dbeafe;color:#1e40af;font-size:12px;padding:6px 14px">Coming Soon</span>
+    </div>
+  `;
+}
 
 // ═══════════════════════════════════════
 // SERVICE WORKER REGISTRATION
