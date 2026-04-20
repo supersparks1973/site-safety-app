@@ -1092,6 +1092,185 @@ async function startApp() {
     } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
   });
 
+  // ═══════ SITE TEMPLATES ═══════
+  app.get('/api/site-templates/:key/docx', authenticate, async (req, res) => {
+    try {
+      const h = docxHelpers();
+      const key = req.params.key;
+      const templates = {
+        'risk-assessment': {
+          title: 'Risk Assessment',
+          docType: 'Risk Assessment Form',
+          sections: [
+            { header: 'PROJECT DETAILS', rows: [['Project Name',''],['Site Address',''],['Client',''],['Assessment Date',''],['Assessor',''],['Review Date','']] },
+            { header: 'HAZARD IDENTIFICATION & RISK CONTROL', table: { heads: ['Hazard','Who at Risk','Existing Controls','Severity (1-5)','Likelihood (1-5)','Risk Rating','Additional Controls','Residual Risk'], rows: Array(8).fill(['','','','','','','','']) } },
+            { header: 'SIGN-OFF', rows: [['Assessed By',''],['Signature',''],['Date',''],['Approved By',''],['Signature',''],['Date','']] },
+          ]
+        },
+        'method-statement': {
+          title: 'Method Statement',
+          docType: 'Method Statement',
+          sections: [
+            { header: 'PROJECT INFORMATION', rows: [['Project Name',''],['Site Address',''],['Client',''],['Document Ref',''],['Revision',''],['Date','']] },
+            { header: 'SCOPE OF WORKS', freeText: true, lines: 6 },
+            { header: 'SEQUENCE OF OPERATIONS', table: { heads: ['Step','Activity','Hazards','Controls','Responsible Person'], rows: Array(10).fill(['','','','','']) } },
+            { header: 'PLANT & EQUIPMENT', freeText: true, lines: 4 },
+            { header: 'PPE REQUIREMENTS', freeText: true, lines: 3 },
+            { header: 'EMERGENCY PROCEDURES', freeText: true, lines: 4 },
+            { header: 'SIGN-OFF', rows: [['Prepared By',''],['Date',''],['Approved By',''],['Date','']] },
+          ]
+        },
+        'permit-to-work': {
+          title: 'Permit to Work',
+          docType: 'Permit to Work',
+          sections: [
+            { header: 'PERMIT DETAILS', rows: [['Permit Number',''],['Permit Type',''],['Date Issued',''],['Valid From',''],['Valid To',''],['Location',''],['Description of Work','']] },
+            { header: 'HAZARDS IDENTIFIED', freeText: true, lines: 4 },
+            { header: 'PRECAUTIONS REQUIRED', freeText: true, lines: 4 },
+            { header: 'PPE REQUIREMENTS', freeText: true, lines: 3 },
+            { header: 'ISOLATION DETAILS', rows: [['Isolation Point(s)',''],['Isolation Method',''],['Isolated By',''],['Proved Dead By','']] },
+            { header: 'AUTHORISATION', rows: [['Issued By',''],['Signature',''],['Accepted By',''],['Signature',''],['Date / Time','']] },
+            { header: 'PERMIT CANCELLATION', rows: [['Work Completed',''],['Area Left Safe',''],['Cancelled By',''],['Signature',''],['Date / Time','']] },
+          ]
+        },
+        'inspection-checklist': {
+          title: 'Site Inspection Checklist',
+          docType: 'Inspection Checklist',
+          sections: [
+            { header: 'INSPECTION DETAILS', rows: [['Site / Project',''],['Date',''],['Inspector',''],['Area Inspected','']] },
+            { header: 'INSPECTION ITEMS', table: { heads: ['Item','Yes','No','N/A','Comments'], rows: [
+              ['PPE being worn correctly','','','',''],['Housekeeping acceptable','','','',''],['Access/egress clear','','','',''],
+              ['Fire extinguishers accessible','','','',''],['First aid kit available','','','',''],['Scaffold tagged and safe','','','',''],
+              ['Edge protection in place','','','',''],['Electrical leads in good condition','','','',''],['COSHH storage correct','','','',''],
+              ['Welfare facilities clean','','','',''],['Signage displayed','','','',''],['Waste segregated correctly','','','',''],
+              ['','','','',''],['','','','',''],['','','','',''],
+            ] } },
+            { header: 'ACTIONS REQUIRED', table: { heads: ['Action','Responsible Person','Due Date','Completed'], rows: Array(6).fill(['','','','']) } },
+            { header: 'SIGN-OFF', rows: [['Inspector Signature',''],['Date','']] },
+          ]
+        },
+        'hot-work-permit': {
+          title: 'Hot Work Permit',
+          docType: 'Hot Work Permit',
+          sections: [
+            { header: 'PERMIT DETAILS', rows: [['Permit Number',''],['Date',''],['Location',''],['Description of Hot Work',''],['Equipment to be Used','']] },
+            { header: 'PRE-WORK CHECKS', table: { heads: ['Check','Yes','No','N/A'], rows: [
+              ['Area cleared of combustible materials','','',''],['Fire extinguisher available at work point','','',''],
+              ['Fire watch person assigned','','',''],['Smoke/heat detectors isolated (with permit)','','',''],
+              ['Combustible floors protected','','',''],['Flammable liquids/gases removed','','',''],
+              ['Adjacent areas checked','','',''],['Ventilation adequate','','',''],
+            ] } },
+            { header: 'AUTHORISATION', rows: [['Issued By',''],['Signature',''],['Date / Time',''],['Accepted By',''],['Signature','']] },
+            { header: 'FIRE WATCH', rows: [['Fire Watch Duration (min 60 mins after)',''],['Fire Watch Person',''],['All Clear Confirmed',''],['Signature',''],['Date / Time','']] },
+          ]
+        },
+        'project-handover': {
+          title: 'Project Handover Form',
+          docType: 'Project Handover',
+          sections: [
+            { header: 'PROJECT DETAILS', rows: [['Project Name',''],['Client',''],['Site Address',''],['Contract Value',''],['Start Date',''],['Completion Date',''],['ManProjects Project Manager','']] },
+            { header: 'HANDOVER CHECKLIST', table: { heads: ['Item','Completed','N/A','Comments'], rows: [
+              ['O&M Manuals provided','','',''],['As-built drawings issued','','',''],['Test certificates provided','','',''],
+              ['Commissioning records issued','','',''],['Spare parts/keys handed over','','',''],['Training provided to client','','',''],
+              ['Defects/snags list completed','','',''],['Building log book updated','','',''],['Warranties issued','','',''],
+              ['Final account agreed','','',''],
+            ] } },
+            { header: 'CLIENT ACCEPTANCE', rows: [['Client Name',''],['Signature',''],['Date',''],['ManProjects Representative',''],['Signature',''],['Date','']] },
+          ]
+        },
+        'commissioning-record': {
+          title: 'Commissioning Record',
+          docType: 'Commissioning Record',
+          sections: [
+            { header: 'PROJECT INFORMATION', rows: [['Project Name',''],['Site Address',''],['System/Equipment',''],['Manufacturer',''],['Model/Serial No',''],['Location/Zone',''],['Date Commissioned','']] },
+            { header: 'PRE-COMMISSIONING CHECKS', table: { heads: ['Check','Pass','Fail','N/A','Comments'], rows: [
+              ['Installation complete','','','',''],['Visual inspection satisfactory','','','',''],
+              ['Electrical connections verified','','','',''],['Fixings secure','','','',''],
+              ['Labelling complete','','','',''],['Access for maintenance confirmed','','','',''],
+              ['','','','',''],['','','','',''],
+            ] } },
+            { header: 'TEST RESULTS', table: { heads: ['Test','Expected Value','Measured Value','Pass/Fail'], rows: Array(8).fill(['','','','']) } },
+            { header: 'SIGN-OFF', rows: [['Commissioned By',''],['Signature',''],['Date',''],['Witnessed By',''],['Signature',''],['Date','']] },
+          ]
+        },
+        'daily-site-diary': {
+          title: 'Daily Site Diary',
+          docType: 'Daily Site Diary',
+          sections: [
+            { header: 'SITE DETAILS', rows: [['Project Name',''],['Site Address',''],['Date',''],['Weather Conditions',''],['Temperature (approx)',''],['Completed By','']] },
+            { header: 'PERSONNEL ON SITE', table: { heads: ['Name','Company','Trade/Role','Hours'], rows: Array(10).fill(['','','','']) } },
+            { header: 'WORK CARRIED OUT TODAY', freeText: true, lines: 8 },
+            { header: 'MATERIALS DELIVERED', freeText: true, lines: 4 },
+            { header: 'VISITORS', table: { heads: ['Name','Company','Purpose','Time In','Time Out'], rows: Array(4).fill(['','','','','']) } },
+            { header: 'ISSUES / DELAYS', freeText: true, lines: 4 },
+            { header: 'SIGN-OFF', rows: [['Site Manager Signature',''],['Date','']] },
+          ]
+        },
+      };
+
+      const tmpl = templates[key];
+      if (!tmpl) return res.status(404).json({ error: 'Template not found' });
+
+      const children = [h.sh(tmpl.title.toUpperCase())];
+
+      for (const sec of tmpl.sections) {
+        children.push(h.sh(sec.header));
+
+        if (sec.rows) {
+          // Key-value pair rows
+          const halfW = h.pw / 2;
+          const tableRows = sec.rows.map(([label, value]) =>
+            new TableRow({ children: [h.lbl(label, halfW), h.val(value || ' ', halfW)] })
+          );
+          children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: tableRows }));
+        }
+
+        if (sec.table) {
+          // Full table with headers
+          const colW = Math.floor(h.pw / sec.table.heads.length);
+          const headerRow = new TableRow({ children: sec.table.heads.map(head =>
+            new TableCell({ borders: h.bds, width: { size: colW, type: WidthType.DXA },
+              shading: { fill: "8B1A1A", type: ShadingType.CLEAR }, margins: h.cm,
+              children: [new Paragraph({ children: [new TextRun({ text: head, bold: true, font: "Arial", size: 18, color: "FFFFFF" })] })] })
+          ) });
+          const dataRows = sec.table.rows.map(row =>
+            new TableRow({ children: row.map(cell =>
+              new TableCell({ borders: h.bds, width: { size: colW, type: WidthType.DXA }, margins: h.cm,
+                children: [new Paragraph({ children: [new TextRun({ text: cell || ' ', font: "Arial", size: 18 })] })] })
+            ) })
+          );
+          children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...dataRows] }));
+        }
+
+        if (sec.freeText) {
+          // Empty lined area for writing
+          for (let i = 0; i < (sec.lines || 4); i++) {
+            children.push(new Paragraph({
+              spacing: { after: 80 },
+              border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC", space: 6 } },
+              children: [new TextRun({ text: ' ', font: "Arial", size: 20 })]
+            }));
+          }
+        }
+      }
+
+      const doc = new docx.Document({
+        styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
+        sections: [{
+          properties: h.pageProps,
+          headers: h.mkHeader(tmpl.title),
+          footers: h.mkFooter(tmpl.docType),
+          children
+        }]
+      });
+
+      const buf = await docx.Packer.toBuffer(doc);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="ManProjects-${tmpl.title.replace(/\s+/g, '-')}.docx"`);
+      res.send(buf);
+    } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
+  });
+
   // ═══════ PROJECTS ═══════
   // List all projects (admin)
   app.get('/api/projects', authenticate, adminOnly, async (req, res) => {

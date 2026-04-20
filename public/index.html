@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.3 - Portal + LOTO + O&M + RFI + Toolbox Talks + esc fix -->
+<!-- v3.4 - Portal + LOTO + O&M + RFI + Toolbox Talks + Site Templates -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -298,6 +298,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
           <li><a data-page="rfi"><span class="nav-icon">📩</span>RFI Manager</a></li>
           <li><a data-page="documents"><span class="nav-icon">📁</span>Document Library</a></li>
           <li><a data-page="om-manager"><span class="nav-icon">📘</span>O&amp;M Manager</a></li>
+        </ul>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Site Templates</div>
+        <ul class="sidebar-nav">
+          <li><a data-page="site-templates"><span class="nav-icon">📄</span>Templates</a></li>
         </ul>
       </div>
       <div class="sidebar-section">
@@ -674,6 +680,7 @@ function renderPage(page) {
     'om-manager': renderOMManager,
     'loto': renderLOTO,
     'toolbox-talks': renderToolboxTalks,
+    'site-templates': renderSiteTemplates,
   };
   if (pages[page]) pages[page](c);
 }
@@ -2163,6 +2170,52 @@ window.tbDeleteTalk = async function(id) {
     alert('Error deleting talk: ' + e.message);
   }
 };
+
+// ═══════════════════════════════════════
+// PORTAL: SITE TEMPLATES
+// ═══════════════════════════════════════
+const SITE_TEMPLATES = [
+  { category: 'Safety Forms', icon: '🛡️', templates: [
+    { key: 'risk-assessment', name: 'Risk Assessment', desc: 'Hazard identification, risk rating, and control measures form', icon: '⚠️' },
+    { key: 'method-statement', name: 'Method Statement', desc: 'Step-by-step safe system of work with sequence of operations', icon: '📝' },
+    { key: 'permit-to-work', name: 'Permit to Work', desc: 'Formal permit for high-risk activities with isolation details', icon: '🔐' },
+    { key: 'hot-work-permit', name: 'Hot Work Permit', desc: 'Hot work authorisation with fire watch requirements', icon: '🔥' },
+    { key: 'inspection-checklist', name: 'Site Inspection Checklist', desc: 'General site safety inspection with action tracking', icon: '📋' },
+  ]},
+  { category: 'Project Documents', icon: '🏗️', templates: [
+    { key: 'project-handover', name: 'Project Handover Form', desc: 'Client handover checklist with O&M, drawings, and sign-off', icon: '🤝' },
+    { key: 'commissioning-record', name: 'Commissioning Record', desc: 'Equipment commissioning with pre-checks and test results', icon: '⚡' },
+    { key: 'daily-site-diary', name: 'Daily Site Diary', desc: 'Daily record of personnel, work done, deliveries, and issues', icon: '📓' },
+  ]},
+];
+
+function renderSiteTemplates(c) {
+  c.innerHTML = `
+    <div style="margin-bottom:20px">
+      <h2 style="margin-bottom:4px">📄 Site Templates</h2>
+      <p style="color:var(--text-light);font-size:14px">Download branded ManProjects templates — ready to print or fill in digitally</p>
+    </div>
+    ${SITE_TEMPLATES.map(cat => `
+      <div style="margin-bottom:24px">
+        <h3 style="margin-bottom:12px;color:#8B1A1A">${cat.icon} ${esc(cat.category)}</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">
+          ${cat.templates.map(t => `
+            <div class="card" style="display:flex;flex-direction:column;justify-content:space-between">
+              <div>
+                <div style="font-size:28px;margin-bottom:8px">${t.icon}</div>
+                <h4 style="margin-bottom:6px">${esc(t.name)}</h4>
+                <p style="font-size:13px;color:var(--text-light);margin-bottom:16px">${esc(t.desc)}</p>
+              </div>
+              <a href="${API}/api/site-templates/${t.key}/docx" class="btn btn-primary" style="text-decoration:none;text-align:center;display:block" target="_blank">
+                📄 Download Word Template
+              </a>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
 
 // ═══════════════════════════════════════
 // PORTAL: DOCUMENT LIBRARY
