@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.4 - Portal + LOTO + O&M + RFI + Toolbox Talks + Site Templates -->
+<!-- v3.5 - Fix authenticated downloads for templates and toolbox talks -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1911,7 +1911,7 @@ async function renderTBList(container) {
               <td>${att.length} attendee${att.length !== 1 ? 's' : ''}</td>
               <td style="display:flex;gap:6px;flex-wrap:wrap">
                 <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="tbViewTalk(${t.id})">View</button>
-                <a href="${API}/api/toolbox-talks/${t.id}/docx" class="btn btn-secondary" style="font-size:12px;padding:4px 10px;text-decoration:none" target="_blank">📄 Word</a>
+                <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="downloadTalkDocx(${t.id},'${esc(t.topic)}')">📄 Word</button>
                 ${state.user.role === 'admin' ? `<button class="btn" style="font-size:12px;padding:4px 10px;background:#dc2626;color:#fff" onclick="tbDeleteTalk(${t.id})">Delete</button>` : ''}
               </td>
             </tr>`;
@@ -2105,7 +2105,7 @@ async function renderTBDetail(container) {
   container.innerHTML = `
     <div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-secondary" onclick="tbTalksView='list';renderToolboxTalks(document.getElementById('appContent'))">← Back to Talks</button>
-      <a href="${API}/api/toolbox-talks/${talk.id}/docx" class="btn btn-primary" style="text-decoration:none" target="_blank">📄 Download Word Doc</a>
+      <button class="btn btn-primary" onclick="downloadTalkDocx(${talk.id},'${esc(talk.topic)}')">📄 Download Word Doc</button>
       ${state.user.role === 'admin' ? `<button class="btn" style="background:#dc2626;color:#fff" onclick="tbDeleteTalk(${talk.id})">🗑 Delete</button>` : ''}
     </div>
     <div class="card">
@@ -2171,6 +2171,31 @@ window.tbDeleteTalk = async function(id) {
   }
 };
 
+// Authenticated file download helper
+async function authDownload(url, filename) {
+  try {
+    const res = await fetch(url, { headers: headers() });
+    if (!res.ok) throw new Error('Download failed');
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+  } catch(e) { alert('Download error: ' + e.message); }
+}
+
+window.downloadTemplate = function(key, name) {
+  authDownload(`${API}/api/site-templates/${key}/docx`, `ManProjects-${name.replace(/\s+/g,'-')}.docx`);
+};
+
+window.downloadTalkDocx = function(id, topic) {
+  authDownload(`${API}/api/toolbox-talks/${id}/docx`, `Toolbox-Talk-${(topic||id).toString().replace(/[^a-zA-Z0-9_-]/g,'_')}.docx`);
+};
+
 // ═══════════════════════════════════════
 // PORTAL: SITE TEMPLATES
 // ═══════════════════════════════════════
@@ -2206,9 +2231,9 @@ function renderSiteTemplates(c) {
                 <h4 style="margin-bottom:6px">${esc(t.name)}</h4>
                 <p style="font-size:13px;color:var(--text-light);margin-bottom:16px">${esc(t.desc)}</p>
               </div>
-              <a href="${API}/api/site-templates/${t.key}/docx" class="btn btn-primary" style="text-decoration:none;text-align:center;display:block" target="_blank">
+              <button class="btn btn-primary" style="width:100%" onclick="downloadTemplate('${t.key}','${t.name.replace(/'/g,"\\'")}')">
                 📄 Download Word Template
-              </a>
+              </button>
             </div>
           `).join('')}
         </div>
