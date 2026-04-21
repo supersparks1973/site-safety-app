@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v5.10 - Invoice Payment Terms & Cost Summary -->
+<!-- v5.11 - Separate Client Name/Company, auto-archive 12 months -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2327,7 +2327,7 @@ function renderQuotesTab(el) {
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div>
             <div style="font-weight:700;font-size:15px">${esc(q.quote_number)}</div>
-            <div style="color:var(--text-light);font-size:13px">${esc(q.client_name||'')}${q.project_name ? ' — '+esc(q.project_name) : ''}</div>
+            <div style="color:var(--text-light);font-size:13px">${esc(q.client_name||'')}${q.company ? ' — '+esc(q.company) : ''}</div>
           </div>
           <div style="text-align:right">
             ${statusBadge(q.status)}
@@ -2341,17 +2341,68 @@ function renderQuotesTab(el) {
 
 // ── MATRIX TAB ──
 function renderMatrixTab(el) {
-  // Build matrix: every quote matched with its PO (if any)
+  // Build matrix: split active vs archived
   const allQuotes = _quotes.slice().sort((a,b) => (a.quote_number||'').localeCompare(b.quote_number||''));
-  const rows = allQuotes.map(q => {
+  const activeQuotes = allQuotes.filter(q => q.status !== 'archived');
+  const archivedQuotes = allQuotes.filter(q => q.status === 'archived');
+  const mapRows = (list) => list.map(q => {
     const po = _pos.find(p => p.quote_id == q.id);
     const inv = _invoices.find(i => i.quote_id == q.id);
     return { q, po, inv };
   });
+  const activeRows = mapRows(activeQuotes);
+  const archRows = mapRows(archivedQuotes);
+  const allRows = mapRows(allQuotes);
+
+  const matrixHead = `<tr style="background:#8B1A1A;color:white">
+    <th style="padding:10px 8px;text-align:left;font-weight:700;white-space:nowrap">Quote No.</th>
+    <th style="padding:10px 8px;text-align:left;font-weight:700">Client</th>
+    <th style="padding:10px 8px;text-align:left;font-weight:700">Description</th>
+    <th style="padding:10px 8px;text-align:left;font-weight:700;white-space:nowrap">Quote Date</th>
+    <th style="padding:10px 8px;text-align:right;font-weight:700">Labour</th>
+    <th style="padding:10px 8px;text-align:right;font-weight:700">Materials</th>
+    <th style="padding:10px 8px;text-align:right;font-weight:700">Other</th>
+    <th style="padding:10px 8px;text-align:right;font-weight:700">Total</th>
+    <th style="padding:10px 8px;text-align:center;font-weight:700">Status</th>
+    <th style="padding:10px 8px;text-align:left;font-weight:700;white-space:nowrap">PO Number</th>
+    <th style="padding:10px 8px;text-align:right;font-weight:700">PO Value</th>
+    <th style="padding:10px 8px;text-align:left;font-weight:700;white-space:nowrap">Invoice No.</th>
+    <th style="padding:10px 8px;text-align:right;font-weight:700">Invoiced</th>
+  </tr>`;
+
+  const matrixRow = (r, idx, dimmed) => `
+    <tr style="background:${dimmed ? (idx%2===1?'#f5f5f5':'#fafafa') : (idx%2===1?'#fdf8f8':'white')};border-bottom:1px solid #f0f0f0;${dimmed?'opacity:0.75':''}">
+      <td style="padding:8px;font-weight:700;color:${dimmed?'#6b7280':'var(--primary)'}">${esc(r.q.quote_number)}</td>
+      <td style="padding:8px">${esc(r.q.client_name||'')}${r.q.company ? '<br><span style="font-size:11px;color:#6b7280">'+esc(r.q.company)+'</span>' : ''}</td>
+      <td style="padding:8px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.q.description||'')}">${esc((r.q.description||'').substring(0,50))}${(r.q.description||'').length>50?'...':''}</td>
+      <td style="padding:8px;white-space:nowrap">${esc(r.q.valid_until||'')}</td>
+      <td style="padding:8px;text-align:right">${money(r.q.subtotal_labour)}</td>
+      <td style="padding:8px;text-align:right">${money(r.q.subtotal_materials)}</td>
+      <td style="padding:8px;text-align:right">${money(r.q.subtotal_plant)}</td>
+      <td style="padding:8px;text-align:right;font-weight:700">${money(r.q.grand_total)}</td>
+      <td style="padding:8px;text-align:center">${statusBadge(r.q.status)}</td>
+      <td style="padding:8px;font-weight:${r.po?'700':'400'};color:${r.po?'#166534':'#ccc'}">${r.po ? esc(r.po.po_number) : '\u2014'}</td>
+      <td style="padding:8px;text-align:right;font-weight:${r.po?'600':'400'};color:${r.po?'#166534':'#ccc'}">${r.po ? money(r.po.po_value) : '\u2014'}</td>
+      <td style="padding:8px;font-weight:${r.inv?'700':'400'};color:${r.inv?'#1e40af':'#ccc'}">${r.inv ? esc(r.inv.invoice_number) : '\u2014'}</td>
+      <td style="padding:8px;text-align:right;font-weight:${r.inv?'600':'400'};color:${r.inv?'#1e40af':'#ccc'}">${r.inv ? money(r.inv.grand_total) : '\u2014'}</td>
+    </tr>`;
+
+  const totalsRow = (rows, label, bgCol) => `<tr style="background:${bgCol};font-weight:700;border-top:2px solid #8B1A1A">
+    <td colspan="4" style="padding:10px 8px;color:#8B1A1A">${label}</td>
+    <td style="padding:10px 8px;text-align:right;color:#8B1A1A">${money(rows.reduce((s,r)=>s+Number(r.q.subtotal_labour||0),0))}</td>
+    <td style="padding:10px 8px;text-align:right;color:#8B1A1A">${money(rows.reduce((s,r)=>s+Number(r.q.subtotal_materials||0),0))}</td>
+    <td style="padding:10px 8px;text-align:right;color:#8B1A1A">${money(rows.reduce((s,r)=>s+Number(r.q.subtotal_plant||0),0))}</td>
+    <td style="padding:10px 8px;text-align:right;color:#8B1A1A">${money(rows.reduce((s,r)=>s+Number(r.q.grand_total||0),0))}</td>
+    <td></td>
+    <td style="padding:10px 8px;color:#166534">\u2014</td>
+    <td style="padding:10px 8px;text-align:right;color:#166534">${money(rows.reduce((s,r)=>s+Number(r.po?r.po.po_value:0),0))}</td>
+    <td style="padding:10px 8px;color:#1e40af">\u2014</td>
+    <td style="padding:10px 8px;text-align:right;color:#1e40af">${money(rows.reduce((s,r)=>s+Number(r.inv?r.inv.grand_total:0),0))}</td>
+  </tr>`;
 
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
-      <p style="color:var(--text-light);font-size:13px;margin:0">${rows.length} quote${rows.length!==1?'s':''} — showing all quotes with PO and invoice status</p>
+      <p style="color:var(--text-light);font-size:13px;margin:0">${activeRows.length} active, ${archRows.length} archived — showing all quotes with PO and invoice status</p>
       <div style="display:flex;gap:8px">
         <button class="btn btn-sm" onclick="printMatrix()" style="background:#1e293b;color:white;font-size:12px;padding:6px 14px;display:flex;align-items:center;gap:6px">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -2363,61 +2414,44 @@ function renderMatrixTab(el) {
         </button>
       </div>
     </div>
-    <div id="matrixTableWrap" style="overflow-x:auto">
+
+    <!-- ACTIVE QUOTES -->
+    <h4 style="color:var(--primary);font-size:14px;margin:0 0 8px 0;padding-bottom:6px;border-bottom:2px solid var(--primary)">ACTIVE QUOTES</h4>
+    <div id="matrixTableWrap" style="overflow-x:auto;margin-bottom:24px">
       <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px" id="matrixTable">
-        <thead>
-          <tr style="background:#8B1A1A;color:white">
-            <th style="padding:10px 8px;text-align:left;font-weight:700;white-space:nowrap">Quote No.</th>
-            <th style="padding:10px 8px;text-align:left;font-weight:700">Client</th>
-            <th style="padding:10px 8px;text-align:left;font-weight:700">Description</th>
-            <th style="padding:10px 8px;text-align:left;font-weight:700;white-space:nowrap">Quote Date</th>
-            <th style="padding:10px 8px;text-align:right;font-weight:700">Labour</th>
-            <th style="padding:10px 8px;text-align:right;font-weight:700">Materials</th>
-            <th style="padding:10px 8px;text-align:right;font-weight:700">Other</th>
-            <th style="padding:10px 8px;text-align:right;font-weight:700">Total</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700">Status</th>
-            <th style="padding:10px 8px;text-align:left;font-weight:700;white-space:nowrap">PO Number</th>
-            <th style="padding:10px 8px;text-align:right;font-weight:700">PO Value</th>
-            <th style="padding:10px 8px;text-align:left;font-weight:700;white-space:nowrap">Invoice No.</th>
-            <th style="padding:10px 8px;text-align:right;font-weight:700">Invoiced</th>
-          </tr>
-        </thead>
+        <thead>${matrixHead}</thead>
         <tbody>
-          ${rows.length === 0 ? '<tr><td colspan="13" style="text-align:center;padding:30px;color:var(--text-light)">No quotes to display</td></tr>' :
-          rows.map((r, idx) => `
-            <tr style="background:${idx%2===1?'#fdf8f8':'white'};border-bottom:1px solid #f0f0f0">
-              <td style="padding:8px;font-weight:700;color:var(--primary)">${esc(r.q.quote_number)}</td>
-              <td style="padding:8px">${esc(r.q.client_name||'')}</td>
-              <td style="padding:8px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.q.description||'')}">${esc((r.q.description||'').substring(0,50))}${(r.q.description||'').length>50?'...':''}</td>
-              <td style="padding:8px;white-space:nowrap">${esc(r.q.valid_until||'')}</td>
-              <td style="padding:8px;text-align:right">${money(r.q.subtotal_labour)}</td>
-              <td style="padding:8px;text-align:right">${money(r.q.subtotal_materials)}</td>
-              <td style="padding:8px;text-align:right">${money(r.q.subtotal_plant)}</td>
-              <td style="padding:8px;text-align:right;font-weight:700">${money(r.q.grand_total)}</td>
-              <td style="padding:8px;text-align:center">${statusBadge(r.q.status)}</td>
-              <td style="padding:8px;font-weight:${r.po?'700':'400'};color:${r.po?'#166534':'#ccc'}">${r.po ? esc(r.po.po_number) : '\u2014'}</td>
-              <td style="padding:8px;text-align:right;font-weight:${r.po?'600':'400'};color:${r.po?'#166534':'#ccc'}">${r.po ? money(r.po.po_value) : '\u2014'}</td>
-              <td style="padding:8px;font-weight:${r.inv?'700':'400'};color:${r.inv?'#1e40af':'#ccc'}">${r.inv ? esc(r.inv.invoice_number) : '\u2014'}</td>
-              <td style="padding:8px;text-align:right;font-weight:${r.inv?'600':'400'};color:${r.inv?'#1e40af':'#ccc'}">${r.inv ? money(r.inv.grand_total) : '\u2014'}</td>
-            </tr>
-          `).join('')}
+          ${activeRows.length === 0 ? '<tr><td colspan="13" style="text-align:center;padding:30px;color:var(--text-light)">No active quotes</td></tr>' :
+          activeRows.map((r, idx) => matrixRow(r, idx, false)).join('')}
         </tbody>
-        ${rows.length > 0 ? `<tfoot>
-          <tr style="background:#f3e8e8;font-weight:700;border-top:2px solid #8B1A1A">
-            <td colspan="4" style="padding:10px 8px;color:#8B1A1A">TOTALS</td>
-            <td style="padding:10px 8px;text-align:right;color:#8B1A1A">${money(rows.reduce((s,r)=>s+Number(r.q.subtotal_labour||0),0))}</td>
-            <td style="padding:10px 8px;text-align:right;color:#8B1A1A">${money(rows.reduce((s,r)=>s+Number(r.q.subtotal_materials||0),0))}</td>
-            <td style="padding:10px 8px;text-align:right;color:#8B1A1A">${money(rows.reduce((s,r)=>s+Number(r.q.subtotal_plant||0),0))}</td>
-            <td style="padding:10px 8px;text-align:right;color:#8B1A1A">${money(rows.reduce((s,r)=>s+Number(r.q.grand_total||0),0))}</td>
-            <td></td>
-            <td style="padding:10px 8px;color:#166534">—</td>
-            <td style="padding:10px 8px;text-align:right;color:#166534">${money(rows.reduce((s,r)=>s+Number(r.po?r.po.po_value:0),0))}</td>
-            <td style="padding:10px 8px;color:#1e40af">—</td>
-            <td style="padding:10px 8px;text-align:right;color:#1e40af">${money(rows.reduce((s,r)=>s+Number(r.inv?r.inv.grand_total:0),0))}</td>
-          </tr>
-        </tfoot>` : ''}
+        ${activeRows.length > 0 ? '<tfoot>'+totalsRow(activeRows, 'ACTIVE TOTALS', '#f3e8e8')+'</tfoot>' : ''}
       </table>
     </div>
+
+    <!-- ARCHIVED QUOTES -->
+    ${archRows.length > 0 ? `
+    <h4 style="color:#6b7280;font-size:14px;margin:0 0 8px 0;padding-bottom:6px;border-bottom:2px solid #d1d5db">ARCHIVED QUOTES</h4>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px" id="matrixTableArchived">
+        <thead><tr style="background:#6b7280;color:white">
+          <th style="padding:10px 8px;text-align:left;font-weight:700;white-space:nowrap">Quote No.</th>
+          <th style="padding:10px 8px;text-align:left;font-weight:700">Client</th>
+          <th style="padding:10px 8px;text-align:left;font-weight:700">Description</th>
+          <th style="padding:10px 8px;text-align:left;font-weight:700;white-space:nowrap">Quote Date</th>
+          <th style="padding:10px 8px;text-align:right;font-weight:700">Labour</th>
+          <th style="padding:10px 8px;text-align:right;font-weight:700">Materials</th>
+          <th style="padding:10px 8px;text-align:right;font-weight:700">Other</th>
+          <th style="padding:10px 8px;text-align:right;font-weight:700">Total</th>
+          <th style="padding:10px 8px;text-align:center;font-weight:700">Status</th>
+          <th style="padding:10px 8px;text-align:left;font-weight:700;white-space:nowrap">PO Number</th>
+          <th style="padding:10px 8px;text-align:right;font-weight:700">PO Value</th>
+          <th style="padding:10px 8px;text-align:left;font-weight:700;white-space:nowrap">Invoice No.</th>
+          <th style="padding:10px 8px;text-align:right;font-weight:700">Invoiced</th>
+        </tr></thead>
+        <tbody>${archRows.map((r, idx) => matrixRow(r, idx, true)).join('')}</tbody>
+        <tfoot>${totalsRow(archRows, 'ARCHIVED TOTALS', '#f1f1f1')}</tfoot>
+      </table>
+    </div>` : ''}
   `;
 }
 
@@ -2463,13 +2497,13 @@ function renderArchiveTab(el) {
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <p style="color:var(--text-light);font-size:13px;margin:0">${archived.length} archived quote${archived.length!==1?'s':''}</p>
     </div>
-    ${archived.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--text-light)">No archived quotes. Quotes are automatically archived when a purchase order is recorded against them.</div>' :
+    ${archived.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--text-light)">No archived quotes. Quotes are automatically archived when a purchase order is recorded against them, or after 12 months.</div>' :
     archived.map(q => `
       <div class="card" style="margin-bottom:10px;border-left:4px solid #6b7280">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div>
             <div style="font-weight:700;font-size:15px">${esc(q.quote_number)}</div>
-            <div style="color:var(--text-light);font-size:13px">${esc(q.client_name||'')}${q.project_name ? ' — '+esc(q.project_name) : ''}</div>
+            <div style="color:var(--text-light);font-size:13px">${esc(q.client_name||'')}${q.company ? ' — '+esc(q.company) : ''}</div>
             ${q.description ? `<div style="color:var(--text-light);font-size:12px;margin-top:4px">${esc(q.description).substring(0,80)}${q.description.length>80?'...':''}</div>` : ''}
           </div>
           <div style="text-align:right">
@@ -2567,7 +2601,8 @@ function showQuoteForm(existing) {
       <h3 style="color:var(--primary);font-size:14px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--primary)">QUOTE DETAILS</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
         <div><label style="${lbl}">Quote Number *</label><input id="qf-number" class="form-control" value="${esc(q.quote_number||'')}" placeholder="e.g. Q-2026-001"></div>
-        <div><label style="${lbl}">Client Name &amp; Company *</label><input id="qf-client" class="form-control" value="${esc(q.client_name||'')}" placeholder="e.g. John Smith — ABC Construction"></div>
+        <div><label style="${lbl}">Client Name *</label><input id="qf-client" class="form-control" value="${esc(q.client_name||'')}" placeholder="e.g. John Smith"></div>
+        <div><label style="${lbl}">Company</label><input id="qf-company" class="form-control" value="${esc(q.company||'')}" placeholder="e.g. ABC Construction"></div>
         <div><label style="${lbl}">Date of Quote</label><input id="qf-date" type="date" class="form-control" value="${esc(q.valid_until||'')}"></div>
         <div><label style="${lbl}">Status</label>
           <select id="qf-status" class="form-control"><option ${q.status==='draft'||!q.status?'selected':''}>draft</option><option ${q.status==='sent'?'selected':''}>sent</option><option ${q.status==='accepted'?'selected':''}>accepted</option><option ${q.status==='declined'?'selected':''}>declined</option><option ${q.status==='invoiced'?'selected':''}>invoiced</option></select>
@@ -2652,7 +2687,7 @@ async function saveQuote(existingId) {
   const vatRate = 20;
   const vat = sub * (vatRate / 100);
   const data = {
-    quote_number: g('qf-number'), client_name: g('qf-client'), description: g('qf-desc'),
+    quote_number: g('qf-number'), client_name: g('qf-client'), company: g('qf-company'), description: g('qf-desc'),
     valid_until: g('qf-date'), status: g('qf-status'), notes: g('qf-notes'),
     subtotal_labour: labour, subtotal_materials: materials, subtotal_plant: plant,
     markup_pct: 0, markup_amount: 0, net_total: sub,
@@ -2709,7 +2744,7 @@ function showPOForm() {
         <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Link to Quote</label>
           <select id="po-quote" class="form-control" onchange="autofillPO()">
             <option value="">— None —</option>
-            ${acceptedQuotes.map(q => `<option value="${q.id}">${esc(q.quote_number)} — ${esc(q.client_name)} (${money(q.grand_total)})</option>`).join('')}
+            ${acceptedQuotes.map(q => `<option value="${q.id}">${esc(q.quote_number)} — ${esc(q.client_name)}${q.company?' / '+esc(q.company):''} (${money(q.grand_total)})</option>`).join('')}
           </select>
         </div>
         <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Client Name</label><input id="po-client" class="form-control"></div>
@@ -2776,7 +2811,7 @@ function showInvoiceForm(existing) {
         <div><label style="${lbl}">Link to Quote</label>
           <select id="inv-quote" class="form-control" onchange="autofillInvoice()">
             <option value="">— None —</option>
-            ${availableQuotes.map(q => `<option value="${q.id}" ${inv.quote_id==q.id?'selected':''}>${esc(q.quote_number)} — ${esc(q.client_name)}</option>`).join('')}
+            ${availableQuotes.map(q => `<option value="${q.id}" ${inv.quote_id==q.id?'selected':''}>${esc(q.quote_number)} — ${esc(q.client_name)}${q.company?' / '+esc(q.company):''}</option>`).join('')}
           </select>
         </div>
         <div><label style="${lbl}">Link to PO</label>
@@ -2893,7 +2928,7 @@ function autofillInvoice() {
   if (!qId) return;
   const q = _quotes.find(x => x.id == qId);
   if (!q) return;
-  document.getElementById('inv-client').value = q.client_name || '';
+  document.getElementById('inv-client').value = (q.client_name||'') + (q.company ? ' — '+q.company : '');
   document.getElementById('inv-address').value = q.client_address || '';
   document.getElementById('inv-project').value = q.project_name || '';
   document.getElementById('inv-labour').value = Number(q.subtotal_labour||0);

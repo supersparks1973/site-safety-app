@@ -244,6 +244,13 @@ async function startApp() {
   try { await pool.query('ALTER TABLE training_records ADD COLUMN IF NOT EXISTS external_name TEXT'); } catch(e) {}
   try { await pool.query('ALTER TABLE training_records ALTER COLUMN user_id DROP NOT NULL'); } catch(e) {}
 
+  // Add payment_terms and cost breakdown to invoices
+  try { await pool.query("ALTER TABLE quotes ADD COLUMN IF NOT EXISTS company TEXT DEFAULT ''"); } catch(e) {}
+  try { await pool.query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_terms TEXT DEFAULT 'N/A'"); } catch(e) {}
+  try { await pool.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS subtotal_labour NUMERIC(12,2) DEFAULT 0'); } catch(e) {}
+  try { await pool.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS subtotal_materials NUMERIC(12,2) DEFAULT 0'); } catch(e) {}
+  try { await pool.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS subtotal_plant NUMERIC(12,2) DEFAULT 0'); } catch(e) {}
+
   const { rows: admins } = await pool.query("SELECT id FROM users WHERE role = 'admin'");
   if (admins.length === 0) {
     const hash = bcrypt.hashSync('admin123', 10);
@@ -1943,6 +1950,8 @@ async function startApp() {
   // ── Quotes CRUD ──
   app.get('/api/quotes', authenticate, adminOnly, async (req, res) => {
     try {
+      // Auto-archive quotes older than 12 months that are still active
+      await pool.query(`UPDATE quotes SET status = 'archived' WHERE status NOT IN ('archived','invoiced') AND created_at < NOW() - INTERVAL '12 months'`);
       const { rows } = await pool.query('SELECT q.*, u.full_name as created_by_name FROM quotes q LEFT JOIN users u ON q.created_by = u.id ORDER BY q.created_at DESC');
       res.json(rows);
     } catch(e) { res.status(500).json({ error: e.message }); }
@@ -1961,10 +1970,10 @@ async function startApp() {
     try {
       const d = req.body;
       const { rows } = await pool.query(
-        `INSERT INTO quotes (quote_number, project_name, client_name, client_address, client_email, description, status,
+        `INSERT INTO quotes (quote_number, project_name, client_name, company, client_address, client_email, description, status,
          subtotal_labour, subtotal_materials, subtotal_plant, markup_pct, markup_amount, net_total, vat_rate, vat_amount, grand_total, notes, valid_until, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
-        [d.quote_number, d.project_name, d.client_name, d.client_address, d.client_email, d.description, d.status||'draft',
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
+        [d.quote_number, d.project_name, d.client_name, d.company||'', d.client_address, d.client_email, d.description, d.status||'draft',
          d.subtotal_labour||0, d.subtotal_materials||0, d.subtotal_plant||0, d.markup_pct||0, d.markup_amount||0, d.net_total||0,
          d.vat_rate||20, d.vat_amount||0, d.grand_total||0, d.notes, d.valid_until, req.user.id]
       );
@@ -1983,10 +1992,10 @@ async function startApp() {
     try {
       const d = req.body;
       const { rows } = await pool.query(
-        `UPDATE quotes SET quote_number=$1, project_name=$2, client_name=$3, client_address=$4, client_email=$5, description=$6, status=$7,
-         subtotal_labour=$8, subtotal_materials=$9, subtotal_plant=$10, markup_pct=$11, markup_amount=$12, net_total=$13,
-         vat_rate=$14, vat_amount=$15, grand_total=$16, notes=$17, valid_until=$18, updated_at=CURRENT_TIMESTAMP WHERE id=$19 RETURNING *`,
-        [d.quote_number, d.project_name, d.client_name, d.client_address, d.client_email, d.description, d.status||'draft',
+        `UPDATE quotes SET quote_number=$1, project_name=$2, client_name=$3, company=$4, client_address=$5, client_email=$6, description=$7, status=$8,
+         subtotal_labour=$9, subtotal_materials=$10, subtotal_plant=$11, markup_pct=$12, markup_amount=$13, net_total=$14,
+         vat_rate=$15, vat_amount=$16, grand_total=$17, notes=$18, valid_until=$19, updated_at=CURRENT_TIMESTAMP WHERE id=$20 RETURNING *`,
+        [d.quote_number, d.project_name, d.client_name, d.company||'', d.client_address, d.client_email, d.description, d.status||'draft',
          d.subtotal_labour||0, d.subtotal_materials||0, d.subtotal_plant||0, d.markup_pct||0, d.markup_amount||0, d.net_total||0,
          d.vat_rate||20, d.vat_amount||0, d.grand_total||0, d.notes, d.valid_until, req.params.id]
       );
@@ -2070,10 +2079,12 @@ async function startApp() {
       const d = req.body;
       const { rows } = await pool.query(
         `INSERT INTO invoices (invoice_number, quote_id, po_id, client_name, client_address, project_name, invoice_date, due_date, status,
-         subtotal, vat_rate, vat_amount, grand_total, amount_paid, notes, is_part_invoice, part_description, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+         subtotal, vat_rate, vat_amount, grand_total, amount_paid, notes, is_part_invoice, part_description, payment_terms,
+         subtotal_labour, subtotal_materials, subtotal_plant, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`,
         [d.invoice_number, d.quote_id||null, d.po_id||null, d.client_name, d.client_address, d.project_name, d.invoice_date, d.due_date, d.status||'draft',
-         d.subtotal||0, d.vat_rate||20, d.vat_amount||0, d.grand_total||0, d.amount_paid||0, d.notes, d.is_part_invoice||false, d.part_description, req.user.id]
+         d.subtotal||0, d.vat_rate||20, d.vat_amount||0, d.grand_total||0, d.amount_paid||0, d.notes, d.is_part_invoice||false, d.part_description,
+         d.payment_terms||'N/A', d.subtotal_labour||0, d.subtotal_materials||0, d.subtotal_plant||0, req.user.id]
       );
       const invId = rows[0].id;
       if (d.items && d.items.length) {
@@ -2093,9 +2104,11 @@ async function startApp() {
       const d = req.body;
       const { rows } = await pool.query(
         `UPDATE invoices SET invoice_number=$1, client_name=$2, client_address=$3, project_name=$4, invoice_date=$5, due_date=$6, status=$7,
-         subtotal=$8, vat_rate=$9, vat_amount=$10, grand_total=$11, amount_paid=$12, notes=$13, is_part_invoice=$14, part_description=$15, updated_at=CURRENT_TIMESTAMP WHERE id=$16 RETURNING *`,
+         subtotal=$8, vat_rate=$9, vat_amount=$10, grand_total=$11, amount_paid=$12, notes=$13, is_part_invoice=$14, part_description=$15,
+         payment_terms=$16, subtotal_labour=$17, subtotal_materials=$18, subtotal_plant=$19, updated_at=CURRENT_TIMESTAMP WHERE id=$20 RETURNING *`,
         [d.invoice_number, d.client_name, d.client_address, d.project_name, d.invoice_date, d.due_date, d.status||'draft',
-         d.subtotal||0, d.vat_rate||20, d.vat_amount||0, d.grand_total||0, d.amount_paid||0, d.notes, d.is_part_invoice||false, d.part_description, req.params.id]
+         d.subtotal||0, d.vat_rate||20, d.vat_amount||0, d.grand_total||0, d.amount_paid||0, d.notes, d.is_part_invoice||false, d.part_description,
+         d.payment_terms||'N/A', d.subtotal_labour||0, d.subtotal_materials||0, d.subtotal_plant||0, req.params.id]
       );
       // Replace items
       await pool.query('DELETE FROM invoice_items WHERE invoice_id = $1', [req.params.id]);
@@ -2157,7 +2170,8 @@ async function startApp() {
       doc.moveDown(0.3);
       dRow('Quote No.', q.quote_number);
       dRow('Date', q.valid_until || new Date(q.created_at).toLocaleDateString('en-GB'));
-      dRow('Client', q.client_name);
+      dRow('Client Name', q.client_name);
+      if (q.company) dRow('Company', q.company);
       if (q.description) dRow('Description', q.description);
       doc.moveDown(0.5);
       // Cost summary
@@ -2329,53 +2343,33 @@ async function startApp() {
       doc.fillColor(255,255,255).fontSize(9.5).font('Helvetica-Bold').text('INVOICE DETAILS', 60, doc.y - 17, { width: 480 });
       doc.moveDown(0.3);
       dRow('Invoice No.', inv.invoice_number); dRow('Date', inv.invoice_date);
-      dRow('Due Date', inv.due_date); dRow('Client', inv.client_name);
+      dRow('Due Date', inv.due_date); dRow('Payment Terms', inv.payment_terms ? inv.payment_terms + (inv.payment_terms !== 'N/A' ? ' Days' : '') : 'N/A');
+      dRow('Client', inv.client_name);
       dRow('Address', inv.client_address); dRow('Project', inv.project_name);
       if (inv.quote_number) dRow('Quote Ref', inv.quote_number);
       if (inv.po_number) dRow('PO Ref', inv.po_number);
       if (inv.is_part_invoice && inv.part_description) dRow('Part Invoice', inv.part_description);
       doc.moveDown(0.5);
-      // Items table
-      if (items.length) {
-        doc.roundedRect(50, doc.y, 495, 20, 3).fill(...maroon);
-        doc.fillColor(255,255,255).fontSize(8.5).font('Helvetica-Bold').text('LINE ITEMS', 60, doc.y - 15, { width: 480 });
-        doc.moveDown(0.2);
-        const y = doc.y; const hH = 16;
-        doc.rect(50, y, 495, hH).fill(245,237,237);
-        doc.fillColor(107,32,32).fontSize(7).font('Helvetica-Bold');
-        doc.text('Description', 56, y+4, { width: 220 });
-        doc.text('Qty', 280, y+4, { width: 50 });
-        doc.text('Unit', 330, y+4, { width: 50 });
-        doc.text('Rate', 385, y+4, { width: 60, align: 'right' });
-        doc.text('Total', 460, y+4, { width: 80, align: 'right' });
-        doc.y = y + hH + 1;
-        items.forEach((item, idx) => {
-          const ry = doc.y; const rH = 16;
-          if (idx % 2 === 1) doc.rect(50, ry, 495, rH).fill(250,248,248);
-          doc.fillColor(50,50,50).fontSize(7).font('Helvetica');
-          doc.text(item.description, 56, ry+4, { width: 220 });
-          doc.text(String(item.quantity), 280, ry+4, { width: 50 });
-          doc.text(item.unit||'each', 330, ry+4, { width: 50 });
-          doc.text('£' + Number(item.rate).toFixed(2), 385, ry+4, { width: 60, align: 'right' });
-          doc.text('£' + Number(item.total).toFixed(2), 460, ry+4, { width: 80, align: 'right' });
-          doc.y = ry + rH;
-        });
-        doc.moveDown(0.3);
-      }
-      // Totals
+      // Cost breakdown
+      doc.roundedRect(50, doc.y, 495, 22, 4).fill(...maroon);
+      doc.fillColor(255,255,255).fontSize(9.5).font('Helvetica-Bold').text('COST SUMMARY', 60, doc.y - 17, { width: 480 });
+      doc.moveDown(0.3);
       const tRow = (lbl, val, bold) => {
-        const y = doc.y; const h = 18;
-        doc.rect(360, y, 90, h).fill(245,237,237);
-        doc.fillColor(107,32,32).fontSize(8).font('Helvetica-Bold').text(lbl, 366, y+4, { width: 80 });
+        const y = doc.y; const h = 20;
+        doc.rect(310, y, 140, h).fill(245,237,237);
+        doc.fillColor(107,32,32).fontSize(9).font('Helvetica-Bold').text(lbl, 318, y+5, { width: 130 });
         doc.rect(450, y, 95, h).fill(bold ? 245 : 252, bold ? 237 : 252, bold ? 237 : 252);
-        doc.fillColor(50,50,50).fontSize(8).font(bold ? 'Helvetica-Bold' : 'Helvetica').text(val, 456, y+4, { width: 84, align: 'right' });
+        doc.fillColor(50,50,50).fontSize(9).font(bold ? 'Helvetica-Bold' : 'Helvetica').text(val, 456, y+5, { width: 84, align: 'right' });
         doc.y = y + h + 1;
       };
-      tRow('Subtotal', '£' + Number(inv.subtotal).toFixed(2));
-      tRow('VAT (' + inv.vat_rate + '%)', '£' + Number(inv.vat_amount).toFixed(2));
-      tRow('TOTAL DUE', '£' + Number(inv.grand_total).toFixed(2), true);
-      if (Number(inv.amount_paid)) tRow('Paid', '£' + Number(inv.amount_paid).toFixed(2));
-      if (Number(inv.amount_paid) && Number(inv.grand_total) > Number(inv.amount_paid)) tRow('Balance', '£' + (Number(inv.grand_total) - Number(inv.amount_paid)).toFixed(2), true);
+      if (Number(inv.subtotal_labour)) tRow('Labour', '\u00a3' + Number(inv.subtotal_labour).toFixed(2));
+      if (Number(inv.subtotal_materials)) tRow('Materials', '\u00a3' + Number(inv.subtotal_materials).toFixed(2));
+      if (Number(inv.subtotal_plant)) tRow('Other Costs', '\u00a3' + Number(inv.subtotal_plant).toFixed(2));
+      tRow('Subtotal (ex. VAT)', '\u00a3' + Number(inv.subtotal).toFixed(2));
+      tRow('VAT (' + inv.vat_rate + '%)', '\u00a3' + Number(inv.vat_amount).toFixed(2));
+      tRow('TOTAL DUE', '\u00a3' + Number(inv.grand_total).toFixed(2), true);
+      if (Number(inv.amount_paid)) tRow('Paid', '\u00a3' + Number(inv.amount_paid).toFixed(2));
+      if (Number(inv.amount_paid) && Number(inv.grand_total) > Number(inv.amount_paid)) tRow('Balance', '\u00a3' + (Number(inv.grand_total) - Number(inv.amount_paid)).toFixed(2), true);
       if (inv.notes) { doc.moveDown(0.5); doc.fillColor(100,100,100).fontSize(7.5).font('Helvetica').text('Notes: ' + inv.notes, 50, doc.y, { width: 495 }); }
       const footY = doc.page.height - 35;
       doc.strokeColor(200,200,200).lineWidth(0.5).moveTo(50, footY).lineTo(545, footY).stroke();
