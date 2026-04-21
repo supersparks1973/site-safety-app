@@ -1613,6 +1613,193 @@ async function startApp() {
     } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
   });
 
+  // ═══════ POINT-TO-POINT CABLE TEST — DOCX ═══════
+  app.post('/api/p2p-test/docx', authenticate, async (req, res) => {
+    try {
+      const { project, cables } = req.body;
+      const h = docxHelpers();
+      const p = project || {};
+      const colWidths = [500, 1400, 1400, 800, 800, 800, 900, 900, 900, 900];
+      const colHeads = ['No.','Cable Ref / Tag','From — To','Cable Type','Cores','Size (mm²)','Continuity (Ω)','Insulation (MΩ)','Result','Tested By'];
+      const softBdr = { style: BorderStyle.SINGLE, size: 1, color: "D6D6D6" };
+      const softBds = { top: softBdr, bottom: softBdr, left: softBdr, right: softBdr };
+      const cellMg = { top: 70, bottom: 70, left: 110, right: 110 };
+
+      const titleChildren = [];
+      const logoRuns = [];
+      if (h.logoData) logoRuns.push(new ImageRun({ data: h.logoData, transformation: { width: 260, height: 100 }, type: 'png' }));
+      if (h.logoData && h.niceicData) logoRuns.push(new TextRun({ text: "      ", font: "Arial", size: 22 }));
+      if (h.niceicData) logoRuns.push(new ImageRun({ data: h.niceicData, transformation: { width: 150, height: 70 }, type: 'png' }));
+      if (logoRuns.length) titleChildren.push(new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 100, after: 100 }, children: logoRuns }));
+      titleChildren.push(
+        new Paragraph({ spacing: { before: 40, after: 40 }, border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: h.maroon, space: 0 } }, children: [] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 60 },
+          children: [new TextRun({ text: "POINT TO POINT CABLE TEST", bold: true, font: "Arial", size: 28, color: "333333" })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 240 },
+          children: [new TextRun({ text: "ManProjects Ltd — Electrical & Mechanical Building Services", font: "Arial", size: 16, color: "AAAAAA", italics: true })] })
+      );
+
+      const secBar = (text) => new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
+        new TableRow({ children: [
+          new TableCell({ borders: { top:{style:BorderStyle.SINGLE,size:1,color:"7A1818"},bottom:{style:BorderStyle.SINGLE,size:1,color:"7A1818"},left:{style:BorderStyle.SINGLE,size:1,color:"7A1818"},right:{style:BorderStyle.SINGLE,size:1,color:"7A1818"} },
+            shading: { fill: "9B2C2C", type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 180, right: 180 },
+            children: [new Paragraph({ children: [new TextRun({ text, bold: true, font: "Arial", size: 20, color: "FFFFFF" })] })] })
+        ] })
+      ] });
+
+      const dLbl = (text, w) => new TableCell({ borders: softBds, width: { size: w, type: WidthType.DXA },
+        shading: { fill: "F5EDED", type: ShadingType.CLEAR }, margins: cellMg,
+        children: [new Paragraph({ children: [new TextRun({ text, bold: true, font: "Arial", size: 18, color: "6B2020" })] })] });
+      const dVal = (text, w) => new TableCell({ borders: softBds, width: { size: w, type: WidthType.DXA },
+        shading: { fill: "FCFCFC", type: ShadingType.CLEAR }, margins: cellMg,
+        children: [new Paragraph({ children: [new TextRun({ text: text || '\u2014', font: "Arial", size: 18, color: "444444" })] })] });
+
+      const projTable = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
+        new TableRow({ children: [dLbl("Project / Site", 2340), dVal(p.project, 2340), dLbl("Location", 2340), dVal(p.location, 2340)] }),
+        new TableRow({ children: [dLbl("Client", 2340), dVal(p.client, 2340), dLbl("Date", 2340), dVal(p.date, 2340)] }),
+        new TableRow({ children: [dLbl("Engineer", 2340), dVal(p.engineer, 2340), dLbl("Test Instrument", 2340), dVal(p.instrument, 2340)] }),
+        new TableRow({ children: [dLbl("Instrument Serial No.", 2340), dVal(p.serialNo, 2340), dLbl("Calibration Due", 2340), dVal(p.calibrationDue, 2340)] }),
+      ] });
+
+      const headerRow = new TableRow({ children: colHeads.map((head, i) =>
+        new TableCell({ borders: softBds, width: { size: colWidths[i], type: WidthType.DXA },
+          shading: { fill: "9B2C2C", type: ShadingType.CLEAR }, margins: cellMg,
+          children: [new Paragraph({ children: [new TextRun({ text: head, bold: true, font: "Arial", size: 15, color: "FFFFFF" })] })] })
+      ) });
+      const rows = (cables || []).map((row, idx) => {
+        const isPass = (row.result||'').toLowerCase() === 'pass';
+        const isFail = (row.result||'').toLowerCase() === 'fail';
+        return new TableRow({ children: [row.no,row.cableRef,row.fromTo,row.cableType,row.cores,row.size,row.continuity,row.insulation,row.result,row.testedBy].map((cell, i) =>
+          new TableCell({ borders: softBds, width: { size: colWidths[i], type: WidthType.DXA },
+            shading: { fill: i === 8 && isPass ? "E6F4EA" : i === 8 && isFail ? "FCE8E6" : idx % 2 === 0 ? "FFFFFF" : "FAF6F6", type: ShadingType.CLEAR }, margins: cellMg,
+            children: [new Paragraph({ children: [new TextRun({ text: (cell||'').toString() || ' ', font: "Arial", size: 15, color: i === 8 && isFail ? "C0392B" : "333333", bold: i === 8 })] })] })
+        ) });
+      });
+
+      const spc = () => new Paragraph({ spacing: { after: 120 }, children: [] });
+      const children = [
+        ...titleChildren,
+        secBar("PROJECT DETAILS"), spc(), projTable, spc(),
+        secBar("CABLE TEST RESULTS"), spc(),
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...rows] }), spc(),
+        secBar("SIGN-OFF"), spc(),
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
+          new TableRow({ children: [dLbl("Tested By", h.pw/2), dVal(p.testedBy, h.pw/2)] }),
+          new TableRow({ children: [dLbl("Checked By", h.pw/2), dVal(p.checkedBy, h.pw/2)] }),
+          new TableRow({ children: [dLbl("Date", h.pw/2), dVal(p.signoffDate, h.pw/2)] }),
+        ] }),
+      ];
+
+      const doc = new Document({
+        styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
+        sections: [{ properties: { ...h.pageProps, page: { ...h.pageProps.page, size: { width: 16838, height: 11906 }, margin: { top: 900, right: 900, bottom: 900, left: 900 } } },
+          headers: h.mkHeader('Point to Point Cable Test'), footers: h.mkFooter('Point to Point Cable Test'), children }]
+      });
+      const buf = await Packer.toBuffer(doc);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', 'attachment; filename="ManProjects-P2P-Cable-Test.docx"');
+      res.send(buf);
+    } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
+  });
+
+  // ═══════ POINT-TO-POINT CABLE TEST — PDF ═══════
+  app.post('/api/p2p-test/pdf', authenticate, async (req, res) => {
+    try {
+      const { project, cables } = req.body;
+      const p = project || {};
+      const colHeads = ['No.','Cable Ref','From — To','Type','Cores','Size','Cont. (Ω)','Ins. (MΩ)','Result','Tested By'];
+      const colW = [28, 72, 90, 52, 32, 36, 52, 52, 44, 56];
+      const tableX = 50;
+      const maroon = [155, 44, 44];
+      const totalTableW = colW.reduce((a,b) => a+b, 0);
+
+      const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margins: { top: 50, bottom: 50, left: 50, right: 50 } });
+      const chunks = [];
+      doc.on('data', c => chunks.push(c));
+      doc.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="ManProjects-P2P-Cable-Test.pdf"');
+        res.send(buf);
+      });
+
+      const logoPath = path.join(__dirname, 'public', 'logo.png');
+      const niceicPath = path.join(__dirname, 'public', 'niceic-logo.png');
+      if (fs.existsSync(logoPath) && fs.existsSync(niceicPath)) {
+        doc.image(logoPath, 50, 30, { width: 170 }); doc.image(niceicPath, 235, 38, { width: 100 }); doc.moveDown(3.5);
+      } else if (fs.existsSync(logoPath)) { doc.image(logoPath, 50, 30, { width: 170 }); doc.moveDown(3.5); }
+
+      doc.strokeColor(...maroon).lineWidth(3).moveTo(50, doc.y).lineTo(doc.page.width - 50, doc.y).stroke();
+      doc.moveDown(0.6);
+      doc.fillColor(50,50,50).fontSize(15).font('Helvetica-Bold').text('POINT TO POINT CABLE TEST', { align: 'center' });
+      doc.fillColor(170,170,170).fontSize(8).font('Helvetica-Oblique').text('ManProjects Ltd — Electrical & Mechanical Building Services', { align: 'center' });
+      doc.moveDown(0.8);
+
+      const drawSectionBar = (text) => {
+        const y = doc.y;
+        doc.roundedRect(50, y, doc.page.width - 100, 22, 4).fill(...maroon);
+        doc.fillColor(255,255,255).fontSize(9.5).font('Helvetica-Bold').text(text, 60, y + 5.5, { width: doc.page.width - 130 });
+        doc.y = y + 28;
+      };
+      const drawDetailRow = (pairs) => {
+        const y = doc.y; const cellH = 20; const totalW = doc.page.width - 100; const pairW = totalW / pairs.length;
+        pairs.forEach(([label, value], i) => {
+          const x = 50 + i * pairW; const lblW = pairW * 0.38; const valW = pairW * 0.62;
+          doc.rect(x, y, lblW, cellH).fill(245, 237, 237);
+          doc.fillColor(107, 32, 32).fontSize(7.5).font('Helvetica-Bold').text(label, x + 6, y + 5.5, { width: lblW - 12 });
+          doc.rect(x + lblW, y, valW, cellH).fill(252,252,252); doc.rect(x + lblW, y, valW, cellH).strokeColor(220,220,220).lineWidth(0.5).stroke();
+          doc.fillColor(50,50,50).fontSize(7.5).font('Helvetica').text(value || '—', x + lblW + 6, y + 5.5, { width: valW - 12 });
+        });
+        doc.y = y + cellH + 1;
+      };
+
+      drawSectionBar('PROJECT DETAILS');
+      drawDetailRow([['Project / Site', p.project], ['Location', p.location]]);
+      drawDetailRow([['Client', p.client], ['Date', p.date]]);
+      drawDetailRow([['Engineer', p.engineer], ['Test Instrument', p.instrument]]);
+      drawDetailRow([['Instrument Serial No.', p.serialNo], ['Calibration Due', p.calibrationDue]]);
+      doc.moveDown(0.5);
+
+      drawSectionBar('CABLE TEST RESULTS');
+      const drawTableHeader = () => {
+        let x = tableX; const y = doc.y;
+        doc.roundedRect(tableX, y, totalTableW, 18, 3).fill(...maroon);
+        colHeads.forEach((head, i) => { doc.fillColor(255,255,255).fontSize(6.5).font('Helvetica-Bold').text(head, x + 3, y + 5, { width: colW[i] - 6 }); x += colW[i]; });
+        doc.y = y + 19;
+      };
+      drawTableHeader();
+
+      (cables || []).forEach((row, idx) => {
+        if (doc.y > doc.page.height - 60) { doc.addPage(); drawTableHeader(); }
+        let x = tableX; const y = doc.y; const rowH = 16;
+        const isPass = (row.result||'').toLowerCase() === 'pass';
+        const isFail = (row.result||'').toLowerCase() === 'fail';
+        if (idx % 2 === 1) doc.rect(tableX, y, totalTableW, rowH).fill(250, 246, 246);
+        else doc.rect(tableX, y, totalTableW, rowH).fill(255, 255, 255);
+        doc.strokeColor(230,230,230).lineWidth(0.3).moveTo(tableX, y + rowH).lineTo(tableX + totalTableW, y + rowH).stroke();
+        const vals = [row.no, row.cableRef, row.fromTo, row.cableType, row.cores, row.size, row.continuity, row.insulation, row.result, row.testedBy];
+        vals.forEach((cell, i) => {
+          if (i === 8 && isPass) { doc.rect(x, y, colW[i], rowH).fill(230, 244, 234); }
+          if (i === 8 && isFail) { doc.rect(x, y, colW[i], rowH).fill(252, 232, 230); }
+          doc.fillColor(i === 8 && isFail ? 192 : 50, i === 8 && isFail ? 57 : 50, i === 8 && isFail ? 43 : 50).fontSize(6.5).font(i === 8 ? 'Helvetica-Bold' : 'Helvetica').text((cell||'').toString(), x + 3, y + 4.5, { width: colW[i] - 6 });
+          x += colW[i];
+        });
+        doc.y = y + rowH;
+      });
+
+      doc.moveDown(0.6);
+      drawSectionBar('SIGN-OFF');
+      drawDetailRow([['Tested By', p.testedBy], ['Checked By', p.checkedBy]]);
+      drawDetailRow([['Date', p.signoffDate], ['', '']]);
+
+      const footY = doc.page.height - 35;
+      doc.strokeColor(200,200,200).lineWidth(0.5).moveTo(50, footY).lineTo(doc.page.width - 50, footY).stroke();
+      doc.fillColor(170,170,170).fontSize(7).font('Helvetica').text('ManProjects Ltd — Point to Point Cable Test', 50, footY + 5, { align: 'center', width: doc.page.width - 100 });
+
+      doc.end();
+    } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
+  });
+
   // ═══════ PROJECTS ═══════
   // List all projects (admin)
   app.get('/api/projects', authenticate, adminOnly, async (req, res) => {

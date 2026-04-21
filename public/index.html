@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v5.3 - Polished Word doc and PDF styling with softer colours, rounded elements, better spacing -->
+<!-- v5.4 - Point to Point Cable Test editor with preview, Word and PDF download -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -713,6 +713,7 @@ function renderPage(page) {
     'toolbox-talks': renderToolboxTalks,
     'site-templates': renderSiteTemplates,
     'db-schedule': renderDBScheduleEditor,
+    'p2p-test': renderP2PTestEditor,
   };
   if (pages[page]) {
     if (state.readOnly) {
@@ -2256,6 +2257,7 @@ const SITE_TEMPLATES = [
   ]},
   { category: 'Electrical Documents', icon: '⚡', templates: [
     { key: 'db-schedule', name: 'DB Schedule', desc: 'Distribution board schedule — circuit details, MCB ratings, cable types and sizes', icon: '🔌' },
+    { key: 'p2p-test', name: 'Point to Point Cable Test', desc: 'Cable continuity and insulation testing — record results per cable run', icon: '🔗' },
   ]},
 ];
 
@@ -2294,10 +2296,10 @@ function renderSiteTemplates(c) {
                 <p style="font-size:12.5px;color:#6b7280;margin:0;line-height:1.4">${esc(t.desc)}</p>
               </div>
               <div style="padding:14px 20px;background:white;border-top:1px solid #f3f4f6;margin-top:auto;display:flex;gap:8px">
-                ${t.key === 'db-schedule' ? `
+                ${(t.key === 'db-schedule' || t.key === 'p2p-test') ? `
                 <button style="flex:1;padding:10px 16px;border:none;border-radius:10px;background:${cc.accent};color:white;font-weight:600;font-size:13.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity 0.15s"
                         onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'"
-                        onclick="renderPage('db-schedule')">
+                        onclick="renderPage('${t.key}')">
                   <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   Open Editor
                 </button>
@@ -2554,6 +2556,243 @@ function dbPreview() {
     </table>
 
     <p style="text-align:center;color:#999;font-size:11px;margin-top:20px">ManProjects Ltd — Distribution Board Schedule</p>
+  `;
+
+  modal.style.display = 'block';
+}
+
+// ═══════════════════════════════════════
+// POINT TO POINT CABLE TEST EDITOR
+// ═══════════════════════════════════════
+function renderP2PTestEditor(c) {
+  const defaultCables = Array.from({length:6}, (_,i) => ({ no:String(i+1), cableRef:'', fromTo:'', cableType:'', cores:'', size:'', continuity:'', insulation:'', result:'', testedBy:'' }));
+
+  c.innerHTML = `
+    <div style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div style="display:flex;align-items:center;gap:14px">
+        <button class="btn" onclick="renderPage('site-templates')" style="padding:8px 12px;font-size:13px">← Back</button>
+        <div>
+          <h2 style="margin-bottom:2px;font-size:20px">🔗 Point to Point Cable Test</h2>
+          <p style="color:var(--text-light);font-size:13px;margin:0">Record cable continuity and insulation test results</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" onclick="p2pPreview()" style="background:#f3f4f6;border:1px solid #d1d5db;font-weight:600;display:flex;align-items:center;gap:6px">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          Preview
+        </button>
+        <button class="btn btn-primary" onclick="p2pDownloadDocx()" style="display:flex;align-items:center;gap:6px">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Word Doc
+        </button>
+        <button class="btn" onclick="p2pDownloadPdf()" style="background:#dc2626;color:white;border:none;font-weight:600;display:flex;align-items:center;gap:6px">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- PROJECT DETAILS -->
+    <div class="card" style="margin-bottom:20px">
+      <h3 style="color:#8B1A1A;font-size:15px;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #8B1A1A">PROJECT DETAILS</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Project / Site</label><input id="p2p-project" class="form-control" placeholder="e.g. GSK Stevenage"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Location</label><input id="p2p-location" class="form-control" placeholder="e.g. Building 1"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Client</label><input id="p2p-client" class="form-control"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Date</label><input id="p2p-date" type="date" class="form-control"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Engineer</label><input id="p2p-engineer" class="form-control"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Test Instrument</label><input id="p2p-instrument" class="form-control" placeholder="e.g. Megger MFT1741"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Instrument Serial No.</label><input id="p2p-serialNo" class="form-control"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Calibration Due</label><input id="p2p-calibrationDue" type="date" class="form-control"></div>
+      </div>
+    </div>
+
+    <!-- CABLE TEST TABLE -->
+    <div class="card" style="margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #8B1A1A">
+        <h3 style="color:#8B1A1A;font-size:15px;margin:0">CABLE TEST RESULTS</h3>
+        <button class="btn btn-primary" onclick="p2pAddRow()" style="font-size:12px;padding:6px 14px">+ Add Cable</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px" id="p2pTable">
+          <thead>
+            <tr style="background:#8B1A1A;color:white">
+              <th style="padding:8px 6px;text-align:left;font-weight:600;width:50px">No.</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;min-width:120px">Cable Ref / Tag</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;min-width:140px">From — To</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600">Cable Type</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;width:60px">Cores</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;width:70px">Size (mm²)</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;width:80px">Cont. (Ω)</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;width:80px">Ins. (MΩ)</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;width:80px">Result</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600">Tested By</th>
+              <th style="padding:8px 6px;width:40px"></th>
+            </tr>
+          </thead>
+          <tbody id="p2pBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SIGN-OFF -->
+    <div class="card" style="margin-bottom:20px">
+      <h3 style="color:#8B1A1A;font-size:15px;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #8B1A1A">SIGN-OFF</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Tested By</label><input id="p2p-testedBy" class="form-control"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Checked By</label><input id="p2p-checkedBy" class="form-control"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Date</label><input id="p2p-signoffDate" type="date" class="form-control"></div>
+      </div>
+    </div>
+
+    <!-- PREVIEW MODAL -->
+    <div id="p2pPreviewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;overflow-y:auto;padding:30px">
+      <div style="max-width:1100px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+        <div style="padding:16px 24px;background:#f9fafb;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
+          <h3 style="margin:0;font-size:16px">Preview — Point to Point Cable Test</h3>
+          <button onclick="document.getElementById('p2pPreviewModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280">✕</button>
+        </div>
+        <div id="p2pPreviewContent" style="padding:30px"></div>
+      </div>
+    </div>
+  `;
+
+  window._p2pCables = defaultCables;
+  p2pRenderRows();
+}
+
+function p2pRenderRows() {
+  const tbody = document.getElementById('p2pBody');
+  if (!tbody) return;
+  const inp = (val, idx, key, ph, extra) => `<input value="${esc(val)}" onchange="window._p2pCables[${idx}].${key}=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;${extra||''}" placeholder="${ph||''}" />`;
+  tbody.innerHTML = window._p2pCables.map((r, i) => `
+    <tr style="background:${i%2===1?'#fdf8f8':'white'};border-bottom:1px solid #f3f4f6">
+      <td style="padding:4px 3px">${inp(r.no, i, 'no', '', 'text-align:center;width:45px')}</td>
+      <td style="padding:4px 3px">${inp(r.cableRef, i, 'cableRef', 'Cable ref')}</td>
+      <td style="padding:4px 3px">${inp(r.fromTo, i, 'fromTo', 'e.g. DB1 → FCU-01')}</td>
+      <td style="padding:4px 3px">${inp(r.cableType, i, 'cableType', 'e.g. SWA')}</td>
+      <td style="padding:4px 3px">${inp(r.cores, i, 'cores', '', 'text-align:center')}</td>
+      <td style="padding:4px 3px">${inp(r.size, i, 'size', 'mm²', 'text-align:center')}</td>
+      <td style="padding:4px 3px">${inp(r.continuity, i, 'continuity', 'Ω', 'text-align:center')}</td>
+      <td style="padding:4px 3px">${inp(r.insulation, i, 'insulation', 'MΩ', 'text-align:center')}</td>
+      <td style="padding:4px 3px">
+        <select onchange="window._p2pCables[${i}].result=this.value;p2pRenderRows()" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;background:${r.result==='Pass'?'#e6f4ea':r.result==='Fail'?'#fce8e6':'white'};font-weight:600;color:${r.result==='Pass'?'#166534':r.result==='Fail'?'#c0392b':'#333'}">
+          <option value="">—</option><option ${r.result==='Pass'?'selected':''}>Pass</option><option ${r.result==='Fail'?'selected':''}>Fail</option>
+        </select>
+      </td>
+      <td style="padding:4px 3px">${inp(r.testedBy, i, 'testedBy', 'Initials')}</td>
+      <td style="padding:4px 3px;text-align:center"><button onclick="p2pRemoveRow(${i})" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:16px" title="Remove">🗑️</button></td>
+    </tr>
+  `).join('');
+}
+
+function p2pAddRow() {
+  const n = window._p2pCables.length + 1;
+  window._p2pCables.push({ no:String(n), cableRef:'', fromTo:'', cableType:'', cores:'', size:'', continuity:'', insulation:'', result:'', testedBy:'' });
+  p2pRenderRows();
+  const tbody = document.getElementById('p2pBody');
+  if (tbody && tbody.lastElementChild) tbody.lastElementChild.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function p2pRemoveRow(idx) {
+  if (window._p2pCables.length <= 1) return;
+  window._p2pCables.splice(idx, 1);
+  p2pRenderRows();
+}
+
+function p2pGetFormData() {
+  const g = id => (document.getElementById(id) || {}).value || '';
+  return {
+    project: { project: g('p2p-project'), location: g('p2p-location'), client: g('p2p-client'), date: g('p2p-date'),
+               engineer: g('p2p-engineer'), instrument: g('p2p-instrument'), serialNo: g('p2p-serialNo'), calibrationDue: g('p2p-calibrationDue'),
+               testedBy: g('p2p-testedBy'), checkedBy: g('p2p-checkedBy'), signoffDate: g('p2p-signoffDate') },
+    cables: window._p2pCables
+  };
+}
+
+async function p2pDownloadDocx() {
+  const data = p2pGetFormData();
+  try {
+    const res = await fetch(API + '/api/p2p-test/docx', { method:'POST', headers:{ ...headers(), 'Content-Type':'application/json' }, body: JSON.stringify(data) });
+    if (!res.ok) throw new Error('Download failed');
+    const blob = await res.blob(); const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'ManProjects-P2P-Cable-Test.docx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  } catch(e) { alert('Download error: ' + e.message); }
+}
+
+async function p2pDownloadPdf() {
+  const data = p2pGetFormData();
+  try {
+    const res = await fetch(API + '/api/p2p-test/pdf', { method:'POST', headers:{ ...headers(), 'Content-Type':'application/json' }, body: JSON.stringify(data) });
+    if (!res.ok) throw new Error('Download failed');
+    const blob = await res.blob(); const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'ManProjects-P2P-Cable-Test.pdf';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  } catch(e) { alert('Download error: ' + e.message); }
+}
+
+function p2pPreview() {
+  const data = p2pGetFormData();
+  const p = data.project;
+  const modal = document.getElementById('p2pPreviewModal');
+  const content = document.getElementById('p2pPreviewContent');
+  if (!modal || !content) return;
+
+  const detailRow = (label, val) => `<tr><td style="padding:6px 12px;background:#f3e8e8;font-weight:700;color:#8B1A1A;border:1px solid #e5e7eb;width:180px;font-size:13px">${esc(label)}</td><td style="padding:6px 12px;border:1px solid #e5e7eb;font-size:13px">${esc(val) || '—'}</td></tr>`;
+
+  content.innerHTML = `
+    <div style="text-align:left;margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:20px;margin-bottom:12px">
+        <img src="/logo.png" alt="ManProjects" style="height:70px" onerror="this.style.display='none'">
+        <img src="/niceic-logo.png" alt="NICEIC" style="height:50px" onerror="this.style.display='none'">
+      </div>
+      <div style="height:3px;background:#8B1A1A;width:100%"></div>
+      <h3 style="color:#333;margin:16px 0 4px;font-size:17px;text-align:center">POINT TO POINT CABLE TEST</h3>
+      <p style="text-align:center;color:#aaa;font-size:11px;font-style:italic;margin:0 0 16px">ManProjects Ltd — Electrical & Mechanical Building Services</p>
+    </div>
+
+    <div style="background:#8B1A1A;color:white;padding:8px 14px;font-weight:700;font-size:13px;border-radius:4px 4px 0 0">PROJECT DETAILS</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+      ${detailRow('Project / Site', p.project)}${detailRow('Location', p.location)}
+      ${detailRow('Client', p.client)}${detailRow('Date', p.date)}
+      ${detailRow('Engineer', p.engineer)}${detailRow('Test Instrument', p.instrument)}
+      ${detailRow('Instrument Serial No.', p.serialNo)}${detailRow('Calibration Due', p.calibrationDue)}
+    </table>
+
+    <div style="background:#8B1A1A;color:white;padding:8px 14px;font-weight:700;font-size:13px;border-radius:4px 4px 0 0">CABLE TEST RESULTS</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px">
+      <thead><tr style="background:#8B1A1A;color:white">
+        <th style="padding:6px 8px;text-align:left">No.</th><th style="padding:6px 8px;text-align:left">Cable Ref</th>
+        <th style="padding:6px 8px;text-align:left">From — To</th><th style="padding:6px 8px;text-align:left">Type</th>
+        <th style="padding:6px 8px;text-align:left">Cores</th><th style="padding:6px 8px;text-align:left">Size</th>
+        <th style="padding:6px 8px;text-align:left">Cont. (Ω)</th><th style="padding:6px 8px;text-align:left">Ins. (MΩ)</th>
+        <th style="padding:6px 8px;text-align:left">Result</th><th style="padding:6px 8px;text-align:left">Tested By</th>
+      </tr></thead>
+      <tbody>
+        ${data.cables.map((r, i) => {
+          const isPass = r.result === 'Pass'; const isFail = r.result === 'Fail';
+          return `<tr style="background:${i%2===1?'#fdf8f8':'white'}">
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.no)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.cableRef)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.fromTo)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.cableType)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.cores)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.size)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.continuity)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.insulation)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee;font-weight:700;background:${isPass?'#e6f4ea':isFail?'#fce8e6':'white'};color:${isFail?'#c0392b':'inherit'}">${esc(r.result)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.testedBy)}</td>
+        </tr>`}).join('')}
+      </tbody>
+    </table>
+
+    <div style="background:#8B1A1A;color:white;padding:8px 14px;font-weight:700;font-size:13px;border-radius:4px 4px 0 0">SIGN-OFF</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+      ${detailRow('Tested By', p.testedBy)}${detailRow('Checked By', p.checkedBy)}${detailRow('Date', p.signoffDate)}
+    </table>
+
+    <p style="text-align:center;color:#999;font-size:11px;margin-top:20px">ManProjects Ltd — Point to Point Cable Test</p>
   `;
 
   modal.style.display = 'block';
