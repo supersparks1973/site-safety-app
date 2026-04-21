@@ -346,18 +346,22 @@ async function startApp() {
     };
     const sh = (text) => new Paragraph({ spacing: { before: 300, after: 120 },
       children: [new TextRun({ text, bold: true, font: "Arial", size: 24, color: maroon })] });
-    let logoData;
+    let logoData, niceicData;
     try { logoData = fs.readFileSync(path.join(__dirname, 'public', 'logo.png')); } catch(e) { logoData = null; }
+    try { niceicData = fs.readFileSync(path.join(__dirname, 'public', 'niceic-logo.png')); } catch(e) { niceicData = null; }
     const mkHeader = (subtitle) => ({
-      default: new Header({ children: [new Paragraph({
-        border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: maroon, space: 4 } },
-        children: [
-          ...(logoData ? [new ImageRun({ data: logoData, transformation: { width: 120, height: 46 }, type: 'png' }), new TextRun({ text: "  ", font: "Arial", size: 22 })] : []),
-          new TextRun({ text: "ManProjects", bold: true, font: "Arial", size: 22, color: grey }),
-          new TextRun({ text: " Ltd", font: "Arial", size: 18, color: "999999" }),
-          new TextRun({ text: "    Electrical and Mechanical Building Services", font: "Arial", size: 14, color: "999999" }),
-        ]
-      })] })
+      default: new Header({ children: [
+        new Paragraph({
+          border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: maroon, space: 4 } },
+          children: [
+            ...(logoData ? [new ImageRun({ data: logoData, transformation: { width: 120, height: 46 }, type: 'png' }), new TextRun({ text: "  ", font: "Arial", size: 22 })] : []),
+            new TextRun({ text: "ManProjects", bold: true, font: "Arial", size: 22, color: grey }),
+            new TextRun({ text: " Ltd", font: "Arial", size: 18, color: "999999" }),
+            new TextRun({ text: "    Electrical and Mechanical Building Services", font: "Arial", size: 14, color: "999999" }),
+            ...(niceicData ? [new TextRun({ text: "    ", font: "Arial", size: 14 }), new ImageRun({ data: niceicData, transformation: { width: 80, height: 37 }, type: 'png' })] : []),
+          ]
+        }),
+      ] })
     });
     const mkFooter = (docType) => ({
       default: new Footer({ children: [new Paragraph({
@@ -372,7 +376,7 @@ async function startApp() {
     const pageProps = {
       page: { size: { width: 11906, height: 16838 }, margin: { top: 1200, right: 1200, bottom: 1200, left: 1200 } }
     };
-    return { maroon, grey, bds, cm, pw, lbl, val, condCell, sh, mkHeader, mkFooter, pageProps, logoData };
+    return { maroon, grey, bds, cm, pw, lbl, val, condCell, sh, mkHeader, mkFooter, pageProps, logoData, niceicData };
   };
 
   // Near-miss Word doc
@@ -1291,14 +1295,15 @@ async function startApp() {
         return res.send(buf);
       }
 
-      // ── Branded title block with logo ──
+      // ── Branded title block with logos ──
       const titleChildren = [];
-      if (h.logoData) {
-        titleChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 100, after: 80 },
-          children: [new ImageRun({ data: h.logoData, transformation: { width: 180, height: 70 }, type: 'png' })] }));
-      }
+      const logoRuns = [];
+      if (h.logoData) logoRuns.push(new ImageRun({ data: h.logoData, transformation: { width: 180, height: 70 }, type: 'png' }));
+      if (h.logoData && h.niceicData) logoRuns.push(new TextRun({ text: "      ", font: "Arial", size: 22 }));
+      if (h.niceicData) logoRuns.push(new ImageRun({ data: h.niceicData, transformation: { width: 110, height: 52 }, type: 'png' }));
+      if (logoRuns.length) titleChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 100, after: 80 }, children: logoRuns }));
       titleChildren.push(
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: h.logoData ? 40 : 200, after: 0 },
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: logoRuns.length ? 40 : 200, after: 0 },
           children: [new TextRun({ text: "MANPROJECTS LTD", bold: true, font: "Arial", size: 34, color: h.maroon })] }),
         new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 40, after: 20 },
           children: [new TextRun({ text: "Electrical & Mechanical Building Services", font: "Arial", size: 20, color: "999999", italics: true })] }),
@@ -1392,12 +1397,13 @@ async function startApp() {
       const colHeads = ['Cct No','Cct Ref','MCB Rating (A)','MCB Type','Supply/ng','Cable Type','Cable Size','CPC Size'];
 
       const titleChildren = [];
-      if (h.logoData) {
-        titleChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 100, after: 80 },
-          children: [new ImageRun({ data: h.logoData, transformation: { width: 180, height: 70 }, type: 'png' })] }));
-      }
+      const logoRuns = [];
+      if (h.logoData) logoRuns.push(new ImageRun({ data: h.logoData, transformation: { width: 180, height: 70 }, type: 'png' }));
+      if (h.logoData && h.niceicData) logoRuns.push(new TextRun({ text: "      ", font: "Arial", size: 22 }));
+      if (h.niceicData) logoRuns.push(new ImageRun({ data: h.niceicData, transformation: { width: 110, height: 52 }, type: 'png' }));
+      if (logoRuns.length) titleChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 100, after: 80 }, children: logoRuns }));
       titleChildren.push(
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: h.logoData ? 40 : 200, after: 0 },
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: logoRuns.length ? 40 : 200, after: 0 },
           children: [new TextRun({ text: "MANPROJECTS LTD", bold: true, font: "Arial", size: 34, color: h.maroon })] }),
         new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 40, after: 20 },
           children: [new TextRun({ text: "Electrical & Mechanical Building Services", font: "Arial", size: 20, color: "999999", italics: true })] }),
@@ -1484,9 +1490,16 @@ async function startApp() {
         res.send(buf);
       });
 
-      // Logo
+      // Logos
       const logoPath = path.join(__dirname, 'public', 'logo.png');
-      if (fs.existsSync(logoPath)) {
+      const niceicPath = path.join(__dirname, 'public', 'niceic-logo.png');
+      const hasLogo = fs.existsSync(logoPath);
+      const hasNiceic = fs.existsSync(niceicPath);
+      if (hasLogo && hasNiceic) {
+        doc.image(logoPath, (doc.page.width / 2) - 100, 30, { width: 120 });
+        doc.image(niceicPath, (doc.page.width / 2) + 30, 34, { width: 80 });
+        doc.moveDown(2.5);
+      } else if (hasLogo) {
         doc.image(logoPath, (doc.page.width / 2) - 60, 30, { width: 120 });
         doc.moveDown(2.5);
       }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.7 - Interactive DB Schedule editor with preview, Word and PDF download -->
+<!-- v4.8 - Add NICEIC Approved Contractor logo to all template downloads -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2509,7 +2509,10 @@ function dbPreview() {
 
   content.innerHTML = `
     <div style="text-align:center;margin-bottom:20px">
-      <img src="/logo.png" alt="ManProjects" style="height:50px;margin-bottom:8px" onerror="this.style.display='none'">
+      <div style="display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:8px">
+        <img src="/logo.png" alt="ManProjects" style="height:50px" onerror="this.style.display='none'">
+        <img src="/niceic-logo.png" alt="NICEIC" style="height:38px" onerror="this.style.display='none'">
+      </div>
       <h2 style="color:#8B1A1A;margin:0;font-size:20px">MANPROJECTS LTD</h2>
       <p style="color:#999;font-size:12px;font-style:italic;margin:2px 0 8px">Electrical & Mechanical Building Services</p>
       <div style="height:3px;background:#8B1A1A;margin:0 auto;width:100%"></div>
