@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v5.4 - Point to Point Cable Test editor with preview, Word and PDF download -->
+<!-- v5.5 - Preview button on all standard templates -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2247,13 +2247,48 @@ window.downloadTalkDocx = function(id, topic) {
 // ═══════════════════════════════════════
 const SITE_TEMPLATES = [
   { category: 'Safety Forms', icon: '🛡️', templates: [
-    { key: 'permit-to-work', name: 'Permit to Work', desc: 'Formal permit for high-risk activities with isolation details', icon: '🔐' },
-    { key: 'inspection-checklist', name: 'Site Inspection Checklist', desc: 'General site safety inspection with action tracking', icon: '📋' },
+    { key: 'permit-to-work', name: 'Permit to Work', desc: 'Formal permit for high-risk activities with isolation details', icon: '🔐',
+      sections: [
+        { header: 'PERMIT DETAILS', rows: ['Permit Number','Permit Type','Date Issued','Valid From','Valid To','Location','Description of Work'] },
+        { header: 'HAZARDS IDENTIFIED', freeText: true },
+        { header: 'PRECAUTIONS REQUIRED', freeText: true },
+        { header: 'PPE REQUIREMENTS', freeText: true },
+        { header: 'ISOLATION DETAILS', rows: ['Isolation Point(s)','Isolation Method','Isolated By','Proved Dead By'] },
+        { header: 'AUTHORISATION', rows: ['Issued By','Signature','Accepted By','Signature','Date / Time'] },
+        { header: 'PERMIT CANCELLATION', rows: ['Work Completed','Area Left Safe','Cancelled By','Signature','Date / Time'] },
+      ] },
+    { key: 'inspection-checklist', name: 'Site Inspection Checklist', desc: 'General site safety inspection with action tracking', icon: '📋',
+      sections: [
+        { header: 'INSPECTION DETAILS', rows: ['Site / Project','Date','Inspector','Area Inspected'] },
+        { header: 'INSPECTION ITEMS', table: ['Item','Yes','No','N/A','Comments'] },
+        { header: 'ACTIONS REQUIRED', table: ['Action','Responsible Person','Due Date','Completed'] },
+        { header: 'SIGN-OFF', rows: ['Inspector Signature','Date'] },
+      ] },
   ]},
   { category: 'Project Documents', icon: '🏗️', templates: [
-    { key: 'project-handover', name: 'Project Handover Form', desc: 'Client handover checklist with O&M, drawings, and sign-off', icon: '🤝' },
-    { key: 'commissioning-record', name: 'Commissioning Record', desc: 'Equipment commissioning with pre-checks and test results', icon: '⚡' },
-    { key: 'daily-site-diary', name: 'Daily Site Diary', desc: 'Daily record of personnel, work done, deliveries, and issues', icon: '📓' },
+    { key: 'project-handover', name: 'Project Handover Form', desc: 'Client handover checklist with O&M, drawings, and sign-off', icon: '🤝',
+      sections: [
+        { header: 'PROJECT DETAILS', rows: ['Project Name','Client','Site Address','Contract Value','Start Date','Completion Date','ManProjects Project Manager'] },
+        { header: 'HANDOVER CHECKLIST', table: ['Item','Completed','N/A','Comments'] },
+        { header: 'CLIENT ACCEPTANCE', rows: ['Client Name','Signature','Date','ManProjects Representative','Signature','Date'] },
+      ] },
+    { key: 'commissioning-record', name: 'Commissioning Record', desc: 'Equipment commissioning with pre-checks and test results', icon: '⚡',
+      sections: [
+        { header: 'PROJECT INFORMATION', rows: ['Project Name','Site Address','System/Equipment','Manufacturer','Model/Serial No','Location/Zone','Date Commissioned'] },
+        { header: 'PRE-COMMISSIONING CHECKS', table: ['Check','Pass','Fail','N/A','Comments'] },
+        { header: 'TEST RESULTS', table: ['Test','Expected Value','Measured Value','Pass/Fail'] },
+        { header: 'SIGN-OFF', rows: ['Commissioned By','Signature','Date','Witnessed By','Signature','Date'] },
+      ] },
+    { key: 'daily-site-diary', name: 'Daily Site Diary', desc: 'Daily record of personnel, work done, deliveries, and issues', icon: '📓',
+      sections: [
+        { header: 'SITE DETAILS', rows: ['Project Name','Site Address','Date','Weather Conditions','Temperature (approx)','Completed By'] },
+        { header: 'PERSONNEL ON SITE', table: ['Name','Company','Trade/Role','Hours'] },
+        { header: 'WORK CARRIED OUT TODAY', freeText: true },
+        { header: 'MATERIALS DELIVERED', freeText: true },
+        { header: 'VISITORS', table: ['Name','Company','Purpose','Time In','Time Out'] },
+        { header: 'ISSUES / DELAYS', freeText: true },
+        { header: 'SIGN-OFF', rows: ['Site Manager Signature','Date'] },
+      ] },
   ]},
   { category: 'Electrical Documents', icon: '⚡', templates: [
     { key: 'db-schedule', name: 'DB Schedule', desc: 'Distribution board schedule — circuit details, MCB ratings, cable types and sizes', icon: '🔌' },
@@ -2309,11 +2344,17 @@ function renderSiteTemplates(c) {
                   <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 </button>
                 ` : `
+                <button style="padding:10px 14px;border:1px solid ${cc.accent};border-radius:10px;background:white;color:${cc.accent};font-weight:600;font-size:13.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:opacity 0.15s"
+                        onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"
+                        onclick="previewTemplate('${t.key}','${t.name.replace(/'/g,"\\'")}')">
+                  <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  Preview
+                </button>
                 <button style="flex:1;padding:10px 16px;border:none;border-radius:10px;background:${cc.accent};color:white;font-weight:600;font-size:13.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity 0.15s"
                         onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'"
                         onclick="downloadTemplate('${t.key}','${t.name.replace(/'/g,"\\'")}')">
                   <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  Download Template
+                  Download
                 </button>
                 `}
               </div>
@@ -2324,6 +2365,74 @@ function renderSiteTemplates(c) {
     }).join('')}
   `;
 }
+
+// ═══════════════════════════════════════
+// GENERIC TEMPLATE PREVIEW
+// ═══════════════════════════════════════
+window.previewTemplate = function(key, name) {
+  // Find template in SITE_TEMPLATES
+  let tmpl = null;
+  for (const cat of SITE_TEMPLATES) {
+    tmpl = cat.templates.find(t => t.key === key);
+    if (tmpl) break;
+  }
+  if (!tmpl || !tmpl.sections) { alert('No preview available for this template.'); return; }
+
+  // Build preview HTML
+  const sectionBar = (title) => `<div style="background:#8B1A1A;color:white;padding:8px 14px;font-weight:700;font-size:13px;border-radius:4px 4px 0 0;margin-top:16px">${esc(title)}</div>`;
+
+  const rowsTable = (rows) => `<table style="width:100%;border-collapse:collapse;margin-bottom:16px">${rows.map(r =>
+    `<tr><td style="padding:7px 12px;background:#f3e8e8;font-weight:700;color:#8B1A1A;border:1px solid #e5e7eb;width:220px;font-size:13px">${esc(r)}</td><td style="padding:7px 12px;border:1px solid #e5e7eb;font-size:13px;min-height:28px;color:#aaa">—</td></tr>`
+  ).join('')}</table>`;
+
+  const dataTable = (cols) => `<table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px">
+    <thead><tr style="background:#8B1A1A;color:white">${cols.map(c => `<th style="padding:6px 8px;text-align:left;font-weight:600">${esc(c)}</th>`).join('')}</tr></thead>
+    <tbody>${[0,1,2].map(i => `<tr style="background:${i%2===1?'#fdf8f8':'white'}">${cols.map(() => `<td style="padding:5px 8px;border:1px solid #eee;color:#ccc">—</td>`).join('')}</tr>`).join('')}</tbody>
+  </table>`;
+
+  const freeTextBlock = () => `<div style="border:1px solid #e5e7eb;border-radius:0 0 4px 4px;padding:16px;margin-bottom:16px;min-height:60px;color:#ccc;font-size:13px;font-style:italic">Free text area...</div>`;
+
+  let sectionsHtml = tmpl.sections.map(s => {
+    let content = '';
+    if (s.rows) content = rowsTable(s.rows);
+    else if (s.table) content = dataTable(s.table);
+    else if (s.freeText) content = freeTextBlock();
+    return sectionBar(s.header) + content;
+  }).join('');
+
+  // Create or reuse modal
+  let modal = document.getElementById('genericPreviewModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'genericPreviewModal';
+    modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;overflow-y:auto;padding:30px';
+    modal.innerHTML = `<div style="max-width:900px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+      <div style="padding:16px 24px;background:#f9fafb;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
+        <h3 id="genericPreviewTitle" style="margin:0;font-size:16px"></h3>
+        <button onclick="document.getElementById('genericPreviewModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280">\u2715</button>
+      </div>
+      <div id="genericPreviewContent" style="padding:30px"></div>
+    </div>`;
+    document.body.appendChild(modal);
+  }
+
+  document.getElementById('genericPreviewTitle').textContent = 'Preview \u2014 ' + name;
+  document.getElementById('genericPreviewContent').innerHTML = `
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:flex-start;gap:20px;margin-bottom:12px">
+        <img src="/logo.png" alt="ManProjects" style="height:70px" onerror="this.style.display='none'">
+        <img src="/niceic-logo.png" alt="NICEIC" style="height:50px" onerror="this.style.display='none'">
+      </div>
+      <div style="height:3px;background:#8B1A1A;margin:0 auto 12px;width:100%"></div>
+      <h3 style="color:#333;margin:0;font-size:17px">${esc(name.toUpperCase())}</h3>
+      <p style="color:#999;font-size:12px;margin-top:4px">ManProjects Ltd — Electrical &amp; Mechanical Building Services</p>
+    </div>
+    ${sectionsHtml}
+    <p style="text-align:center;color:#999;font-size:11px;margin-top:20px">ManProjects Ltd — ${esc(name)}</p>
+  `;
+
+  modal.style.display = 'block';
+};
 
 // ═══════════════════════════════════════
 // DB SCHEDULE EDITOR
@@ -2565,7 +2674,7 @@ function dbPreview() {
 // POINT TO POINT CABLE TEST EDITOR
 // ═══════════════════════════════════════
 function renderP2PTestEditor(c) {
-  const defaultCables = Array.from({length:6}, (_,i) => ({ no:String(i+1), cableRef:'', fromTo:'', cableType:'', cores:'', size:'', continuity:'', insulation:'', result:'', testedBy:'' }));
+  const defaultCables = Array.from({length:6}, (_,i) => ({ no:String(i+1), cableRef:'', from:'', to:'', cableType:'', cores:'', size:'', continuity:'', insulation:'', result:'', testedBy:'' }));
 
   c.innerHTML = `
     <div style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
@@ -2619,7 +2728,8 @@ function renderP2PTestEditor(c) {
             <tr style="background:#8B1A1A;color:white">
               <th style="padding:8px 6px;text-align:left;font-weight:600;width:50px">No.</th>
               <th style="padding:8px 6px;text-align:left;font-weight:600;min-width:120px">Cable Ref / Tag</th>
-              <th style="padding:8px 6px;text-align:left;font-weight:600;min-width:140px">From — To</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;min-width:100px">From</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;min-width:100px">To</th>
               <th style="padding:8px 6px;text-align:left;font-weight:600">Cable Type</th>
               <th style="padding:8px 6px;text-align:left;font-weight:600;width:60px">Cores</th>
               <th style="padding:8px 6px;text-align:left;font-weight:600;width:70px">Size (mm²)</th>
@@ -2669,7 +2779,8 @@ function p2pRenderRows() {
     <tr style="background:${i%2===1?'#fdf8f8':'white'};border-bottom:1px solid #f3f4f6">
       <td style="padding:4px 3px">${inp(r.no, i, 'no', '', 'text-align:center;width:45px')}</td>
       <td style="padding:4px 3px">${inp(r.cableRef, i, 'cableRef', 'Cable ref')}</td>
-      <td style="padding:4px 3px">${inp(r.fromTo, i, 'fromTo', 'e.g. DB1 → FCU-01')}</td>
+      <td style="padding:4px 3px">${inp(r.from, i, 'from', 'e.g. DB1')}</td>
+      <td style="padding:4px 3px">${inp(r.to, i, 'to', 'e.g. FCU-01')}</td>
       <td style="padding:4px 3px">${inp(r.cableType, i, 'cableType', 'e.g. SWA')}</td>
       <td style="padding:4px 3px">${inp(r.cores, i, 'cores', '', 'text-align:center')}</td>
       <td style="padding:4px 3px">${inp(r.size, i, 'size', 'mm²', 'text-align:center')}</td>
@@ -2688,7 +2799,7 @@ function p2pRenderRows() {
 
 function p2pAddRow() {
   const n = window._p2pCables.length + 1;
-  window._p2pCables.push({ no:String(n), cableRef:'', fromTo:'', cableType:'', cores:'', size:'', continuity:'', insulation:'', result:'', testedBy:'' });
+  window._p2pCables.push({ no:String(n), cableRef:'', from:'', to:'', cableType:'', cores:'', size:'', continuity:'', insulation:'', result:'', testedBy:'' });
   p2pRenderRows();
   const tbody = document.getElementById('p2pBody');
   if (tbody && tbody.lastElementChild) tbody.lastElementChild.scrollIntoView({ behavior:'smooth', block:'nearest' });
@@ -2764,7 +2875,7 @@ function p2pPreview() {
     <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px">
       <thead><tr style="background:#8B1A1A;color:white">
         <th style="padding:6px 8px;text-align:left">No.</th><th style="padding:6px 8px;text-align:left">Cable Ref</th>
-        <th style="padding:6px 8px;text-align:left">From — To</th><th style="padding:6px 8px;text-align:left">Type</th>
+        <th style="padding:6px 8px;text-align:left">From</th><th style="padding:6px 8px;text-align:left">To</th><th style="padding:6px 8px;text-align:left">Type</th>
         <th style="padding:6px 8px;text-align:left">Cores</th><th style="padding:6px 8px;text-align:left">Size</th>
         <th style="padding:6px 8px;text-align:left">Cont. (Ω)</th><th style="padding:6px 8px;text-align:left">Ins. (MΩ)</th>
         <th style="padding:6px 8px;text-align:left">Result</th><th style="padding:6px 8px;text-align:left">Tested By</th>
@@ -2775,7 +2886,8 @@ function p2pPreview() {
           return `<tr style="background:${i%2===1?'#fdf8f8':'white'}">
           <td style="padding:5px 8px;border:1px solid #eee">${esc(r.no)}</td>
           <td style="padding:5px 8px;border:1px solid #eee">${esc(r.cableRef)}</td>
-          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.fromTo)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.from)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.to)}</td>
           <td style="padding:5px 8px;border:1px solid #eee">${esc(r.cableType)}</td>
           <td style="padding:5px 8px;border:1px solid #eee">${esc(r.cores)}</td>
           <td style="padding:5px 8px;border:1px solid #eee">${esc(r.size)}</td>

@@ -1619,8 +1619,8 @@ async function startApp() {
       const { project, cables } = req.body;
       const h = docxHelpers();
       const p = project || {};
-      const colWidths = [500, 1400, 1400, 800, 800, 800, 900, 900, 900, 900];
-      const colHeads = ['No.','Cable Ref / Tag','From — To','Cable Type','Cores','Size (mm²)','Continuity (Ω)','Insulation (MΩ)','Result','Tested By'];
+      const colWidths = [500, 1200, 900, 900, 800, 800, 800, 900, 900, 900, 900];
+      const colHeads = ['No.','Cable Ref / Tag','From','To','Cable Type','Cores','Size (mm²)','Continuity (Ω)','Insulation (MΩ)','Result','Tested By'];
       const softBdr = { style: BorderStyle.SINGLE, size: 1, color: "D6D6D6" };
       const softBds = { top: softBdr, bottom: softBdr, left: softBdr, right: softBdr };
       const cellMg = { top: 70, bottom: 70, left: 110, right: 110 };
@@ -1669,10 +1669,10 @@ async function startApp() {
       const rows = (cables || []).map((row, idx) => {
         const isPass = (row.result||'').toLowerCase() === 'pass';
         const isFail = (row.result||'').toLowerCase() === 'fail';
-        return new TableRow({ children: [row.no,row.cableRef,row.fromTo,row.cableType,row.cores,row.size,row.continuity,row.insulation,row.result,row.testedBy].map((cell, i) =>
+        return new TableRow({ children: [row.no,row.cableRef,row.from||'',row.to||'',row.cableType,row.cores,row.size,row.continuity,row.insulation,row.result,row.testedBy].map((cell, i) =>
           new TableCell({ borders: softBds, width: { size: colWidths[i], type: WidthType.DXA },
-            shading: { fill: i === 8 && isPass ? "E6F4EA" : i === 8 && isFail ? "FCE8E6" : idx % 2 === 0 ? "FFFFFF" : "FAF6F6", type: ShadingType.CLEAR }, margins: cellMg,
-            children: [new Paragraph({ children: [new TextRun({ text: (cell||'').toString() || ' ', font: "Arial", size: 15, color: i === 8 && isFail ? "C0392B" : "333333", bold: i === 8 })] })] })
+            shading: { fill: i === 9 && isPass ? "E6F4EA" : i === 9 && isFail ? "FCE8E6" : idx % 2 === 0 ? "FFFFFF" : "FAF6F6", type: ShadingType.CLEAR }, margins: cellMg,
+            children: [new Paragraph({ children: [new TextRun({ text: (cell||'').toString() || ' ', font: "Arial", size: 15, color: i === 9 && isFail ? "C0392B" : "333333", bold: i === 9 })] })] })
         ) });
       });
 
@@ -1707,8 +1707,8 @@ async function startApp() {
     try {
       const { project, cables } = req.body;
       const p = project || {};
-      const colHeads = ['No.','Cable Ref','From — To','Type','Cores','Size','Cont. (Ω)','Ins. (MΩ)','Result','Tested By'];
-      const colW = [28, 72, 90, 52, 32, 36, 52, 52, 44, 56];
+      const colHeads = ['No.','Cable Ref','From','To','Type','Cores','Size','Cont. (Ω)','Ins. (MΩ)','Result','Tested By'];
+      const colW = [26, 64, 52, 52, 48, 30, 34, 50, 50, 42, 52];
       const tableX = 50;
       const maroon = [155, 44, 44];
       const totalTableW = colW.reduce((a,b) => a+b, 0);
@@ -1777,11 +1777,11 @@ async function startApp() {
         if (idx % 2 === 1) doc.rect(tableX, y, totalTableW, rowH).fill(250, 246, 246);
         else doc.rect(tableX, y, totalTableW, rowH).fill(255, 255, 255);
         doc.strokeColor(230,230,230).lineWidth(0.3).moveTo(tableX, y + rowH).lineTo(tableX + totalTableW, y + rowH).stroke();
-        const vals = [row.no, row.cableRef, row.fromTo, row.cableType, row.cores, row.size, row.continuity, row.insulation, row.result, row.testedBy];
+        const vals = [row.no, row.cableRef, row.from||'', row.to||'', row.cableType, row.cores, row.size, row.continuity, row.insulation, row.result, row.testedBy];
         vals.forEach((cell, i) => {
-          if (i === 8 && isPass) { doc.rect(x, y, colW[i], rowH).fill(230, 244, 234); }
-          if (i === 8 && isFail) { doc.rect(x, y, colW[i], rowH).fill(252, 232, 230); }
-          doc.fillColor(i === 8 && isFail ? 192 : 50, i === 8 && isFail ? 57 : 50, i === 8 && isFail ? 43 : 50).fontSize(6.5).font(i === 8 ? 'Helvetica-Bold' : 'Helvetica').text((cell||'').toString(), x + 3, y + 4.5, { width: colW[i] - 6 });
+          if (i === 9 && isPass) { doc.rect(x, y, colW[i], rowH).fill(230, 244, 234); }
+          if (i === 9 && isFail) { doc.rect(x, y, colW[i], rowH).fill(252, 232, 230); }
+          doc.fillColor(i === 9 && isFail ? 192 : 50, i === 9 && isFail ? 57 : 50, i === 9 && isFail ? 43 : 50).fontSize(6.5).font(i === 9 ? 'Helvetica-Bold' : 'Helvetica').text((cell||'').toString(), x + 3, y + 4.5, { width: colW[i] - 6 });
           x += colW[i];
         });
         doc.y = y + rowH;
