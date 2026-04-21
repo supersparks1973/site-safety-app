@@ -1245,11 +1245,16 @@ async function startApp() {
           ) })
         );
 
+        const blankLogoRuns = [];
+        if (h.logoData) blankLogoRuns.push(new ImageRun({ data: h.logoData, transformation: { width: 180, height: 70 }, type: 'png' }));
+        if (h.logoData && h.niceicData) blankLogoRuns.push(new TextRun({ text: "      ", font: "Arial", size: 22 }));
+        if (h.niceicData) blankLogoRuns.push(new ImageRun({ data: h.niceicData, transformation: { width: 110, height: 52 }, type: 'png' }));
+
         const children = [
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 0 },
-            children: [new TextRun({ text: "MANPROJECTS LTD", bold: true, font: "Arial", size: 32, color: h.maroon })] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80, after: 200 },
-            children: [new TextRun({ text: "DISTRIBUTION BOARD SCHEDULE", bold: true, font: "Arial", size: 24, color: h.grey })] }),
+          ...(blankLogoRuns.length ? [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 100, after: 80 }, children: blankLogoRuns })] : []),
+          new Paragraph({ spacing: { before: 20, after: 20 }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: h.maroon, space: 0 } }, children: [] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 180, after: 200 },
+            children: [new TextRun({ text: "DISTRIBUTION BOARD SCHEDULE", bold: true, font: "Arial", size: 30, color: "333333" })] }),
 
           h.sh("BOARD DETAILS"),
           new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
@@ -1403,10 +1408,6 @@ async function startApp() {
       if (h.niceicData) logoRuns.push(new ImageRun({ data: h.niceicData, transformation: { width: 110, height: 52 }, type: 'png' }));
       if (logoRuns.length) titleChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 100, after: 80 }, children: logoRuns }));
       titleChildren.push(
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: logoRuns.length ? 40 : 200, after: 0 },
-          children: [new TextRun({ text: "MANPROJECTS LTD", bold: true, font: "Arial", size: 34, color: h.maroon })] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 40, after: 20 },
-          children: [new TextRun({ text: "Electrical & Mechanical Building Services", font: "Arial", size: 20, color: "999999", italics: true })] }),
         new Paragraph({ spacing: { before: 20, after: 20 }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: h.maroon, space: 0 } }, children: [] }),
         new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 180, after: 200 },
           children: [new TextRun({ text: "DISTRIBUTION BOARD SCHEDULE", bold: true, font: "Arial", size: 30, color: "333333" })] })
@@ -1504,10 +1505,7 @@ async function startApp() {
         doc.moveDown(2.5);
       }
 
-      // Title
-      doc.fillColor(...maroon).fontSize(18).font('Helvetica-Bold').text('MANPROJECTS LTD', { align: 'center' });
-      doc.fillColor(150,150,150).fontSize(10).font('Helvetica-Oblique').text('Electrical & Mechanical Building Services', { align: 'center' });
-      doc.moveDown(0.3);
+      // Title (logos only, no company text for DB Schedule)
       doc.strokeColor(...maroon).lineWidth(2).moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke();
       doc.moveDown(0.5);
       doc.fillColor(50,50,50).fontSize(14).font('Helvetica-Bold').text('DISTRIBUTION BOARD SCHEDULE', { align: 'center' });
