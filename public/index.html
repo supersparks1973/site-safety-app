@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.1 - Allow dashboard for External View -->
+<!-- v4.2 - Hide training form and delete for External View -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3066,7 +3066,7 @@ async function renderAdminTraining(c) {
         <div class="stat-card"><div class="stat-value">${users.filter(u=>u.role==='operative').length}</div><div class="stat-label">Operatives</div></div>
       </div>
 
-      <div class="form-section">
+      <div class="form-section hide-readonly">
         <h3>➕ Add Training Record</h3>
         <div class="form-group"><label>Operative</label>
           <select id="trainUser">
@@ -3143,7 +3143,7 @@ window.showTrainingView = function(view, btn) {
           <p>${r.completion_date ? `<strong>Completed:</strong> ${r.completion_date}` : ''}${r.completion_date && r.expiry_date ? ' &nbsp;|&nbsp; ' : ''}${r.expiry_date ? `<strong>Expires:</strong> ${r.expiry_date}` : ''}${!r.completion_date && !r.expiry_date ? '<em style="color:var(--text-light)">No dates recorded</em>' : ''}</p>
           ${r.card_number ? `<p><strong>Card/Cert:</strong> ${r.card_number}</p>` : ''}
         </div>
-        <button class="btn btn-outline btn-sm" style="margin-top:8px;color:var(--danger);border-color:var(--danger);width:auto" onclick="deleteTraining(${r.id})">Remove</button>
+        <button class="btn btn-outline btn-sm hide-readonly" style="margin-top:8px;color:var(--danger);border-color:var(--danger);width:auto" onclick="deleteTraining(${r.id})">Remove</button>
       </div>`;
   }).join('');
 };
