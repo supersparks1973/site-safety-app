@@ -144,6 +144,93 @@ async function startApp() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  // ── Quoting & Invoicing tables ──
+  await pool.query(`CREATE TABLE IF NOT EXISTS quotes (
+    id SERIAL PRIMARY KEY,
+    quote_number TEXT NOT NULL,
+    project_name TEXT,
+    client_name TEXT,
+    client_address TEXT,
+    client_email TEXT,
+    description TEXT,
+    status TEXT NOT NULL DEFAULT 'draft',
+    subtotal_labour NUMERIC(12,2) DEFAULT 0,
+    subtotal_materials NUMERIC(12,2) DEFAULT 0,
+    subtotal_plant NUMERIC(12,2) DEFAULT 0,
+    markup_pct NUMERIC(5,2) DEFAULT 0,
+    markup_amount NUMERIC(12,2) DEFAULT 0,
+    net_total NUMERIC(12,2) DEFAULT 0,
+    vat_rate NUMERIC(5,2) DEFAULT 20,
+    vat_amount NUMERIC(12,2) DEFAULT 0,
+    grand_total NUMERIC(12,2) DEFAULT 0,
+    notes TEXT,
+    valid_until TEXT,
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS quote_items (
+    id SERIAL PRIMARY KEY,
+    quote_id INTEGER REFERENCES quotes(id) ON DELETE CASCADE,
+    category TEXT NOT NULL,
+    description TEXT NOT NULL,
+    quantity NUMERIC(10,2) DEFAULT 1,
+    unit TEXT DEFAULT 'each',
+    rate NUMERIC(12,2) DEFAULT 0,
+    total NUMERIC(12,2) DEFAULT 0,
+    sort_order INTEGER DEFAULT 0
+  )`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS purchase_orders (
+    id SERIAL PRIMARY KEY,
+    quote_id INTEGER REFERENCES quotes(id),
+    po_number TEXT NOT NULL,
+    client_name TEXT,
+    project_name TEXT,
+    po_date TEXT,
+    po_value NUMERIC(12,2),
+    notes TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS invoices (
+    id SERIAL PRIMARY KEY,
+    invoice_number TEXT NOT NULL,
+    quote_id INTEGER REFERENCES quotes(id),
+    po_id INTEGER REFERENCES purchase_orders(id),
+    client_name TEXT,
+    client_address TEXT,
+    project_name TEXT,
+    invoice_date TEXT,
+    due_date TEXT,
+    status TEXT NOT NULL DEFAULT 'draft',
+    subtotal NUMERIC(12,2) DEFAULT 0,
+    vat_rate NUMERIC(5,2) DEFAULT 20,
+    vat_amount NUMERIC(12,2) DEFAULT 0,
+    grand_total NUMERIC(12,2) DEFAULT 0,
+    amount_paid NUMERIC(12,2) DEFAULT 0,
+    notes TEXT,
+    is_part_invoice BOOLEAN DEFAULT FALSE,
+    part_description TEXT,
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS invoice_items (
+    id SERIAL PRIMARY KEY,
+    invoice_id INTEGER REFERENCES invoices(id) ON DELETE CASCADE,
+    description TEXT NOT NULL,
+    quantity NUMERIC(10,2) DEFAULT 1,
+    unit TEXT DEFAULT 'each',
+    rate NUMERIC(12,2) DEFAULT 0,
+    total NUMERIC(12,2) DEFAULT 0,
+    sort_order INTEGER DEFAULT 0
+  )`);
+
   // Add signature column to existing tables if not present
   const migrateSig = async (table) => {
     try { await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS signature TEXT`); } catch(e) {}
@@ -1849,6 +1936,383 @@ async function startApp() {
       await pool.query('DELETE FROM projects WHERE id = $1', [req.params.id]);
       res.json({ message: 'Project deleted' });
     } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ═══════ QUOTING & INVOICING ═══════
+
+  // ── Quotes CRUD ──
+  app.get('/api/quotes', authenticate, adminOnly, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT q.*, u.full_name as created_by_name FROM quotes q LEFT JOIN users u ON q.created_by = u.id ORDER BY q.created_at DESC');
+      res.json(rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get('/api/quotes/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT * FROM quotes WHERE id = $1', [req.params.id]);
+      if (!rows.length) return res.status(404).json({ error: 'Quote not found' });
+      const items = await pool.query('SELECT * FROM quote_items WHERE quote_id = $1 ORDER BY category, sort_order', [req.params.id]);
+      res.json({ ...rows[0], items: items.rows });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post('/api/quotes', authenticate, adminOnly, async (req, res) => {
+    try {
+      const d = req.body;
+      const { rows } = await pool.query(
+        `INSERT INTO quotes (quote_number, project_name, client_name, client_address, client_email, description, status,
+         subtotal_labour, subtotal_materials, subtotal_plant, markup_pct, markup_amount, net_total, vat_rate, vat_amount, grand_total, notes, valid_until, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
+        [d.quote_number, d.project_name, d.client_name, d.client_address, d.client_email, d.description, d.status||'draft',
+         d.subtotal_labour||0, d.subtotal_materials||0, d.subtotal_plant||0, d.markup_pct||0, d.markup_amount||0, d.net_total||0,
+         d.vat_rate||20, d.vat_amount||0, d.grand_total||0, d.notes, d.valid_until, req.user.id]
+      );
+      const quoteId = rows[0].id;
+      if (d.items && d.items.length) {
+        for (const item of d.items) {
+          await pool.query('INSERT INTO quote_items (quote_id, category, description, quantity, unit, rate, total, sort_order) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+            [quoteId, item.category, item.description, item.quantity||1, item.unit||'each', item.rate||0, item.total||0, item.sort_order||0]);
+        }
+      }
+      res.json(rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put('/api/quotes/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      const d = req.body;
+      const { rows } = await pool.query(
+        `UPDATE quotes SET quote_number=$1, project_name=$2, client_name=$3, client_address=$4, client_email=$5, description=$6, status=$7,
+         subtotal_labour=$8, subtotal_materials=$9, subtotal_plant=$10, markup_pct=$11, markup_amount=$12, net_total=$13,
+         vat_rate=$14, vat_amount=$15, grand_total=$16, notes=$17, valid_until=$18, updated_at=CURRENT_TIMESTAMP WHERE id=$19 RETURNING *`,
+        [d.quote_number, d.project_name, d.client_name, d.client_address, d.client_email, d.description, d.status||'draft',
+         d.subtotal_labour||0, d.subtotal_materials||0, d.subtotal_plant||0, d.markup_pct||0, d.markup_amount||0, d.net_total||0,
+         d.vat_rate||20, d.vat_amount||0, d.grand_total||0, d.notes, d.valid_until, req.params.id]
+      );
+      // Replace items
+      await pool.query('DELETE FROM quote_items WHERE quote_id = $1', [req.params.id]);
+      if (d.items && d.items.length) {
+        for (const item of d.items) {
+          await pool.query('INSERT INTO quote_items (quote_id, category, description, quantity, unit, rate, total, sort_order) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+            [req.params.id, item.category, item.description, item.quantity||1, item.unit||'each', item.rate||0, item.total||0, item.sort_order||0]);
+        }
+      }
+      res.json(rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete('/api/quotes/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      await pool.query('DELETE FROM quotes WHERE id = $1', [req.params.id]);
+      res.json({ message: 'Quote deleted' });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Purchase Orders CRUD ──
+  app.get('/api/purchase-orders', authenticate, adminOnly, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT po.*, q.quote_number FROM purchase_orders po LEFT JOIN quotes q ON po.quote_id = q.id ORDER BY po.created_at DESC');
+      res.json(rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post('/api/purchase-orders', authenticate, adminOnly, async (req, res) => {
+    try {
+      const d = req.body;
+      const { rows } = await pool.query(
+        'INSERT INTO purchase_orders (quote_id, po_number, client_name, project_name, po_date, po_value, notes, status, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
+        [d.quote_id||null, d.po_number, d.client_name, d.project_name, d.po_date, d.po_value||0, d.notes, d.status||'active', req.user.id]
+      );
+      // Update quote status to 'accepted' if linked
+      if (d.quote_id) await pool.query("UPDATE quotes SET status='accepted', updated_at=CURRENT_TIMESTAMP WHERE id=$1", [d.quote_id]);
+      res.json(rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put('/api/purchase-orders/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      const d = req.body;
+      const { rows } = await pool.query(
+        'UPDATE purchase_orders SET po_number=$1, client_name=$2, project_name=$3, po_date=$4, po_value=$5, notes=$6, status=$7 WHERE id=$8 RETURNING *',
+        [d.po_number, d.client_name, d.project_name, d.po_date, d.po_value||0, d.notes, d.status||'active', req.params.id]
+      );
+      res.json(rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete('/api/purchase-orders/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      await pool.query('DELETE FROM purchase_orders WHERE id = $1', [req.params.id]);
+      res.json({ message: 'PO deleted' });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Invoices CRUD ──
+  app.get('/api/invoices', authenticate, adminOnly, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT i.*, q.quote_number, po.po_number FROM invoices i LEFT JOIN quotes q ON i.quote_id = q.id LEFT JOIN purchase_orders po ON i.po_id = po.id ORDER BY i.created_at DESC');
+      res.json(rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get('/api/invoices/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT i.*, q.quote_number, po.po_number FROM invoices i LEFT JOIN quotes q ON i.quote_id = q.id LEFT JOIN purchase_orders po ON i.po_id = po.id WHERE i.id = $1', [req.params.id]);
+      if (!rows.length) return res.status(404).json({ error: 'Invoice not found' });
+      const items = await pool.query('SELECT * FROM invoice_items WHERE invoice_id = $1 ORDER BY sort_order', [req.params.id]);
+      res.json({ ...rows[0], items: items.rows });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post('/api/invoices', authenticate, adminOnly, async (req, res) => {
+    try {
+      const d = req.body;
+      const { rows } = await pool.query(
+        `INSERT INTO invoices (invoice_number, quote_id, po_id, client_name, client_address, project_name, invoice_date, due_date, status,
+         subtotal, vat_rate, vat_amount, grand_total, amount_paid, notes, is_part_invoice, part_description, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+        [d.invoice_number, d.quote_id||null, d.po_id||null, d.client_name, d.client_address, d.project_name, d.invoice_date, d.due_date, d.status||'draft',
+         d.subtotal||0, d.vat_rate||20, d.vat_amount||0, d.grand_total||0, d.amount_paid||0, d.notes, d.is_part_invoice||false, d.part_description, req.user.id]
+      );
+      const invId = rows[0].id;
+      if (d.items && d.items.length) {
+        for (const item of d.items) {
+          await pool.query('INSERT INTO invoice_items (invoice_id, description, quantity, unit, rate, total, sort_order) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+            [invId, item.description, item.quantity||1, item.unit||'each', item.rate||0, item.total||0, item.sort_order||0]);
+        }
+      }
+      // Update quote status if linked
+      if (d.quote_id) await pool.query("UPDATE quotes SET status='invoiced', updated_at=CURRENT_TIMESTAMP WHERE id=$1", [d.quote_id]);
+      res.json(rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put('/api/invoices/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      const d = req.body;
+      const { rows } = await pool.query(
+        `UPDATE invoices SET invoice_number=$1, client_name=$2, client_address=$3, project_name=$4, invoice_date=$5, due_date=$6, status=$7,
+         subtotal=$8, vat_rate=$9, vat_amount=$10, grand_total=$11, amount_paid=$12, notes=$13, is_part_invoice=$14, part_description=$15, updated_at=CURRENT_TIMESTAMP WHERE id=$16 RETURNING *`,
+        [d.invoice_number, d.client_name, d.client_address, d.project_name, d.invoice_date, d.due_date, d.status||'draft',
+         d.subtotal||0, d.vat_rate||20, d.vat_amount||0, d.grand_total||0, d.amount_paid||0, d.notes, d.is_part_invoice||false, d.part_description, req.params.id]
+      );
+      // Replace items
+      await pool.query('DELETE FROM invoice_items WHERE invoice_id = $1', [req.params.id]);
+      if (d.items && d.items.length) {
+        for (const item of d.items) {
+          await pool.query('INSERT INTO invoice_items (invoice_id, description, quantity, unit, rate, total, sort_order) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+            [req.params.id, item.description, item.quantity||1, item.unit||'each', item.rate||0, item.total||0, item.sort_order||0]);
+        }
+      }
+      res.json(rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete('/api/invoices/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      await pool.query('DELETE FROM invoices WHERE id = $1', [req.params.id]);
+      res.json({ message: 'Invoice deleted' });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Quote PDF ──
+  app.get('/api/quotes/:id/pdf', authenticate, adminOnly, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT * FROM quotes WHERE id = $1', [req.params.id]);
+      if (!rows.length) return res.status(404).json({ error: 'Quote not found' });
+      const q = rows[0];
+      const items = (await pool.query('SELECT * FROM quote_items WHERE quote_id = $1 ORDER BY category, sort_order', [req.params.id])).rows;
+      const maroon = [139, 26, 26];
+      const doc = new PDFDocument({ size: 'A4', margins: { top: 50, bottom: 50, left: 50, right: 50 } });
+      const chunks = [];
+      doc.on('data', c => chunks.push(c));
+      doc.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Quote-${q.quote_number}.pdf"`);
+        res.send(buf);
+      });
+      const logoPath = path.join(__dirname, 'public', 'logo.png');
+      const niceicPath = path.join(__dirname, 'public', 'niceic-logo.png');
+      if (fs.existsSync(logoPath)) doc.image(logoPath, 50, 30, { width: 160 });
+      if (fs.existsSync(niceicPath)) doc.image(niceicPath, 225, 38, { width: 90 });
+      doc.moveDown(4);
+      doc.strokeColor(...maroon).lineWidth(3).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+      doc.moveDown(0.6);
+      doc.fillColor(50,50,50).fontSize(18).font('Helvetica-Bold').text('QUOTATION', { align: 'center' });
+      doc.moveDown(0.3);
+      doc.fillColor(170,170,170).fontSize(8).font('Helvetica-Oblique').text('ManProjects Ltd — Electrical & Mechanical Building Services', { align: 'center' });
+      doc.moveDown(1);
+      // Quote details
+      const dRow = (lbl, val) => {
+        const y = doc.y; const cellH = 18;
+        doc.rect(50, y, 130, cellH).fill(245,237,237);
+        doc.fillColor(107,32,32).fontSize(8).font('Helvetica-Bold').text(lbl, 56, y+4, { width: 120 });
+        doc.rect(180, y, 365, cellH).fill(252,252,252);
+        doc.fillColor(50,50,50).fontSize(8).font('Helvetica').text(val||'—', 186, y+4, { width: 350 });
+        doc.y = y + cellH + 1;
+      };
+      doc.roundedRect(50, doc.y, 495, 22, 4).fill(...maroon);
+      doc.fillColor(255,255,255).fontSize(9.5).font('Helvetica-Bold').text('QUOTE DETAILS', 60, doc.y - 17, { width: 480 });
+      doc.moveDown(0.3);
+      dRow('Quote No.', q.quote_number); dRow('Date', new Date(q.created_at).toLocaleDateString('en-GB'));
+      dRow('Valid Until', q.valid_until); dRow('Client', q.client_name);
+      dRow('Address', q.client_address); dRow('Project', q.project_name);
+      if (q.description) dRow('Description', q.description);
+      doc.moveDown(0.5);
+      // Items by category
+      const cats = ['labour','materials','plant'];
+      const catLabels = { labour: 'LABOUR', materials: 'MATERIALS', plant: 'PLANT / EQUIPMENT' };
+      cats.forEach(cat => {
+        const catItems = items.filter(it => it.category === cat);
+        if (!catItems.length) return;
+        doc.roundedRect(50, doc.y, 495, 20, 3).fill(...maroon);
+        doc.fillColor(255,255,255).fontSize(8.5).font('Helvetica-Bold').text(catLabels[cat], 60, doc.y - 15, { width: 480 });
+        doc.moveDown(0.2);
+        // Table header
+        const y = doc.y; const hH = 16;
+        doc.rect(50, y, 495, hH).fill(245,237,237);
+        doc.fillColor(107,32,32).fontSize(7).font('Helvetica-Bold');
+        doc.text('Description', 56, y+4, { width: 220 });
+        doc.text('Qty', 280, y+4, { width: 50 });
+        doc.text('Unit', 330, y+4, { width: 50 });
+        doc.text('Rate', 385, y+4, { width: 60, align: 'right' });
+        doc.text('Total', 460, y+4, { width: 80, align: 'right' });
+        doc.y = y + hH + 1;
+        catItems.forEach((item, idx) => {
+          const ry = doc.y; const rH = 16;
+          if (idx % 2 === 1) doc.rect(50, ry, 495, rH).fill(250,248,248);
+          doc.fillColor(50,50,50).fontSize(7).font('Helvetica');
+          doc.text(item.description, 56, ry+4, { width: 220 });
+          doc.text(String(item.quantity), 280, ry+4, { width: 50 });
+          doc.text(item.unit||'each', 330, ry+4, { width: 50 });
+          doc.text('£' + Number(item.rate).toFixed(2), 385, ry+4, { width: 60, align: 'right' });
+          doc.text('£' + Number(item.total).toFixed(2), 460, ry+4, { width: 80, align: 'right' });
+          doc.y = ry + rH;
+        });
+        doc.moveDown(0.3);
+      });
+      // Totals
+      doc.moveDown(0.3);
+      const totY = doc.y;
+      const tRow = (lbl, val, bold) => {
+        const y = doc.y; const h = 18;
+        doc.rect(360, y, 90, h).fill(245,237,237);
+        doc.fillColor(107,32,32).fontSize(8).font(bold ? 'Helvetica-Bold' : 'Helvetica-Bold').text(lbl, 366, y+4, { width: 80 });
+        doc.rect(450, y, 95, h).fill(bold ? 245 : 252, bold ? 237 : 252, bold ? 237 : 252);
+        doc.fillColor(50,50,50).fontSize(8).font(bold ? 'Helvetica-Bold' : 'Helvetica').text(val, 456, y+4, { width: 84, align: 'right' });
+        doc.y = y + h + 1;
+      };
+      if (Number(q.subtotal_labour)) tRow('Labour', '£' + Number(q.subtotal_labour).toFixed(2));
+      if (Number(q.subtotal_materials)) tRow('Materials', '£' + Number(q.subtotal_materials).toFixed(2));
+      if (Number(q.subtotal_plant)) tRow('Plant', '£' + Number(q.subtotal_plant).toFixed(2));
+      if (Number(q.markup_pct)) tRow('Markup (' + q.markup_pct + '%)', '£' + Number(q.markup_amount).toFixed(2));
+      tRow('Net Total', '£' + Number(q.net_total).toFixed(2));
+      tRow('VAT (' + q.vat_rate + '%)', '£' + Number(q.vat_amount).toFixed(2));
+      tRow('GRAND TOTAL', '£' + Number(q.grand_total).toFixed(2), true);
+      if (q.notes) { doc.moveDown(0.5); doc.fillColor(100,100,100).fontSize(7.5).font('Helvetica').text('Notes: ' + q.notes, 50, doc.y, { width: 495 }); }
+      // Footer
+      const footY = doc.page.height - 35;
+      doc.strokeColor(200,200,200).lineWidth(0.5).moveTo(50, footY).lineTo(545, footY).stroke();
+      doc.fillColor(170,170,170).fontSize(7).font('Helvetica').text('ManProjects Ltd — Quotation', 50, footY+5, { align: 'center', width: 495 });
+      doc.end();
+    } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Invoice PDF ──
+  app.get('/api/invoices/:id/pdf', authenticate, adminOnly, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT i.*, q.quote_number, po.po_number FROM invoices i LEFT JOIN quotes q ON i.quote_id = q.id LEFT JOIN purchase_orders po ON i.po_id = po.id WHERE i.id = $1', [req.params.id]);
+      if (!rows.length) return res.status(404).json({ error: 'Invoice not found' });
+      const inv = rows[0];
+      const items = (await pool.query('SELECT * FROM invoice_items WHERE invoice_id = $1 ORDER BY sort_order', [req.params.id])).rows;
+      const maroon = [139, 26, 26];
+      const doc = new PDFDocument({ size: 'A4', margins: { top: 50, bottom: 50, left: 50, right: 50 } });
+      const chunks = [];
+      doc.on('data', c => chunks.push(c));
+      doc.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Invoice-${inv.invoice_number}.pdf"`);
+        res.send(buf);
+      });
+      const logoPath = path.join(__dirname, 'public', 'logo.png');
+      const niceicPath = path.join(__dirname, 'public', 'niceic-logo.png');
+      if (fs.existsSync(logoPath)) doc.image(logoPath, 50, 30, { width: 160 });
+      if (fs.existsSync(niceicPath)) doc.image(niceicPath, 225, 38, { width: 90 });
+      doc.moveDown(4);
+      doc.strokeColor(...maroon).lineWidth(3).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+      doc.moveDown(0.6);
+      doc.fillColor(50,50,50).fontSize(18).font('Helvetica-Bold').text(inv.is_part_invoice ? 'PART INVOICE' : 'INVOICE', { align: 'center' });
+      doc.moveDown(0.3);
+      doc.fillColor(170,170,170).fontSize(8).font('Helvetica-Oblique').text('ManProjects Ltd — Electrical & Mechanical Building Services', { align: 'center' });
+      doc.moveDown(1);
+      const dRow = (lbl, val) => {
+        const y = doc.y; const cellH = 18;
+        doc.rect(50, y, 130, cellH).fill(245,237,237);
+        doc.fillColor(107,32,32).fontSize(8).font('Helvetica-Bold').text(lbl, 56, y+4, { width: 120 });
+        doc.rect(180, y, 365, cellH).fill(252,252,252);
+        doc.fillColor(50,50,50).fontSize(8).font('Helvetica').text(val||'—', 186, y+4, { width: 350 });
+        doc.y = y + cellH + 1;
+      };
+      doc.roundedRect(50, doc.y, 495, 22, 4).fill(...maroon);
+      doc.fillColor(255,255,255).fontSize(9.5).font('Helvetica-Bold').text('INVOICE DETAILS', 60, doc.y - 17, { width: 480 });
+      doc.moveDown(0.3);
+      dRow('Invoice No.', inv.invoice_number); dRow('Date', inv.invoice_date);
+      dRow('Due Date', inv.due_date); dRow('Client', inv.client_name);
+      dRow('Address', inv.client_address); dRow('Project', inv.project_name);
+      if (inv.quote_number) dRow('Quote Ref', inv.quote_number);
+      if (inv.po_number) dRow('PO Ref', inv.po_number);
+      if (inv.is_part_invoice && inv.part_description) dRow('Part Invoice', inv.part_description);
+      doc.moveDown(0.5);
+      // Items table
+      if (items.length) {
+        doc.roundedRect(50, doc.y, 495, 20, 3).fill(...maroon);
+        doc.fillColor(255,255,255).fontSize(8.5).font('Helvetica-Bold').text('LINE ITEMS', 60, doc.y - 15, { width: 480 });
+        doc.moveDown(0.2);
+        const y = doc.y; const hH = 16;
+        doc.rect(50, y, 495, hH).fill(245,237,237);
+        doc.fillColor(107,32,32).fontSize(7).font('Helvetica-Bold');
+        doc.text('Description', 56, y+4, { width: 220 });
+        doc.text('Qty', 280, y+4, { width: 50 });
+        doc.text('Unit', 330, y+4, { width: 50 });
+        doc.text('Rate', 385, y+4, { width: 60, align: 'right' });
+        doc.text('Total', 460, y+4, { width: 80, align: 'right' });
+        doc.y = y + hH + 1;
+        items.forEach((item, idx) => {
+          const ry = doc.y; const rH = 16;
+          if (idx % 2 === 1) doc.rect(50, ry, 495, rH).fill(250,248,248);
+          doc.fillColor(50,50,50).fontSize(7).font('Helvetica');
+          doc.text(item.description, 56, ry+4, { width: 220 });
+          doc.text(String(item.quantity), 280, ry+4, { width: 50 });
+          doc.text(item.unit||'each', 330, ry+4, { width: 50 });
+          doc.text('£' + Number(item.rate).toFixed(2), 385, ry+4, { width: 60, align: 'right' });
+          doc.text('£' + Number(item.total).toFixed(2), 460, ry+4, { width: 80, align: 'right' });
+          doc.y = ry + rH;
+        });
+        doc.moveDown(0.3);
+      }
+      // Totals
+      const tRow = (lbl, val, bold) => {
+        const y = doc.y; const h = 18;
+        doc.rect(360, y, 90, h).fill(245,237,237);
+        doc.fillColor(107,32,32).fontSize(8).font('Helvetica-Bold').text(lbl, 366, y+4, { width: 80 });
+        doc.rect(450, y, 95, h).fill(bold ? 245 : 252, bold ? 237 : 252, bold ? 237 : 252);
+        doc.fillColor(50,50,50).fontSize(8).font(bold ? 'Helvetica-Bold' : 'Helvetica').text(val, 456, y+4, { width: 84, align: 'right' });
+        doc.y = y + h + 1;
+      };
+      tRow('Subtotal', '£' + Number(inv.subtotal).toFixed(2));
+      tRow('VAT (' + inv.vat_rate + '%)', '£' + Number(inv.vat_amount).toFixed(2));
+      tRow('TOTAL DUE', '£' + Number(inv.grand_total).toFixed(2), true);
+      if (Number(inv.amount_paid)) tRow('Paid', '£' + Number(inv.amount_paid).toFixed(2));
+      if (Number(inv.amount_paid) && Number(inv.grand_total) > Number(inv.amount_paid)) tRow('Balance', '£' + (Number(inv.grand_total) - Number(inv.amount_paid)).toFixed(2), true);
+      if (inv.notes) { doc.moveDown(0.5); doc.fillColor(100,100,100).fontSize(7.5).font('Helvetica').text('Notes: ' + inv.notes, 50, doc.y, { width: 495 }); }
+      const footY = doc.page.height - 35;
+      doc.strokeColor(200,200,200).lineWidth(0.5).moveTo(50, footY).lineTo(545, footY).stroke();
+      doc.fillColor(170,170,170).fontSize(7).font('Helvetica').text('ManProjects Ltd — Invoice', 50, footY+5, { align: 'center', width: 495 });
+      doc.end();
+    } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
   });
 
   app.get('*', (req, res) => {
