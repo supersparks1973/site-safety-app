@@ -2330,7 +2330,7 @@ function renderSiteTemplates(c) {
 // DB SCHEDULE EDITOR
 // ═══════════════════════════════════════
 function renderDBScheduleEditor(c) {
-  const defaultCircuits = Array.from({length:6}, (_,i) => ({ cctNo:String(i+1), cctPhase:'', bsEn:'', type:'B', ratingA:'', scCapacity:'', supplying:'', cableType:'', cableSize:'', cpcSize:'' }));
+  const defaultCircuits = Array.from({length:6}, (_,i) => ({ cctNo:String(i+1), cctPhase:'', bsEn:'', type:'', ratingA:'', scCapacity:'', supplying:'', cableType:'', cableSize:'', cpcSize:'' }));
 
   c.innerHTML = `
     <div style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
@@ -2437,11 +2437,7 @@ function dbRenderRows() {
       <td style="padding:4px 3px"><input value="${esc(r.cctNo)}" onchange="window._dbCircuits[${i}].cctNo=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;text-align:center" /></td>
       <td style="padding:4px 3px"><input value="${esc(r.cctPhase)}" onchange="window._dbCircuits[${i}].cctPhase=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px" placeholder="L1/L2/L3" /></td>
       <td style="padding:4px 3px"><input value="${esc(r.bsEn)}" onchange="window._dbCircuits[${i}].bsEn=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px" placeholder="e.g. 60898" /></td>
-      <td style="padding:4px 3px">
-        <select onchange="window._dbCircuits[${i}].type=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;background:white">
-          <option ${r.type==='B'?'selected':''}>B</option><option ${r.type==='C'?'selected':''}>C</option><option ${r.type==='D'?'selected':''}>D</option>
-        </select>
-      </td>
+      <td style="padding:4px 3px"><input value="${esc(r.type)}" onchange="window._dbCircuits[${i}].type=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;text-align:center" placeholder="e.g. B" /></td>
       <td style="padding:4px 3px"><input value="${esc(r.ratingA)}" onchange="window._dbCircuits[${i}].ratingA=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;text-align:center" placeholder="A" /></td>
       <td style="padding:4px 3px"><input value="${esc(r.scCapacity)}" onchange="window._dbCircuits[${i}].scCapacity=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;text-align:center" placeholder="kA" /></td>
       <td style="padding:4px 3px"><input value="${esc(r.supplying)}" onchange="window._dbCircuits[${i}].supplying=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px" placeholder="Description of supply" /></td>
@@ -2455,7 +2451,7 @@ function dbRenderRows() {
 
 function dbAddRow() {
   const n = window._dbCircuits.length + 1;
-  window._dbCircuits.push({ cctNo: String(n), cctPhase:'', bsEn:'', type:'B', ratingA:'', scCapacity:'', supplying:'', cableType:'', cableSize:'', cpcSize:'' });
+  window._dbCircuits.push({ cctNo: String(n), cctPhase:'', bsEn:'', type:'', ratingA:'', scCapacity:'', supplying:'', cableType:'', cableSize:'', cpcSize:'' });
   dbRenderRows();
   // Scroll to bottom of table
   const tbody = document.getElementById('dbCircuitBody');
