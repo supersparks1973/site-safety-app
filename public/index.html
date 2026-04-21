@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.8 - Add Project Manager role -->
+<!-- v3.9 - Add External View role for client auditing -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -42,6 +42,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 24px;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;transition:all .2s;width:100%}
 .btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-dark)}
 .btn-danger{background:var(--danger);color:#fff}
+.read-only-banner{background:#fef3c7;border:1px solid #f59e0b;color:#92400e;padding:10px 16px;border-radius:8px;margin-bottom:16px;font-size:14px;display:flex;align-items:center;gap:8px}
+body.read-only-mode .hide-readonly{display:none!important}
 .btn-success{background:var(--success);color:#fff}
 .btn-warning{background:var(--warning);color:#fff}
 .btn-outline{background:transparent;border:2px solid var(--border);color:var(--text)}.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
@@ -406,6 +408,11 @@ function headers() {
   return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.token}` };
 }
 
+// Read-only banner for external_view users
+function readOnlyBanner() {
+  return state.readOnly ? '<div class="read-only-banner">🔒 <strong>View Only</strong> — You have read-only access for audit purposes. Data cannot be modified.</div>' : '';
+}
+
 // HTML escape helper
 function esc(str) {
   if (!str) return '';
@@ -588,15 +595,21 @@ function showApp() {
   // Sidebar user info
   const name = state.user.name || state.user.username || 'User';
   document.getElementById('sidebarName').textContent = name;
-  document.getElementById('sidebarRole').textContent = state.user.role === 'project_manager' ? 'Project Manager' : state.user.role.charAt(0).toUpperCase() + state.user.role.slice(1);
+  const roleLabels = { admin: 'Admin', project_manager: 'Project Manager', external_view: 'External View', operative: 'Operative' };
+  document.getElementById('sidebarRole').textContent = roleLabels[state.user.role] || state.user.role;
   document.getElementById('sidebarAvatar').textContent = name.charAt(0).toUpperCase();
 
-  const isAdmin = state.user.role === 'admin' || state.user.role === 'project_manager';
-  if (isAdmin) {
+  const isAdminLike = ['admin', 'project_manager', 'external_view'].includes(state.user.role);
+  state.readOnly = state.user.role === 'external_view';
+
+  if (isAdminLike) {
     document.getElementById('adminNav').classList.remove('hidden');
     document.getElementById('operativeNav').classList.add('hidden');
     document.getElementById('sidebarAdminNav').classList.remove('hidden');
     document.getElementById('sidebarOpNav').classList.add('hidden');
+    // Hide Admin section (Users) for external_view
+    const adminSection = document.querySelector('#sidebarAdminNav .sidebar-section:last-child');
+    if (state.readOnly && adminSection) adminSection.style.display = 'none';
     navigate('dashboard');
   } else {
     document.getElementById('operativeNav').classList.remove('hidden');
@@ -605,6 +618,10 @@ function showApp() {
     document.getElementById('sidebarOpNav').classList.remove('hidden');
     navigate('home');
   }
+  // Set read-only mode class on body for external_view users
+  if (state.readOnly) document.body.classList.add('read-only-mode');
+  else document.body.classList.remove('read-only-mode');
+
   // Wire up sidebar nav clicks
   document.querySelectorAll('.sidebar-nav a[data-page]').forEach(a => {
     a.addEventListener('click', (e) => {
@@ -683,7 +700,15 @@ function renderPage(page) {
     'toolbox-talks': renderToolboxTalks,
     'site-templates': renderSiteTemplates,
   };
-  if (pages[page]) pages[page](c);
+  if (pages[page]) {
+    if (state.readOnly) {
+      // Wrap content in a container with banner above
+      c.innerHTML = readOnlyBanner() + '<div id="pageContent"></div>';
+      pages[page](document.getElementById('pageContent'));
+    } else {
+      pages[page](c);
+    }
+  }
 }
 
 // ═══════════════════════════════════════
@@ -1511,7 +1536,7 @@ async function renderAdminUsers(c) {
         <div class="form-group"><label>Username</label><input type="text" id="newUsername" placeholder="e.g. jsmith" autocapitalize="none"></div>
         <div class="form-group"><label>Password</label><input type="password" id="newPassword" placeholder="Min 6 characters"></div>
         <div class="form-group"><label>Role</label>
-          <select id="newRole"><option value="operative">Operative</option><option value="project_manager">Project Manager</option><option value="admin">Admin</option></select>
+          <select id="newRole"><option value="operative">Operative</option><option value="project_manager">Project Manager</option><option value="external_view">External View (Audit)</option><option value="admin">Admin</option></select>
         </div>
         <button class="btn btn-primary btn-sm" onclick="addUser()">Add User</button>
       </div>
@@ -1520,13 +1545,13 @@ async function renderAdminUsers(c) {
         <div class="card">
           <div class="card-header">
             <h3>${u.full_name}</h3>
-            <span class="badge" style="background:${u.role==='admin'?'#fee2e2':u.role==='project_manager'?'#dbeafe':'#e2e8f0'};color:${u.role==='admin'?'#991b1b':u.role==='project_manager'?'#1e40af':'#475569'}">${u.role==='project_manager'?'Project Manager':u.role.charAt(0).toUpperCase()+u.role.slice(1)}</span>
+            <span class="badge" style="background:${u.role==='admin'?'#fee2e2':u.role==='project_manager'?'#dbeafe':u.role==='external_view'?'#fef3c7':'#e2e8f0'};color:${u.role==='admin'?'#991b1b':u.role==='project_manager'?'#1e40af':u.role==='external_view'?'#92400e':'#475569'}">${{'project_manager':'Project Manager','external_view':'External View','admin':'Admin','operative':'Operative'}[u.role]||u.role}</span>
           </div>
           <div class="card-body">
             <p><strong>Username:</strong> ${u.username}</p>
             <p><strong>Created:</strong> ${new Date(u.created_at).toLocaleDateString()}</p>
           </div>
-          ${u.role === 'operative' ? `<button class="btn btn-outline btn-sm" style="margin-top:8px;color:var(--danger);border-color:var(--danger)" onclick="deleteUser(${u.id})">Remove</button>` : ''}
+          ${u.role === 'operative' || u.role === 'external_view' ? `<button class="btn btn-outline btn-sm" style="margin-top:8px;color:var(--danger);border-color:var(--danger)" onclick="deleteUser(${u.id})">Remove</button>` : ''}
         </div>
       `).join('')}
     `;
@@ -1567,7 +1592,7 @@ async function renderProjects(c) {
         <h2 style="margin-bottom:4px">🏗️ Projects</h2>
         <p style="color:var(--text-light);font-size:14px">Manage your active and completed projects</p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="showProjectForm()">+ New Project</button>
+      <button class="btn btn-primary btn-sm hide-readonly" onclick="showProjectForm()">+ New Project</button>
     </div>
     <div class="tab-bar" id="projectTabs">
       <button class="active" onclick="filterProjects('all')">All</button>
@@ -1850,7 +1875,7 @@ async function renderToolboxTalks(c) {
         <h2 style="margin-bottom:4px">📢 Toolbox Talks</h2>
         <p style="color:var(--text-light);font-size:14px">Pre-built talk library, record talks, and track attendance</p>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;flex-wrap:wrap" class="hide-readonly">
         <button class="btn btn-secondary" onclick="tbTalksView='library';renderToolboxTalks(document.getElementById('appContent'))">📚 Talk Library</button>
         <button class="btn btn-primary" onclick="tbTalksView='record';tbTalkSelected=null;renderToolboxTalks(document.getElementById('appContent'))">➕ Record Talk</button>
       </div>

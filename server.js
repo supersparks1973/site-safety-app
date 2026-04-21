@@ -177,12 +177,18 @@ async function startApp() {
   function authenticate(req, res, next) {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ error: 'No token provided' });
-    try { req.user = jwt.verify(token, JWT_SECRET); next(); }
+    try { req.user = jwt.verify(token, JWT_SECRET); }
     catch { return res.status(401).json({ error: 'Invalid token' }); }
+    // Block write operations for external_view (read-only audit) users
+    if (req.user.role === 'external_view' && req.method !== 'GET') {
+      return res.status(403).json({ error: 'Read-only access — view only' });
+    }
+    next();
   }
 
   function adminOnly(req, res, next) {
-    if (req.user.role !== 'admin' && req.user.role !== 'project_manager') return res.status(403).json({ error: 'Admin access required' });
+    const allowed = ['admin', 'project_manager', 'external_view'];
+    if (!allowed.includes(req.user.role)) return res.status(403).json({ error: 'Admin access required' });
     next();
   }
 
@@ -236,7 +242,7 @@ async function startApp() {
   });
 
   app.get('/api/near-miss', authenticate, async (req, res) => {
-    if (req.user.role === 'admin' || req.user.role === 'project_manager') {
+    if (['admin', 'project_manager', 'external_view'].includes(req.user.role)) {
       const { rows } = await pool.query('SELECT n.*, u.full_name as reported_by FROM near_miss_reports n JOIN users u ON n.user_id = u.id ORDER BY n.created_at DESC');
       res.json(rows);
     } else {
