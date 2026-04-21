@@ -2394,71 +2394,63 @@ function renderInvoicesTab(el) {
 }
 
 // ── QUOTE FORM ──
-window._quoteItems = [];
 function showQuoteForm(existing) {
   const q = existing || {};
-  const items = q.items || [];
-  window._quoteItems = items.length ? items : [
-    { category:'labour', description:'', quantity:1, unit:'hours', rate:0, total:0 },
-    { category:'materials', description:'', quantity:1, unit:'each', rate:0, total:0 }
-  ];
   const isEdit = !!q.id;
   const el = document.getElementById('quotingContent');
+  const lbl = 'font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px';
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-      <button class="btn btn-sm" onclick="renderQuotingTab()" style="padding:6px 12px">← Back</button>
-      <h3 style="margin:0;font-size:18px">${isEdit ? 'Edit' : 'New'} Quote</h3>
+      <button class="btn btn-sm" onclick="renderQuotingTab()" style="padding:6px 12px">\u2190 Back</button>
+      <h3 style="margin:0;font-size:18px">${isEdit ? 'Edit' : 'Record'} Quote</h3>
     </div>
     <div class="card" style="margin-bottom:16px">
       <h3 style="color:var(--primary);font-size:14px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--primary)">QUOTE DETAILS</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Quote Number *</label><input id="qf-number" class="form-control" value="${esc(q.quote_number||'')}" placeholder="e.g. Q-2026-001"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Client Name *</label><input id="qf-client" class="form-control" value="${esc(q.client_name||'')}"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Client Address</label><input id="qf-address" class="form-control" value="${esc(q.client_address||'')}"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Client Email</label><input id="qf-email" class="form-control" value="${esc(q.client_email||'')}" type="email"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Project Name</label><input id="qf-project" class="form-control" value="${esc(q.project_name||'')}"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Valid Until</label><input id="qf-valid" type="date" class="form-control" value="${esc(q.valid_until||'')}"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Status</label>
+        <div><label style="${lbl}">Quote Number *</label><input id="qf-number" class="form-control" value="${esc(q.quote_number||'')}" placeholder="e.g. Q-2026-001"></div>
+        <div><label style="${lbl}">Client Name &amp; Company *</label><input id="qf-client" class="form-control" value="${esc(q.client_name||'')}" placeholder="e.g. John Smith — ABC Construction"></div>
+        <div><label style="${lbl}">Date of Quote</label><input id="qf-date" type="date" class="form-control" value="${esc(q.valid_until||'')}"></div>
+        <div><label style="${lbl}">Status</label>
           <select id="qf-status" class="form-control"><option ${q.status==='draft'||!q.status?'selected':''}>draft</option><option ${q.status==='sent'?'selected':''}>sent</option><option ${q.status==='accepted'?'selected':''}>accepted</option><option ${q.status==='declined'?'selected':''}>declined</option><option ${q.status==='invoiced'?'selected':''}>invoiced</option></select>
         </div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Markup %</label><input id="qf-markup" type="number" class="form-control" value="${q.markup_pct||0}" min="0" step="0.5" onchange="recalcQuote()"></div>
       </div>
-      <div style="margin-top:12px"><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Description / Scope</label><textarea id="qf-desc" class="form-control" rows="2">${esc(q.description||'')}</textarea></div>
-      <div style="margin-top:12px"><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Notes / Terms</label><textarea id="qf-notes" class="form-control" rows="2">${esc(q.notes||'')}</textarea></div>
+      <div style="margin-top:12px"><label style="${lbl}">Description of Works</label><textarea id="qf-desc" class="form-control" rows="3" placeholder="Describe the scope of work quoted for...">${esc(q.description||'')}</textarea></div>
     </div>
 
-    <!-- LINE ITEMS -->
-    ${['labour','materials','plant'].map(cat => {
-      const catLabel = { labour:'LABOUR', materials:'MATERIALS', plant:'PLANT / EQUIPMENT' }[cat];
-      const defUnit = { labour:'hours', materials:'each', plant:'days' }[cat];
-      return `
-      <div class="card" style="margin-bottom:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--primary)">
-          <h3 style="color:var(--primary);font-size:14px;margin:0">${catLabel}</h3>
-          <button class="btn btn-primary btn-sm" onclick="addQuoteItem('${cat}','${defUnit}')" style="font-size:12px;padding:4px 12px">+ Add</button>
+    <!-- COST SUMMARY -->
+    <div class="card" style="margin-bottom:16px">
+      <h3 style="color:var(--primary);font-size:14px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--primary)">COST SUMMARY</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px">
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;text-align:center">
+          <label style="font-size:12px;font-weight:700;color:#166534;display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Total Labour Cost</label>
+          <div style="display:flex;align-items:center;justify-content:center;gap:4px">
+            <span style="font-size:18px;font-weight:700;color:#166534">\u00a3</span>
+            <input id="qf-labour" type="number" value="${Number(q.subtotal_labour||0)}" min="0" step="0.01" onchange="recalcQuote()" style="width:140px;padding:10px;border:2px solid #bbf7d0;border-radius:8px;font-size:18px;font-weight:700;text-align:center;color:#166534;background:white">
+          </div>
         </div>
-        <div style="overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:13px">
-            <thead><tr style="background:var(--primary);color:white">
-              <th style="padding:8px;text-align:left;font-weight:600">Description</th>
-              <th style="padding:8px;text-align:center;font-weight:600;width:70px">Qty</th>
-              <th style="padding:8px;text-align:center;font-weight:600;width:80px">Unit</th>
-              <th style="padding:8px;text-align:right;font-weight:600;width:90px">Rate (£)</th>
-              <th style="padding:8px;text-align:right;font-weight:600;width:90px">Total (£)</th>
-              <th style="width:40px"></th>
-            </tr></thead>
-            <tbody id="qi-${cat}"></tbody>
-          </table>
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px;text-align:center">
+          <label style="font-size:12px;font-weight:700;color:#1e40af;display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Total Material Cost</label>
+          <div style="display:flex;align-items:center;justify-content:center;gap:4px">
+            <span style="font-size:18px;font-weight:700;color:#1e40af">\u00a3</span>
+            <input id="qf-materials" type="number" value="${Number(q.subtotal_materials||0)}" min="0" step="0.01" onchange="recalcQuote()" style="width:140px;padding:10px;border:2px solid #bfdbfe;border-radius:8px;font-size:18px;font-weight:700;text-align:center;color:#1e40af;background:white">
+          </div>
         </div>
-        <div style="text-align:right;margin-top:8px;font-weight:700;color:var(--primary);font-size:14px" id="qi-${cat}-subtotal"></div>
-      </div>`;
-    }).join('')}
+        <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:16px;text-align:center">
+          <label style="font-size:12px;font-weight:700;color:#92400e;display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Other Costs (Plant Hire etc.)</label>
+          <div style="display:flex;align-items:center;justify-content:center;gap:4px">
+            <span style="font-size:18px;font-weight:700;color:#92400e">\u00a3</span>
+            <input id="qf-plant" type="number" value="${Number(q.subtotal_plant||0)}" min="0" step="0.01" onchange="recalcQuote()" style="width:140px;padding:10px;border:2px solid #fde68a;border-radius:8px;font-size:18px;font-weight:700;text-align:center;color:#92400e;background:white">
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- TOTALS -->
     <div class="card" style="margin-bottom:16px">
-      <h3 style="color:var(--primary);font-size:14px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--primary)">TOTALS</h3>
       <div id="qf-totals" style="font-size:14px"></div>
     </div>
+
+    <div style="margin-bottom:16px"><label style="${lbl}">Notes</label><textarea id="qf-notes" class="form-control" rows="2" placeholder="Any additional notes...">${esc(q.notes||'')}</textarea></div>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn btn-primary" onclick="saveQuote(${q.id||'null'})" style="flex:1;min-width:150px">${isEdit ? 'Update' : 'Save'} Quote</button>
@@ -2467,63 +2459,26 @@ function showQuoteForm(existing) {
       <button class="btn btn-outline" onclick="renderQuotingTab()">Cancel</button>
     </div>
   `;
-  renderQuoteItems();
-}
-
-function renderQuoteItems() {
-  ['labour','materials','plant'].forEach(cat => {
-    const tbody = document.getElementById('qi-'+cat);
-    if (!tbody) return;
-    const catItems = window._quoteItems.filter(it => it.category === cat);
-    tbody.innerHTML = catItems.map((item, i) => {
-      const globalIdx = window._quoteItems.indexOf(item);
-      return `<tr style="border-bottom:1px solid #f3f4f6">
-        <td style="padding:4px"><input value="${esc(item.description)}" onchange="window._quoteItems[${globalIdx}].description=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px"></td>
-        <td style="padding:4px"><input type="number" value="${item.quantity}" onchange="window._quoteItems[${globalIdx}].quantity=Number(this.value);window._quoteItems[${globalIdx}].total=Number(this.value)*window._quoteItems[${globalIdx}].rate;recalcQuote()" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;text-align:center" min="0" step="0.5"></td>
-        <td style="padding:4px"><input value="${esc(item.unit)}" onchange="window._quoteItems[${globalIdx}].unit=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;text-align:center"></td>
-        <td style="padding:4px"><input type="number" value="${item.rate}" onchange="window._quoteItems[${globalIdx}].rate=Number(this.value);window._quoteItems[${globalIdx}].total=window._quoteItems[${globalIdx}].quantity*Number(this.value);recalcQuote()" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;text-align:right" min="0" step="0.01"></td>
-        <td style="padding:4px;text-align:right;font-weight:600">${money(item.total)}</td>
-        <td style="padding:4px;text-align:center"><button onclick="removeQuoteItem(${globalIdx})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px">🗑️</button></td>
-      </tr>`;
-    }).join('');
-    const sub = catItems.reduce((s, it) => s + Number(it.total||0), 0);
-    const subEl = document.getElementById('qi-'+cat+'-subtotal');
-    if (subEl) subEl.textContent = 'Subtotal: ' + money(sub);
-  });
   recalcQuote();
 }
 
-function addQuoteItem(cat, unit) {
-  window._quoteItems.push({ category:cat, description:'', quantity:1, unit:unit||'each', rate:0, total:0 });
-  renderQuoteItems();
-}
-
-function removeQuoteItem(idx) {
-  window._quoteItems.splice(idx, 1);
-  renderQuoteItems();
-}
-
 function recalcQuote() {
-  const labour = window._quoteItems.filter(i=>i.category==='labour').reduce((s,i)=>s+Number(i.total||0),0);
-  const materials = window._quoteItems.filter(i=>i.category==='materials').reduce((s,i)=>s+Number(i.total||0),0);
-  const plant = window._quoteItems.filter(i=>i.category==='plant').reduce((s,i)=>s+Number(i.total||0),0);
+  const labour = Number((document.getElementById('qf-labour')||{}).value||0);
+  const materials = Number((document.getElementById('qf-materials')||{}).value||0);
+  const plant = Number((document.getElementById('qf-plant')||{}).value||0);
   const subTotal = labour + materials + plant;
-  const markupPct = Number((document.getElementById('qf-markup')||{}).value||0);
-  const markupAmt = subTotal * (markupPct / 100);
-  const net = subTotal + markupAmt;
   const vatRate = 20;
-  const vat = net * (vatRate / 100);
-  const grand = net + vat;
+  const vat = subTotal * (vatRate / 100);
+  const grand = subTotal + vat;
   const el = document.getElementById('qf-totals');
   if (el) el.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr auto;gap:6px 20px;max-width:350px;margin-left:auto">
+    <div style="display:grid;grid-template-columns:1fr auto;gap:8px 24px;max-width:380px;margin-left:auto">
       <div style="color:var(--text-light)">Labour</div><div style="text-align:right;font-weight:600">${money(labour)}</div>
       <div style="color:var(--text-light)">Materials</div><div style="text-align:right;font-weight:600">${money(materials)}</div>
-      <div style="color:var(--text-light)">Plant / Equipment</div><div style="text-align:right;font-weight:600">${money(plant)}</div>
-      ${markupPct > 0 ? `<div style="color:var(--text-light)">Markup (${markupPct}%)</div><div style="text-align:right;font-weight:600">${money(markupAmt)}</div>` : ''}
-      <div style="border-top:1px solid var(--border);padding-top:6px;font-weight:600">Net Total</div><div style="border-top:1px solid var(--border);padding-top:6px;text-align:right;font-weight:700">${money(net)}</div>
+      <div style="color:var(--text-light)">Other Costs</div><div style="text-align:right;font-weight:600">${money(plant)}</div>
+      <div style="border-top:1px solid var(--border);padding-top:8px;font-weight:600">Subtotal (ex. VAT)</div><div style="border-top:1px solid var(--border);padding-top:8px;text-align:right;font-weight:700">${money(subTotal)}</div>
       <div style="color:var(--text-light)">VAT (${vatRate}%)</div><div style="text-align:right;font-weight:600">${money(vat)}</div>
-      <div style="border-top:2px solid var(--primary);padding-top:8px;font-weight:700;font-size:16px;color:var(--primary)">GRAND TOTAL</div><div style="border-top:2px solid var(--primary);padding-top:8px;text-align:right;font-weight:800;font-size:16px;color:var(--primary)">${money(grand)}</div>
+      <div style="border-top:2px solid var(--primary);padding-top:10px;font-weight:700;font-size:18px;color:var(--primary)">TOTAL (inc. VAT)</div><div style="border-top:2px solid var(--primary);padding-top:10px;text-align:right;font-weight:800;font-size:18px;color:var(--primary)">${money(grand)}</div>
     </div>
   `;
 }
@@ -2531,21 +2486,19 @@ function recalcQuote() {
 async function saveQuote(existingId) {
   const g = id => (document.getElementById(id)||{}).value||'';
   if (!g('qf-number') || !g('qf-client')) { alert('Quote number and client name are required.'); return; }
-  const labour = window._quoteItems.filter(i=>i.category==='labour').reduce((s,i)=>s+Number(i.total||0),0);
-  const materials = window._quoteItems.filter(i=>i.category==='materials').reduce((s,i)=>s+Number(i.total||0),0);
-  const plant = window._quoteItems.filter(i=>i.category==='plant').reduce((s,i)=>s+Number(i.total||0),0);
+  const labour = Number(g('qf-labour'))||0;
+  const materials = Number(g('qf-materials'))||0;
+  const plant = Number(g('qf-plant'))||0;
   const sub = labour + materials + plant;
-  const markupPct = Number(g('qf-markup'));
-  const markupAmt = sub * (markupPct / 100);
-  const net = sub + markupAmt;
   const vatRate = 20;
-  const vat = net * (vatRate / 100);
+  const vat = sub * (vatRate / 100);
   const data = {
-    quote_number: g('qf-number'), client_name: g('qf-client'), client_address: g('qf-address'), client_email: g('qf-email'),
-    project_name: g('qf-project'), valid_until: g('qf-valid'), status: g('qf-status'), description: g('qf-desc'), notes: g('qf-notes'),
-    markup_pct: markupPct, markup_amount: markupAmt, subtotal_labour: labour, subtotal_materials: materials, subtotal_plant: plant,
-    net_total: net, vat_rate: vatRate, vat_amount: vat, grand_total: net + vat,
-    items: window._quoteItems.map((it,i) => ({ ...it, sort_order: i }))
+    quote_number: g('qf-number'), client_name: g('qf-client'), description: g('qf-desc'),
+    valid_until: g('qf-date'), status: g('qf-status'), notes: g('qf-notes'),
+    subtotal_labour: labour, subtotal_materials: materials, subtotal_plant: plant,
+    markup_pct: 0, markup_amount: 0, net_total: sub,
+    vat_rate: vatRate, vat_amount: vat, grand_total: sub + vat,
+    items: []
   };
   try {
     const url = existingId ? API+'/api/quotes/'+existingId : API+'/api/quotes';

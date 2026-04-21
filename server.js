@@ -2122,7 +2122,6 @@ async function startApp() {
       const { rows } = await pool.query('SELECT * FROM quotes WHERE id = $1', [req.params.id]);
       if (!rows.length) return res.status(404).json({ error: 'Quote not found' });
       const q = rows[0];
-      const items = (await pool.query('SELECT * FROM quote_items WHERE quote_id = $1 ORDER BY category, sort_order', [req.params.id])).rows;
       const maroon = [139, 26, 26];
       const doc = new PDFDocument({ size: 'A4', margins: { top: 50, bottom: 50, left: 50, right: 50 } });
       const chunks = [];
@@ -2142,7 +2141,7 @@ async function startApp() {
       doc.moveDown(0.6);
       doc.fillColor(50,50,50).fontSize(18).font('Helvetica-Bold').text('QUOTATION', { align: 'center' });
       doc.moveDown(0.3);
-      doc.fillColor(170,170,170).fontSize(8).font('Helvetica-Oblique').text('ManProjects Ltd — Electrical & Mechanical Building Services', { align: 'center' });
+      doc.fillColor(170,170,170).fontSize(8).font('Helvetica-Oblique').text('ManProjects Ltd \u2014 Electrical & Mechanical Building Services', { align: 'center' });
       doc.moveDown(1);
       // Quote details
       const dRow = (lbl, val) => {
@@ -2150,72 +2149,41 @@ async function startApp() {
         doc.rect(50, y, 130, cellH).fill(245,237,237);
         doc.fillColor(107,32,32).fontSize(8).font('Helvetica-Bold').text(lbl, 56, y+4, { width: 120 });
         doc.rect(180, y, 365, cellH).fill(252,252,252);
-        doc.fillColor(50,50,50).fontSize(8).font('Helvetica').text(val||'—', 186, y+4, { width: 350 });
+        doc.fillColor(50,50,50).fontSize(8).font('Helvetica').text(val||'\u2014', 186, y+4, { width: 350 });
         doc.y = y + cellH + 1;
       };
       doc.roundedRect(50, doc.y, 495, 22, 4).fill(...maroon);
       doc.fillColor(255,255,255).fontSize(9.5).font('Helvetica-Bold').text('QUOTE DETAILS', 60, doc.y - 17, { width: 480 });
       doc.moveDown(0.3);
-      dRow('Quote No.', q.quote_number); dRow('Date', new Date(q.created_at).toLocaleDateString('en-GB'));
-      dRow('Valid Until', q.valid_until); dRow('Client', q.client_name);
-      dRow('Address', q.client_address); dRow('Project', q.project_name);
+      dRow('Quote No.', q.quote_number);
+      dRow('Date', q.valid_until || new Date(q.created_at).toLocaleDateString('en-GB'));
+      dRow('Client', q.client_name);
       if (q.description) dRow('Description', q.description);
       doc.moveDown(0.5);
-      // Items by category
-      const cats = ['labour','materials','plant'];
-      const catLabels = { labour: 'LABOUR', materials: 'MATERIALS', plant: 'PLANT / EQUIPMENT' };
-      cats.forEach(cat => {
-        const catItems = items.filter(it => it.category === cat);
-        if (!catItems.length) return;
-        doc.roundedRect(50, doc.y, 495, 20, 3).fill(...maroon);
-        doc.fillColor(255,255,255).fontSize(8.5).font('Helvetica-Bold').text(catLabels[cat], 60, doc.y - 15, { width: 480 });
-        doc.moveDown(0.2);
-        // Table header
-        const y = doc.y; const hH = 16;
-        doc.rect(50, y, 495, hH).fill(245,237,237);
-        doc.fillColor(107,32,32).fontSize(7).font('Helvetica-Bold');
-        doc.text('Description', 56, y+4, { width: 220 });
-        doc.text('Qty', 280, y+4, { width: 50 });
-        doc.text('Unit', 330, y+4, { width: 50 });
-        doc.text('Rate', 385, y+4, { width: 60, align: 'right' });
-        doc.text('Total', 460, y+4, { width: 80, align: 'right' });
-        doc.y = y + hH + 1;
-        catItems.forEach((item, idx) => {
-          const ry = doc.y; const rH = 16;
-          if (idx % 2 === 1) doc.rect(50, ry, 495, rH).fill(250,248,248);
-          doc.fillColor(50,50,50).fontSize(7).font('Helvetica');
-          doc.text(item.description, 56, ry+4, { width: 220 });
-          doc.text(String(item.quantity), 280, ry+4, { width: 50 });
-          doc.text(item.unit||'each', 330, ry+4, { width: 50 });
-          doc.text('£' + Number(item.rate).toFixed(2), 385, ry+4, { width: 60, align: 'right' });
-          doc.text('£' + Number(item.total).toFixed(2), 460, ry+4, { width: 80, align: 'right' });
-          doc.y = ry + rH;
-        });
-        doc.moveDown(0.3);
-      });
-      // Totals
+      // Cost summary
+      doc.roundedRect(50, doc.y, 495, 22, 4).fill(...maroon);
+      doc.fillColor(255,255,255).fontSize(9.5).font('Helvetica-Bold').text('COST SUMMARY', 60, doc.y - 17, { width: 480 });
       doc.moveDown(0.3);
-      const totY = doc.y;
+      // Totals
       const tRow = (lbl, val, bold) => {
-        const y = doc.y; const h = 18;
-        doc.rect(360, y, 90, h).fill(245,237,237);
-        doc.fillColor(107,32,32).fontSize(8).font(bold ? 'Helvetica-Bold' : 'Helvetica-Bold').text(lbl, 366, y+4, { width: 80 });
+        const y = doc.y; const h = 20;
+        doc.rect(310, y, 140, h).fill(245,237,237);
+        doc.fillColor(107,32,32).fontSize(9).font('Helvetica-Bold').text(lbl, 318, y+5, { width: 130 });
         doc.rect(450, y, 95, h).fill(bold ? 245 : 252, bold ? 237 : 252, bold ? 237 : 252);
-        doc.fillColor(50,50,50).fontSize(8).font(bold ? 'Helvetica-Bold' : 'Helvetica').text(val, 456, y+4, { width: 84, align: 'right' });
+        doc.fillColor(50,50,50).fontSize(9).font(bold ? 'Helvetica-Bold' : 'Helvetica').text(val, 456, y+5, { width: 84, align: 'right' });
         doc.y = y + h + 1;
       };
-      if (Number(q.subtotal_labour)) tRow('Labour', '£' + Number(q.subtotal_labour).toFixed(2));
-      if (Number(q.subtotal_materials)) tRow('Materials', '£' + Number(q.subtotal_materials).toFixed(2));
-      if (Number(q.subtotal_plant)) tRow('Plant', '£' + Number(q.subtotal_plant).toFixed(2));
-      if (Number(q.markup_pct)) tRow('Markup (' + q.markup_pct + '%)', '£' + Number(q.markup_amount).toFixed(2));
-      tRow('Net Total', '£' + Number(q.net_total).toFixed(2));
-      tRow('VAT (' + q.vat_rate + '%)', '£' + Number(q.vat_amount).toFixed(2));
-      tRow('GRAND TOTAL', '£' + Number(q.grand_total).toFixed(2), true);
-      if (q.notes) { doc.moveDown(0.5); doc.fillColor(100,100,100).fontSize(7.5).font('Helvetica').text('Notes: ' + q.notes, 50, doc.y, { width: 495 }); }
+      if (Number(q.subtotal_labour)) tRow('Labour', '\u00a3' + Number(q.subtotal_labour).toFixed(2));
+      if (Number(q.subtotal_materials)) tRow('Materials', '\u00a3' + Number(q.subtotal_materials).toFixed(2));
+      if (Number(q.subtotal_plant)) tRow('Other Costs', '\u00a3' + Number(q.subtotal_plant).toFixed(2));
+      tRow('Subtotal (ex. VAT)', '\u00a3' + Number(q.net_total).toFixed(2));
+      tRow('VAT (' + q.vat_rate + '%)', '\u00a3' + Number(q.vat_amount).toFixed(2));
+      tRow('TOTAL (inc. VAT)', '\u00a3' + Number(q.grand_total).toFixed(2), true);
+      if (q.notes) { doc.moveDown(0.8); doc.fillColor(100,100,100).fontSize(7.5).font('Helvetica').text('Notes: ' + q.notes, 50, doc.y, { width: 495 }); }
       // Footer
       const footY = doc.page.height - 35;
       doc.strokeColor(200,200,200).lineWidth(0.5).moveTo(50, footY).lineTo(545, footY).stroke();
-      doc.fillColor(170,170,170).fontSize(7).font('Helvetica').text('ManProjects Ltd — Quotation', 50, footY+5, { align: 'center', width: 495 });
+      doc.fillColor(170,170,170).fontSize(7).font('Helvetica').text('ManProjects Ltd \u2014 Quotation', 50, footY+5, { align: 'center', width: 495 });
       doc.end();
     } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
   });
