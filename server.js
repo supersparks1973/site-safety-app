@@ -1400,68 +1400,82 @@ async function startApp() {
       const h = docxHelpers();
       const colWidths = [550, 650, 600, 500, 600, 750, 2200, 800, 650, 650];
       const colHeads = ['Cct No','Cct Phase','BS (EN)','Type','Rating (A)','Short-circuit capacity (kA)','Supply/ng','Cable Type','Cable Size','CPC Size'];
+      const softBdr = { style: BorderStyle.SINGLE, size: 1, color: "D6D6D6" };
+      const softBds = { top: softBdr, bottom: softBdr, left: softBdr, right: softBdr };
+      const cellMg = { top: 70, bottom: 70, left: 110, right: 110 };
 
       const titleChildren = [];
       const logoRuns = [];
       if (h.logoData) logoRuns.push(new ImageRun({ data: h.logoData, transformation: { width: 260, height: 100 }, type: 'png' }));
       if (h.logoData && h.niceicData) logoRuns.push(new TextRun({ text: "      ", font: "Arial", size: 22 }));
       if (h.niceicData) logoRuns.push(new ImageRun({ data: h.niceicData, transformation: { width: 150, height: 70 }, type: 'png' }));
-      if (logoRuns.length) titleChildren.push(new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 100, after: 80 }, children: logoRuns }));
+      if (logoRuns.length) titleChildren.push(new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 100, after: 100 }, children: logoRuns }));
       titleChildren.push(
-        new Paragraph({ spacing: { before: 20, after: 20 }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: h.maroon, space: 0 } }, children: [] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 180, after: 200 },
-          children: [new TextRun({ text: "DISTRIBUTION BOARD SCHEDULE", bold: true, font: "Arial", size: 30, color: "333333" })] })
+        new Paragraph({ spacing: { before: 40, after: 40 }, border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: h.maroon, space: 0 } }, children: [] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 60 },
+          children: [new TextRun({ text: "DISTRIBUTION BOARD SCHEDULE", bold: true, font: "Arial", size: 28, color: "333333" })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 240 },
+          children: [new TextRun({ text: "ManProjects Ltd — Electrical & Mechanical Building Services", font: "Arial", size: 16, color: "AAAAAA", italics: true })] })
       );
 
-      // Board details section bar
+      // Rounded-feel section bar with softer colour
       const secBar = (text) => new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
         new TableRow({ children: [
-          new TableCell({ borders: { top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE} },
-            shading: { fill: h.maroon, type: ShadingType.CLEAR }, margins: { top: 60, bottom: 60, left: 140, right: 140 },
-            children: [new Paragraph({ children: [new TextRun({ text, bold: true, font: "Arial", size: 22, color: "FFFFFF" })] })] })
+          new TableCell({ borders: { top:{style:BorderStyle.SINGLE,size:1,color:"7A1818"},bottom:{style:BorderStyle.SINGLE,size:1,color:"7A1818"},left:{style:BorderStyle.SINGLE,size:1,color:"7A1818"},right:{style:BorderStyle.SINGLE,size:1,color:"7A1818"} },
+            shading: { fill: "9B2C2C", type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 180, right: 180 },
+            children: [new Paragraph({ children: [new TextRun({ text, bold: true, font: "Arial", size: 20, color: "FFFFFF" })] })] })
         ] })
       ] });
 
+      // Softer label/value cells
+      const dLbl = (text, w) => new TableCell({ borders: softBds, width: { size: w, type: WidthType.DXA },
+        shading: { fill: "F5EDED", type: ShadingType.CLEAR }, margins: cellMg,
+        children: [new Paragraph({ children: [new TextRun({ text, bold: true, font: "Arial", size: 18, color: "6B2020" })] })] });
+      const dVal = (text, w) => new TableCell({ borders: softBds, width: { size: w, type: WidthType.DXA },
+        shading: { fill: "FCFCFC", type: ShadingType.CLEAR }, margins: cellMg,
+        children: [new Paragraph({ children: [new TextRun({ text: text || '\u2014', font: "Arial", size: 18, color: "444444" })] })] });
+
       const b = board || {};
       const boardTable = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
-        new TableRow({ children: [h.lbl("DB-Ref", 2340), h.val(b.dbRef||'', 2340), h.lbl("Location", 2340), h.val(b.location||'', 2340)] }),
-        new TableRow({ children: [h.lbl("Board Size & Rating", 2340), h.val(b.boardSize||'', 2340), h.lbl("Manufacturer", 2340), h.val(b.manufacturer||'', 2340)] }),
-        new TableRow({ children: [h.lbl("Supply Cable Ref", 2340), h.val(b.supplyCableRef||'', 2340), h.lbl("PFC (kA)", 2340), h.val(b.pfc||'', 2340)] }),
-        new TableRow({ children: [h.lbl("Project / Site", 2340), h.val(b.project||'', 2340), h.lbl("Date", 2340), h.val(b.date||'', 2340)] }),
-        new TableRow({ children: [h.lbl("Fed From", 2340), h.val(b.podRoom||'', 2340), h.lbl("ZDB ID", 2340), h.val(b.zdbId||'', 2340)] }),
+        new TableRow({ children: [dLbl("DB-Ref", 2340), dVal(b.dbRef, 2340), dLbl("Location", 2340), dVal(b.location, 2340)] }),
+        new TableRow({ children: [dLbl("Board Size & Rating", 2340), dVal(b.boardSize, 2340), dLbl("Manufacturer", 2340), dVal(b.manufacturer, 2340)] }),
+        new TableRow({ children: [dLbl("Supply Cable Ref", 2340), dVal(b.supplyCableRef, 2340), dLbl("PFC (kA)", 2340), dVal(b.pfc, 2340)] }),
+        new TableRow({ children: [dLbl("Project / Site", 2340), dVal(b.project, 2340), dLbl("Date", 2340), dVal(b.date, 2340)] }),
+        new TableRow({ children: [dLbl("Fed From", 2340), dVal(b.podRoom, 2340), dLbl("ZDB ID", 2340), dVal(b.zdbId, 2340)] }),
       ] });
 
+      // Circuit table header — slightly softer maroon with more padding
       const headerRow = new TableRow({ children: colHeads.map((head, i) =>
-        new TableCell({ borders: h.bds, width: { size: colWidths[i], type: WidthType.DXA },
-          shading: { fill: "8B1A1A", type: ShadingType.CLEAR }, margins: h.cm,
-          children: [new Paragraph({ children: [new TextRun({ text: head, bold: true, font: "Arial", size: 16, color: "FFFFFF" })] })] })
+        new TableCell({ borders: softBds, width: { size: colWidths[i], type: WidthType.DXA },
+          shading: { fill: "9B2C2C", type: ShadingType.CLEAR }, margins: cellMg,
+          children: [new Paragraph({ children: [new TextRun({ text: head, bold: true, font: "Arial", size: 15, color: "FFFFFF" })] })] })
       ) });
       const rows = (circuits || []).map((row, idx) =>
         new TableRow({ children: [row.cctNo,row.cctPhase,row.bsEn,row.type,row.ratingA,row.scCapacity,row.supplying,row.cableType,row.cableSize,row.cpcSize].map((cell, i) =>
-          new TableCell({ borders: h.bds, width: { size: colWidths[i], type: WidthType.DXA },
-            shading: idx % 2 === 1 ? { fill: "F9F5F5", type: ShadingType.CLEAR } : undefined, margins: h.cm,
-            children: [new Paragraph({ children: [new TextRun({ text: (cell||'').toString() || ' ', font: "Arial", size: 16 })] })] })
+          new TableCell({ borders: softBds, width: { size: colWidths[i], type: WidthType.DXA },
+            shading: { fill: idx % 2 === 0 ? "FFFFFF" : "FAF6F6", type: ShadingType.CLEAR }, margins: cellMg,
+            children: [new Paragraph({ children: [new TextRun({ text: (cell||'').toString() || ' ', font: "Arial", size: 15, color: "333333" })] })] })
         ) })
       );
 
+      const spc = () => new Paragraph({ spacing: { after: 120 }, children: [] });
+
       const children = [
         ...titleChildren,
-        secBar("BOARD DETAILS"), new Paragraph({ spacing: { after: 80 }, children: [] }), boardTable,
-        new Paragraph({ spacing: { after: 100 }, children: [] }),
-        secBar("CIRCUIT SCHEDULE"), new Paragraph({ spacing: { after: 80 }, children: [] }),
-        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...rows] }),
-        new Paragraph({ spacing: { after: 100 }, children: [] }),
-        secBar("SIGN-OFF"), new Paragraph({ spacing: { after: 80 }, children: [] }),
+        secBar("BOARD DETAILS"), spc(), boardTable, spc(),
+        secBar("CIRCUIT SCHEDULE"), spc(),
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...rows] }), spc(),
+        secBar("SIGN-OFF"), spc(),
         new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
-          new TableRow({ children: [h.lbl("Completed By", h.pw/2), h.val(b.completedBy||'', h.pw/2)] }),
-          new TableRow({ children: [h.lbl("Checked By", h.pw/2), h.val(b.checkedBy||'', h.pw/2)] }),
-          new TableRow({ children: [h.lbl("Date", h.pw/2), h.val(b.signoffDate||'', h.pw/2)] }),
+          new TableRow({ children: [dLbl("Completed By", h.pw/2), dVal(b.completedBy, h.pw/2)] }),
+          new TableRow({ children: [dLbl("Checked By", h.pw/2), dVal(b.checkedBy, h.pw/2)] }),
+          new TableRow({ children: [dLbl("Date", h.pw/2), dVal(b.signoffDate, h.pw/2)] }),
         ] }),
       ];
 
       const doc = new Document({
         styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
-        sections: [{ properties: { ...h.pageProps, page: { ...h.pageProps.page, size: { width: 16838, height: 11906 }, margin: { top: 1000, right: 1000, bottom: 1000, left: 1000 } } },
+        sections: [{ properties: { ...h.pageProps, page: { ...h.pageProps.page, size: { width: 16838, height: 11906 }, margin: { top: 900, right: 900, bottom: 900, left: 900 } } },
           headers: h.mkHeader('DB Schedule'), footers: h.mkFooter('Distribution Board Schedule'), children }]
       });
       const buf = await Packer.toBuffer(doc);
@@ -1477,11 +1491,12 @@ async function startApp() {
       const { board, circuits } = req.body;
       const b = board || {};
       const colHeads = ['Cct No','Cct Phase','BS (EN)','Type','Rating (A)','SC (kA)','Supply/ng','Cable Type','Cable Size','CPC Size'];
-      const colW = [35, 40, 40, 35, 42, 40, 175, 50, 42, 42];
-      const tableX = 40;
-      const maroon = [139, 26, 26];
+      const colW = [38, 44, 44, 38, 46, 42, 178, 52, 44, 44];
+      const tableX = 50;
+      const maroon = [155, 44, 44];
+      const pw = 842 - 100; // A4 landscape width minus margins
 
-      const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margins: { top: 50, bottom: 50, left: 40, right: 40 } });
+      const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margins: { top: 50, bottom: 50, left: 50, right: 50 } });
       const chunks = [];
       doc.on('data', c => chunks.push(c));
       doc.on('end', () => {
@@ -1497,41 +1512,49 @@ async function startApp() {
       const hasLogo = fs.existsSync(logoPath);
       const hasNiceic = fs.existsSync(niceicPath);
       if (hasLogo && hasNiceic) {
-        doc.image(logoPath, 40, 30, { width: 180 });
-        doc.image(niceicPath, 235, 40, { width: 110 });
+        doc.image(logoPath, 50, 30, { width: 170 });
+        doc.image(niceicPath, 235, 38, { width: 100 });
         doc.moveDown(3.5);
       } else if (hasLogo) {
-        doc.image(logoPath, 40, 30, { width: 180 });
+        doc.image(logoPath, 50, 30, { width: 170 });
         doc.moveDown(3.5);
       }
 
-      // Title (logos only, no company text for DB Schedule)
-      doc.strokeColor(...maroon).lineWidth(2).moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke();
-      doc.moveDown(0.5);
-      doc.fillColor(50,50,50).fontSize(14).font('Helvetica-Bold').text('DISTRIBUTION BOARD SCHEDULE', { align: 'center' });
+      // Title divider and heading
+      doc.strokeColor(...maroon).lineWidth(3).moveTo(50, doc.y).lineTo(doc.page.width - 50, doc.y).stroke();
+      doc.moveDown(0.6);
+      doc.fillColor(50,50,50).fontSize(15).font('Helvetica-Bold').text('DISTRIBUTION BOARD SCHEDULE', { align: 'center' });
+      doc.fillColor(170,170,170).fontSize(8).font('Helvetica-Oblique').text('ManProjects Ltd — Electrical & Mechanical Building Services', { align: 'center' });
       doc.moveDown(0.8);
 
-      // Board details
+      // Rounded section bar
       const drawSectionBar = (text) => {
         const y = doc.y;
-        doc.rect(40, y, doc.page.width - 80, 20).fill(...maroon);
-        doc.fillColor(255,255,255).fontSize(10).font('Helvetica-Bold').text(text, 48, y + 4, { width: doc.page.width - 100 });
-        doc.y = y + 26;
+        doc.roundedRect(50, y, doc.page.width - 100, 22, 4).fill(...maroon);
+        doc.fillColor(255,255,255).fontSize(9.5).font('Helvetica-Bold').text(text, 60, y + 5.5, { width: doc.page.width - 130 });
+        doc.y = y + 28;
       };
 
+      // Rounded detail rows
       const drawDetailRow = (pairs) => {
         const y = doc.y;
-        const cellH = 18;
-        const totalW = doc.page.width - 80;
+        const cellH = 20;
+        const totalW = doc.page.width - 100;
         const pairW = totalW / pairs.length;
         pairs.forEach(([label, value], i) => {
-          const x = 40 + i * pairW;
-          doc.rect(x, y, pairW * 0.4, cellH).fill(243, 232, 232);
-          doc.fillColor(...maroon).fontSize(8).font('Helvetica-Bold').text(label, x + 4, y + 4, { width: pairW * 0.4 - 8 });
-          doc.rect(x + pairW * 0.4, y, pairW * 0.6, cellH).fill(250,250,250).stroke(200,200,200);
-          doc.fillColor(30,30,30).fontSize(8).font('Helvetica').text(value || '', x + pairW * 0.4 + 4, y + 4, { width: pairW * 0.6 - 8 });
+          const x = 50 + i * pairW;
+          const lblW = pairW * 0.38;
+          const valW = pairW * 0.62;
+          // Label cell - rounded left
+          if (i === 0) doc.roundedRect(x, y, lblW, cellH, 3).fill(245, 237, 237);
+          else doc.rect(x, y, lblW, cellH).fill(245, 237, 237);
+          doc.fillColor(107, 32, 32).fontSize(7.5).font('Helvetica-Bold').text(label, x + 6, y + 5.5, { width: lblW - 12 });
+          // Value cell
+          doc.rect(x + lblW, y, valW, cellH).fill(252,252,252);
+          doc.rect(x + lblW, y, valW, cellH).strokeColor(220,220,220).lineWidth(0.5).stroke();
+          doc.fillColor(50,50,50).fontSize(7.5).font('Helvetica').text(value || '—', x + lblW + 6, y + 5.5, { width: valW - 12 });
         });
-        doc.y = y + cellH;
+        doc.y = y + cellH + 1;
       };
 
       drawSectionBar('BOARD DETAILS');
@@ -1542,17 +1565,19 @@ async function startApp() {
       drawDetailRow([['Fed From', b.podRoom], ['ZDB ID', b.zdbId]]);
       doc.moveDown(0.5);
 
-      // Circuit table
+      // Circuit table with rounded header
       drawSectionBar('CIRCUIT SCHEDULE');
+      const totalTableW = colW.reduce((a,b) => a+b, 0);
       const drawTableHeader = () => {
         let x = tableX;
         const y = doc.y;
+        // Full rounded header background
+        doc.roundedRect(tableX, y, totalTableW, 18, 3).fill(...maroon);
         colHeads.forEach((head, i) => {
-          doc.rect(x, y, colW[i], 16).fill(...maroon);
-          doc.fillColor(255,255,255).fontSize(7).font('Helvetica-Bold').text(head, x + 2, y + 4, { width: colW[i] - 4 });
+          doc.fillColor(255,255,255).fontSize(6.5).font('Helvetica-Bold').text(head, x + 3, y + 5, { width: colW[i] - 6 });
           x += colW[i];
         });
-        doc.y = y + 16;
+        doc.y = y + 19;
       };
       drawTableHeader();
 
@@ -1560,23 +1585,29 @@ async function startApp() {
         if (doc.y > doc.page.height - 60) { doc.addPage(); drawTableHeader(); }
         let x = tableX;
         const y = doc.y;
+        const rowH = 16;
+        // Alternating row background
+        if (idx % 2 === 1) doc.rect(tableX, y, totalTableW, rowH).fill(250, 246, 246);
+        else doc.rect(tableX, y, totalTableW, rowH).fill(255, 255, 255);
+        // Subtle bottom border
+        doc.strokeColor(230,230,230).lineWidth(0.3).moveTo(tableX, y + rowH).lineTo(tableX + totalTableW, y + rowH).stroke();
         const vals = [row.cctNo, row.cctPhase, row.bsEn, row.type, row.ratingA, row.scCapacity, row.supplying, row.cableType, row.cableSize, row.cpcSize];
         vals.forEach((cell, i) => {
-          if (idx % 2 === 1) doc.rect(x, y, colW[i], 15).fill(249, 245, 245);
-          doc.rect(x, y, colW[i], 15).strokeColor(200,200,200).stroke();
-          doc.fillColor(30,30,30).fontSize(7).font('Helvetica').text((cell||'').toString(), x + 2, y + 4, { width: colW[i] - 4 });
+          doc.fillColor(50,50,50).fontSize(6.5).font('Helvetica').text((cell||'').toString(), x + 3, y + 4.5, { width: colW[i] - 6 });
           x += colW[i];
         });
-        doc.y = y + 15;
+        doc.y = y + rowH;
       });
 
-      doc.moveDown(0.5);
+      doc.moveDown(0.6);
       drawSectionBar('SIGN-OFF');
       drawDetailRow([['Completed By', b.completedBy], ['Checked By', b.checkedBy]]);
       drawDetailRow([['Date', b.signoffDate], ['', '']]);
 
-      // Footer
-      doc.fillColor(150,150,150).fontSize(7).font('Helvetica').text('ManProjects Ltd — Distribution Board Schedule', 40, doc.page.height - 30, { align: 'center', width: doc.page.width - 80 });
+      // Footer with subtle line
+      const footY = doc.page.height - 35;
+      doc.strokeColor(200,200,200).lineWidth(0.5).moveTo(50, footY).lineTo(doc.page.width - 50, footY).stroke();
+      doc.fillColor(170,170,170).fontSize(7).font('Helvetica').text('ManProjects Ltd — Distribution Board Schedule', 50, footY + 5, { align: 'center', width: doc.page.width - 100 });
 
       doc.end();
     } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
