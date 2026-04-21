@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.3 - Fix rescue plan detail spacing and layout -->
+<!-- v4.4 - Fix rescue plan form checklist and equipment spacing -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2697,27 +2697,27 @@ function renderRescuePlanForm(el) {
 
       <div class="form-section">
         <h3>✅ 5. Pre-Rescue Checklist</h3>
-        <div class="form-group">
-          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="check_team_briefed" value="Yes"> Rescue team briefed and competent</label>
-          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="check_equipment_checked" value="Yes"> Rescue equipment checked and in position</label>
-          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="check_comms_tested" value="Yes"> Communications tested</label>
-          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="check_first_aid" value="Yes"> First aid provision confirmed</label>
-          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="check_access_routes" value="Yes"> Access / egress routes confirmed</label>
-          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="check_emergency_services" value="Yes"> Emergency services access confirmed</label>
+        <div style="display:grid;grid-template-columns:1fr;gap:12px;padding:12px 0">
+          <label style="display:flex;align-items:center;gap:10px;font-weight:400;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" name="check_team_briefed" value="Yes" style="width:20px;height:20px;accent-color:#8B1A1A"> Rescue team briefed and competent</label>
+          <label style="display:flex;align-items:center;gap:10px;font-weight:400;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" name="check_equipment_checked" value="Yes" style="width:20px;height:20px;accent-color:#8B1A1A"> Rescue equipment checked and in position</label>
+          <label style="display:flex;align-items:center;gap:10px;font-weight:400;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" name="check_comms_tested" value="Yes" style="width:20px;height:20px;accent-color:#8B1A1A"> Communications tested</label>
+          <label style="display:flex;align-items:center;gap:10px;font-weight:400;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" name="check_first_aid" value="Yes" style="width:20px;height:20px;accent-color:#8B1A1A"> First aid provision confirmed</label>
+          <label style="display:flex;align-items:center;gap:10px;font-weight:400;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" name="check_access_routes" value="Yes" style="width:20px;height:20px;accent-color:#8B1A1A"> Access / egress routes confirmed</label>
+          <label style="display:flex;align-items:center;gap:10px;font-weight:400;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" name="check_emergency_services" value="Yes" style="width:20px;height:20px;accent-color:#8B1A1A"> Emergency services access confirmed</label>
         </div>
       </div>
 
       <div class="form-section">
         <h3>🛠️ 6. Rescue Equipment Available</h3>
-        <div class="form-group">
-          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="equip_harness" value="Yes"> Full body harness</label>
-          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="equip_lanyard" value="Yes"> Rescue lanyard / rope</label>
-          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="equip_tripod" value="Yes"> Tripod / davit system</label>
-          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="equip_winch" value="Yes"> Winch / descent device</label>
-          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="equip_first_aid" value="Yes"> First aid kit</label>
-          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="equip_stretcher" value="Yes"> Stretcher / spine board</label>
-          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="equip_radio" value="Yes"> Two-way radios</label>
-          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px"><input type="checkbox" name="equip_gas_monitor" value="Yes"> Gas monitor</label>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;padding:12px 0">
+          <label style="display:flex;align-items:center;gap:10px;font-weight:400;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" name="equip_harness" value="Yes" style="width:20px;height:20px;accent-color:#8B1A1A"> Full body harness</label>
+          <label style="display:flex;align-items:center;gap:10px;font-weight:400;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" name="equip_lanyard" value="Yes" style="width:20px;height:20px;accent-color:#8B1A1A"> Rescue lanyard / rope</label>
+          <label style="display:flex;align-items:center;gap:10px;font-weight:400;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" name="equip_tripod" value="Yes" style="width:20px;height:20px;accent-color:#8B1A1A"> Tripod / davit system</label>
+          <label style="display:flex;align-items:center;gap:10px;font-weight:400;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" name="equip_winch" value="Yes" style="width:20px;height:20px;accent-color:#8B1A1A"> Winch / descent device</label>
+          <label style="display:flex;align-items:center;gap:10px;font-weight:400;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" name="equip_first_aid" value="Yes" style="width:20px;height:20px;accent-color:#8B1A1A"> First aid kit</label>
+          <label style="display:flex;align-items:center;gap:10px;font-weight:400;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" name="equip_stretcher" value="Yes" style="width:20px;height:20px;accent-color:#8B1A1A"> Stretcher / spine board</label>
+          <label style="display:flex;align-items:center;gap:10px;font-weight:400;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" name="equip_radio" value="Yes" style="width:20px;height:20px;accent-color:#8B1A1A"> Two-way radios</label>
+          <label style="display:flex;align-items:center;gap:10px;font-weight:400;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" name="equip_gas_monitor" value="Yes" style="width:20px;height:20px;accent-color:#8B1A1A"> Gas monitor</label>
         </div>
         <div class="form-group"><label>Other Equipment</label><input type="text" name="equip_other" placeholder="Any other rescue equipment available"></div>
       </div>
