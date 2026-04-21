@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.0 - Restrict External View to audit-only sections -->
+<!-- v4.1 - Allow dashboard for External View -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -611,7 +611,7 @@ function showApp() {
 
     if (state.readOnly) {
       // External View: only allow specific pages
-      const allowedPages = ['reports', 'closed', 'inspections', 'training', 'toolbox-talks'];
+      const allowedPages = ['dashboard', 'reports', 'closed', 'inspections', 'training', 'toolbox-talks'];
       // Grey out disallowed sidebar links
       document.querySelectorAll('#sidebarAdminNav .sidebar-nav a[data-page]').forEach(a => {
         if (!allowedPages.includes(a.dataset.page)) a.classList.add('disabled-link');
@@ -620,7 +620,7 @@ function showApp() {
       document.querySelectorAll('#adminNav button[data-page]').forEach(btn => {
         if (!allowedPages.includes(btn.dataset.page)) btn.classList.add('disabled-link');
       });
-      navigate('reports');
+      navigate('dashboard');
     } else {
       navigate('dashboard');
     }
@@ -715,7 +715,7 @@ function renderPage(page) {
   };
   if (pages[page]) {
     if (state.readOnly) {
-      const allowedPages = ['reports', 'closed', 'inspections', 'training', 'toolbox-talks'];
+      const allowedPages = ['dashboard', 'reports', 'closed', 'inspections', 'training', 'toolbox-talks'];
       if (!allowedPages.includes(page)) {
         c.innerHTML = readOnlyBanner() + '<div class="card" style="text-align:center;padding:40px 20px"><div style="font-size:48px;margin-bottom:16px">🔒</div><h3>Access Restricted</h3><p style="color:var(--text-light);margin-top:8px">This section is not available with External View access.</p></div>';
         return;
