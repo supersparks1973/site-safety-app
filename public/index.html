@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v5.6 - Quoting & Invoicing module (admin only) -->
+<!-- v5.10 - Invoice Payment Terms & Cost Summary -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2539,6 +2539,7 @@ function renderInvoicesTab(el) {
             <div style="color:var(--text-light);font-size:13px">${esc(inv.client_name||'')} — ${esc(inv.project_name||'')}</div>
             ${inv.quote_number ? `<div style="font-size:12px;color:var(--text-light)">Quote: ${esc(inv.quote_number)}</div>` : ''}
             ${inv.po_number ? `<div style="font-size:12px;color:var(--text-light)">PO: ${esc(inv.po_number)}</div>` : ''}
+            ${inv.payment_terms && inv.payment_terms !== 'N/A' ? `<div style="font-size:12px;color:var(--text-light)">Terms: ${esc(inv.payment_terms)} Days</div>` : ''}
           </div>
           <div style="text-align:right">
             ${statusBadge(inv.status)}
@@ -2756,71 +2757,84 @@ async function deletePO(id) {
 }
 
 // ── INVOICE FORM ──
-window._invoiceItems = [];
 function showInvoiceForm(existing) {
   const inv = existing || {};
-  window._invoiceItems = inv.items || [{ description:'', quantity:1, unit:'each', rate:0, total:0 }];
   const isEdit = !!inv.id;
   const availableQuotes = _quotes.filter(q => q.status !== 'declined');
   const availablePOs = _pos.filter(po => po.status === 'active');
+  const lbl = 'font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px';
   const el = document.getElementById('quotingContent');
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-      <button class="btn btn-sm" onclick="renderQuotingTab()" style="padding:6px 12px">← Back</button>
+      <button class="btn btn-sm" onclick="renderQuotingTab()" style="padding:6px 12px">\u2190 Back</button>
       <h3 style="margin:0;font-size:18px">${isEdit ? 'Edit' : 'New'} Invoice</h3>
     </div>
     <div class="card" style="margin-bottom:16px">
       <h3 style="color:var(--primary);font-size:14px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--primary)">INVOICE DETAILS</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Invoice Number *</label><input id="inv-number" class="form-control" value="${esc(inv.invoice_number||'')}" placeholder="e.g. INV-2026-001"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Link to Quote</label>
+        <div><label style="${lbl}">Invoice Number *</label><input id="inv-number" class="form-control" value="${esc(inv.invoice_number||'')}" placeholder="e.g. INV-2026-001"></div>
+        <div><label style="${lbl}">Link to Quote</label>
           <select id="inv-quote" class="form-control" onchange="autofillInvoice()">
             <option value="">— None —</option>
             ${availableQuotes.map(q => `<option value="${q.id}" ${inv.quote_id==q.id?'selected':''}>${esc(q.quote_number)} — ${esc(q.client_name)}</option>`).join('')}
           </select>
         </div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Link to PO</label>
+        <div><label style="${lbl}">Link to PO</label>
           <select id="inv-po" class="form-control">
             <option value="">— None —</option>
             ${availablePOs.map(po => `<option value="${po.id}" ${inv.po_id==po.id?'selected':''}>${esc(po.po_number)} — ${esc(po.client_name)}</option>`).join('')}
           </select>
         </div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Client Name *</label><input id="inv-client" class="form-control" value="${esc(inv.client_name||'')}"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Client Address</label><input id="inv-address" class="form-control" value="${esc(inv.client_address||'')}"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Project Name</label><input id="inv-project" class="form-control" value="${esc(inv.project_name||'')}"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Invoice Date</label><input id="inv-date" type="date" class="form-control" value="${esc(inv.invoice_date||today())}"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Due Date</label><input id="inv-due" type="date" class="form-control" value="${esc(inv.due_date||'')}"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Status</label>
+        <div><label style="${lbl}">Client Name *</label><input id="inv-client" class="form-control" value="${esc(inv.client_name||'')}"></div>
+        <div><label style="${lbl}">Client Address</label><input id="inv-address" class="form-control" value="${esc(inv.client_address||'')}"></div>
+        <div><label style="${lbl}">Project Name</label><input id="inv-project" class="form-control" value="${esc(inv.project_name||'')}"></div>
+        <div><label style="${lbl}">Invoice Date</label><input id="inv-date" type="date" class="form-control" value="${esc(inv.invoice_date||today())}"></div>
+        <div><label style="${lbl}">Due Date</label><input id="inv-due" type="date" class="form-control" value="${esc(inv.due_date||'')}"></div>
+        <div><label style="${lbl}">Payment Terms</label>
+          <select id="inv-terms" class="form-control" onchange="autoSetDueDate()">
+            <option value="N/A" ${inv.payment_terms==='N/A'||!inv.payment_terms?'selected':''}>N/A</option>
+            <option value="30" ${inv.payment_terms==='30'?'selected':''}>30 Days</option>
+            <option value="60" ${inv.payment_terms==='60'?'selected':''}>60 Days</option>
+          </select>
+        </div>
+        <div><label style="${lbl}">Status</label>
           <select id="inv-status" class="form-control"><option ${inv.status==='draft'||!inv.status?'selected':''}>draft</option><option ${inv.status==='sent'?'selected':''}>sent</option><option ${inv.status==='paid'?'selected':''}>paid</option><option ${inv.status==='part-paid'?'selected':''}>part-paid</option><option ${inv.status==='overdue'?'selected':''}>overdue</option></select>
         </div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Amount Paid (£)</label><input id="inv-paid" type="number" class="form-control" value="${inv.amount_paid||0}" min="0" step="0.01"></div>
+        <div><label style="${lbl}">Amount Paid (\u00a3)</label><input id="inv-paid" type="number" class="form-control" value="${inv.amount_paid||0}" min="0" step="0.01"></div>
       </div>
       <div style="margin-top:12px;display:flex;align-items:center;gap:12px">
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="inv-part" ${inv.is_part_invoice?'checked':''}> Part Invoice</label>
-        <input id="inv-partdesc" class="form-control" placeholder="e.g. Phase 1 completion — 60% of quoted value" value="${esc(inv.part_description||'')}" style="flex:1;${inv.is_part_invoice?'':'display:none'}">
+        <input id="inv-partdesc" class="form-control" placeholder="e.g. Phase 1 completion \u2014 60% of quoted value" value="${esc(inv.part_description||'')}" style="flex:1;${inv.is_part_invoice?'':'display:none'}">
       </div>
       <script>document.getElementById('inv-part').addEventListener('change', function(){ document.getElementById('inv-partdesc').style.display = this.checked ? '' : 'none'; });<\/script>
-      <div style="margin-top:12px"><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Notes</label><textarea id="inv-notes" class="form-control" rows="2">${esc(inv.notes||'')}</textarea></div>
+      <div style="margin-top:12px"><label style="${lbl}">Notes</label><textarea id="inv-notes" class="form-control" rows="2">${esc(inv.notes||'')}</textarea></div>
     </div>
 
-    <!-- LINE ITEMS -->
+    <!-- COST SUMMARY -->
     <div class="card" style="margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--primary)">
-        <h3 style="color:var(--primary);font-size:14px;margin:0">LINE ITEMS</h3>
-        <button class="btn btn-primary btn-sm" onclick="addInvoiceItem()" style="font-size:12px;padding:4px 12px">+ Add</button>
-      </div>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:13px">
-          <thead><tr style="background:var(--primary);color:white">
-            <th style="padding:8px;text-align:left;font-weight:600">Description</th>
-            <th style="padding:8px;text-align:center;font-weight:600;width:70px">Qty</th>
-            <th style="padding:8px;text-align:center;font-weight:600;width:80px">Unit</th>
-            <th style="padding:8px;text-align:right;font-weight:600;width:90px">Rate (£)</th>
-            <th style="padding:8px;text-align:right;font-weight:600;width:90px">Total (£)</th>
-            <th style="width:40px"></th>
-          </tr></thead>
-          <tbody id="inv-items-body"></tbody>
-        </table>
+      <h3 style="color:var(--primary);font-size:14px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--primary)">COST SUMMARY</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px">
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;text-align:center">
+          <label style="font-size:12px;font-weight:700;color:#166534;display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Labour Cost</label>
+          <div style="display:flex;align-items:center;justify-content:center;gap:4px">
+            <span style="font-size:18px;font-weight:700;color:#166534">\u00a3</span>
+            <input id="inv-labour" type="number" value="${Number(inv.subtotal_labour||0)}" min="0" step="0.01" onchange="recalcInvoice()" style="width:140px;padding:10px;border:2px solid #bbf7d0;border-radius:8px;font-size:18px;font-weight:700;text-align:center;color:#166534;background:white">
+          </div>
+        </div>
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px;text-align:center">
+          <label style="font-size:12px;font-weight:700;color:#1e40af;display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Material Cost</label>
+          <div style="display:flex;align-items:center;justify-content:center;gap:4px">
+            <span style="font-size:18px;font-weight:700;color:#1e40af">\u00a3</span>
+            <input id="inv-materials" type="number" value="${Number(inv.subtotal_materials||0)}" min="0" step="0.01" onchange="recalcInvoice()" style="width:140px;padding:10px;border:2px solid #bfdbfe;border-radius:8px;font-size:18px;font-weight:700;text-align:center;color:#1e40af;background:white">
+          </div>
+        </div>
+        <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:16px;text-align:center">
+          <label style="font-size:12px;font-weight:700;color:#92400e;display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Other Costs (Plant Hire etc.)</label>
+          <div style="display:flex;align-items:center;justify-content:center;gap:4px">
+            <span style="font-size:18px;font-weight:700;color:#92400e">\u00a3</span>
+            <input id="inv-plant" type="number" value="${Number(inv.subtotal_plant||0)}" min="0" step="0.01" onchange="recalcInvoice()" style="width:140px;padding:10px;border:2px solid #fde68a;border-radius:8px;font-size:18px;font-weight:700;text-align:center;color:#92400e;background:white">
+          </div>
+        </div>
       </div>
     </div>
 
@@ -2836,45 +2850,40 @@ function showInvoiceForm(existing) {
       <button class="btn btn-outline" onclick="renderQuotingTab()">Cancel</button>
     </div>
   `;
-  renderInvoiceItems();
-}
-
-function renderInvoiceItems() {
-  const tbody = document.getElementById('inv-items-body');
-  if (!tbody) return;
-  tbody.innerHTML = window._invoiceItems.map((item, i) => `
-    <tr style="border-bottom:1px solid #f3f4f6">
-      <td style="padding:4px"><input value="${esc(item.description)}" onchange="window._invoiceItems[${i}].description=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px"></td>
-      <td style="padding:4px"><input type="number" value="${item.quantity}" onchange="window._invoiceItems[${i}].quantity=Number(this.value);window._invoiceItems[${i}].total=Number(this.value)*window._invoiceItems[${i}].rate;recalcInvoice()" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;text-align:center" min="0" step="0.5"></td>
-      <td style="padding:4px"><input value="${esc(item.unit)}" onchange="window._invoiceItems[${i}].unit=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;text-align:center"></td>
-      <td style="padding:4px"><input type="number" value="${item.rate}" onchange="window._invoiceItems[${i}].rate=Number(this.value);window._invoiceItems[${i}].total=window._invoiceItems[${i}].quantity*Number(this.value);recalcInvoice()" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;text-align:right" min="0" step="0.01"></td>
-      <td style="padding:4px;text-align:right;font-weight:600">${money(item.total)}</td>
-      <td style="padding:4px;text-align:center"><button onclick="removeInvoiceItem(${i})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px">🗑️</button></td>
-    </tr>
-  `).join('');
   recalcInvoice();
 }
 
-function addInvoiceItem() {
-  window._invoiceItems.push({ description:'', quantity:1, unit:'each', rate:0, total:0 });
-  renderInvoiceItems();
-}
-function removeInvoiceItem(idx) {
-  window._invoiceItems.splice(idx, 1);
-  renderInvoiceItems();
+function autoSetDueDate() {
+  const terms = document.getElementById('inv-terms').value;
+  const invDate = document.getElementById('inv-date').value;
+  if (terms !== 'N/A' && invDate) {
+    const d = new Date(invDate);
+    d.setDate(d.getDate() + Number(terms));
+    document.getElementById('inv-due').value = d.toISOString().split('T')[0];
+  }
 }
 
 function recalcInvoice() {
-  const sub = window._invoiceItems.reduce((s,i)=>s+Number(i.total||0),0);
+  const labour = Number((document.getElementById('inv-labour')||{}).value||0);
+  const materials = Number((document.getElementById('inv-materials')||{}).value||0);
+  const plant = Number((document.getElementById('inv-plant')||{}).value||0);
+  const subTotal = labour + materials + plant;
   const vatRate = 20;
-  const vat = sub * (vatRate / 100);
-  const grand = sub + vat;
+  const vat = subTotal * (vatRate / 100);
+  const grand = subTotal + vat;
+  const paid = Number((document.getElementById('inv-paid')||{}).value||0);
+  const balance = grand - paid;
   const el = document.getElementById('inv-totals');
   if (el) el.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr auto;gap:6px 20px;max-width:350px;margin-left:auto">
-      <div style="color:var(--text-light)">Subtotal</div><div style="text-align:right;font-weight:600">${money(sub)}</div>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:8px 24px;max-width:380px;margin-left:auto">
+      <div style="color:var(--text-light)">Labour</div><div style="text-align:right;font-weight:600">${money(labour)}</div>
+      <div style="color:var(--text-light)">Materials</div><div style="text-align:right;font-weight:600">${money(materials)}</div>
+      <div style="color:var(--text-light)">Other Costs</div><div style="text-align:right;font-weight:600">${money(plant)}</div>
+      <div style="border-top:1px solid var(--border);padding-top:8px;font-weight:600">Subtotal (ex. VAT)</div><div style="border-top:1px solid var(--border);padding-top:8px;text-align:right;font-weight:700">${money(subTotal)}</div>
       <div style="color:var(--text-light)">VAT (${vatRate}%)</div><div style="text-align:right;font-weight:600">${money(vat)}</div>
-      <div style="border-top:2px solid var(--primary);padding-top:8px;font-weight:700;font-size:16px;color:var(--primary)">TOTAL</div><div style="border-top:2px solid var(--primary);padding-top:8px;text-align:right;font-weight:800;font-size:16px;color:var(--primary)">${money(grand)}</div>
+      <div style="border-top:2px solid var(--primary);padding-top:10px;font-weight:700;font-size:18px;color:var(--primary)">TOTAL (inc. VAT)</div><div style="border-top:2px solid var(--primary);padding-top:10px;text-align:right;font-weight:800;font-size:18px;color:var(--primary)">${money(grand)}</div>
+      ${paid > 0 ? `<div style="color:var(--success);font-weight:600">Paid</div><div style="text-align:right;font-weight:600;color:var(--success)">${money(paid)}</div>
+      <div style="font-weight:700;color:${balance>0?'var(--danger)':'var(--success)'}">Balance Due</div><div style="text-align:right;font-weight:700;color:${balance>0?'var(--danger)':'var(--success)'}">${money(balance)}</div>` : ''}
     </div>
   `;
 }
@@ -2887,6 +2896,10 @@ function autofillInvoice() {
   document.getElementById('inv-client').value = q.client_name || '';
   document.getElementById('inv-address').value = q.client_address || '';
   document.getElementById('inv-project').value = q.project_name || '';
+  document.getElementById('inv-labour').value = Number(q.subtotal_labour||0);
+  document.getElementById('inv-materials').value = Number(q.subtotal_materials||0);
+  document.getElementById('inv-plant').value = Number(q.subtotal_plant||0);
+  recalcInvoice();
   // Find linked PO
   const linkedPO = _pos.find(po => po.quote_id == qId);
   if (linkedPO) document.getElementById('inv-po').value = linkedPO.id;
@@ -2895,18 +2908,23 @@ function autofillInvoice() {
 async function saveInvoice(existingId) {
   const g = id => (document.getElementById(id)||{}).value||'';
   if (!g('inv-number') || !g('inv-client')) { alert('Invoice number and client name are required.'); return; }
-  const sub = window._invoiceItems.reduce((s,i)=>s+Number(i.total||0),0);
+  const labour = Number(g('inv-labour'))||0;
+  const materials = Number(g('inv-materials'))||0;
+  const plant = Number(g('inv-plant'))||0;
+  const sub = labour + materials + plant;
   const vatRate = 20;
   const vat = sub * (vatRate / 100);
   const data = {
     invoice_number: g('inv-number'), quote_id: g('inv-quote')||null, po_id: g('inv-po')||null,
     client_name: g('inv-client'), client_address: g('inv-address'), project_name: g('inv-project'),
     invoice_date: g('inv-date'), due_date: g('inv-due'), status: g('inv-status'),
+    payment_terms: g('inv-terms'),
+    subtotal_labour: labour, subtotal_materials: materials, subtotal_plant: plant,
     subtotal: sub, vat_rate: vatRate, vat_amount: vat, grand_total: sub + vat,
     amount_paid: Number(g('inv-paid'))||0, notes: g('inv-notes'),
     is_part_invoice: document.getElementById('inv-part').checked,
     part_description: g('inv-partdesc'),
-    items: window._invoiceItems.map((it,i) => ({ ...it, sort_order: i }))
+    items: []
   };
   try {
     const url = existingId ? API+'/api/invoices/'+existingId : API+'/api/invoices';
