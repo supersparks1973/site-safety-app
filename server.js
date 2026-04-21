@@ -8,7 +8,7 @@ const fs = require('fs');
 const nodemailer = require('nodemailer');
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
         Header, Footer, AlignmentType, BorderStyle, WidthType,
-        ShadingType, PageNumber, PageBreak } = require('docx');
+        ShadingType, PageNumber, PageBreak, ImageRun } = require('docx');
 
 
 const app = express();
@@ -345,10 +345,13 @@ async function startApp() {
     };
     const sh = (text) => new Paragraph({ spacing: { before: 300, after: 120 },
       children: [new TextRun({ text, bold: true, font: "Arial", size: 24, color: maroon })] });
+    let logoData;
+    try { logoData = fs.readFileSync(path.join(__dirname, 'public', 'logo.png')); } catch(e) { logoData = null; }
     const mkHeader = (subtitle) => ({
       default: new Header({ children: [new Paragraph({
         border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: maroon, space: 4 } },
         children: [
+          ...(logoData ? [new ImageRun({ data: logoData, transformation: { width: 120, height: 46 }, type: 'png' }), new TextRun({ text: "  ", font: "Arial", size: 22 })] : []),
           new TextRun({ text: "ManProjects", bold: true, font: "Arial", size: 22, color: grey }),
           new TextRun({ text: " Ltd", font: "Arial", size: 18, color: "999999" }),
           new TextRun({ text: "    Electrical and Mechanical Building Services", font: "Arial", size: 14, color: "999999" }),
@@ -1211,10 +1214,81 @@ async function startApp() {
             { header: 'SIGN-OFF', rows: [['Site Manager Signature',''],['Date','']] },
           ]
         },
+        'db-schedule': {
+          title: 'DB Schedule',
+          docType: 'Distribution Board Schedule',
+          custom: true
+        },
       };
 
       const tmpl = templates[key];
       if (!tmpl) return res.status(404).json({ error: 'Template not found' });
+
+      // ── Custom DB Schedule template ──
+      if (tmpl.custom && key === 'db-schedule') {
+        const colWidths = [700, 900, 900, 900, 3060, 1100, 900, 900];
+        const colHeads = ['Cct No','Cct Ref','MCB Rating (A)','MCB Type','Supply/ng','Cable Type','Cable Size','CPC Size'];
+        const headerRow = new TableRow({ children: colHeads.map((head, i) =>
+          new TableCell({ borders: h.bds, width: { size: colWidths[i], type: WidthType.DXA },
+            shading: { fill: "8B1A1A", type: ShadingType.CLEAR }, margins: h.cm,
+            children: [new Paragraph({ children: [new TextRun({ text: head, bold: true, font: "Arial", size: 16, color: "FFFFFF" })] })] })
+        ) });
+        const dataRows = Array(30).fill(null).map((_, idx) =>
+          new TableRow({ children: colWidths.map((w) =>
+            new TableCell({ borders: h.bds, width: { size: w, type: WidthType.DXA }, margins: h.cm,
+              children: [new Paragraph({ children: [new TextRun({ text: ' ', font: "Arial", size: 16 })] })] })
+          ) })
+        );
+
+        const children = [
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 0 },
+            children: [new TextRun({ text: "MANPROJECTS LTD", bold: true, font: "Arial", size: 32, color: h.maroon })] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80, after: 200 },
+            children: [new TextRun({ text: "DISTRIBUTION BOARD SCHEDULE", bold: true, font: "Arial", size: 24, color: h.grey })] }),
+
+          h.sh("BOARD DETAILS"),
+          new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
+            new TableRow({ children: [h.lbl("DB-Ref", 2340), h.val('', 2340), h.lbl("Location", 2340), h.val('', 2340)] }),
+            new TableRow({ children: [h.lbl("Board Size & Rating", 2340), h.val('', 2340), h.lbl("Manufacturer", 2340), h.val('', 2340)] }),
+            new TableRow({ children: [h.lbl("Supply Cable Ref", 2340), h.val('', 2340), h.lbl("PFC (kA)", 2340), h.val('', 2340)] }),
+            new TableRow({ children: [h.lbl("Project / Site", 2340), h.val('', 2340), h.lbl("Date", 2340), h.val('', 2340)] }),
+            new TableRow({ children: [h.lbl("Pod Room", 2340), h.val('', 2340), h.lbl("ZDB ID", 2340), h.val('', 2340)] }),
+          ] }),
+
+          h.sh("CIRCUIT SCHEDULE"),
+          new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...dataRows] }),
+
+          h.sh("NOTES"),
+          ...Array(4).fill(null).map(() => new Paragraph({
+            spacing: { after: 80 },
+            border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC", space: 6 } },
+            children: [new TextRun({ text: ' ', font: "Arial", size: 20 })]
+          })),
+
+          h.sh("SIGN-OFF"),
+          new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
+            new TableRow({ children: [h.lbl("Completed By", h.pw/2), h.val('', h.pw/2)] }),
+            new TableRow({ children: [h.lbl("Signature", h.pw/2), h.val('', h.pw/2)] }),
+            new TableRow({ children: [h.lbl("Date", h.pw/2), h.val('', h.pw/2)] }),
+            new TableRow({ children: [h.lbl("Checked By", h.pw/2), h.val('', h.pw/2)] }),
+            new TableRow({ children: [h.lbl("Date", h.pw/2), h.val('', h.pw/2)] }),
+          ] }),
+        ];
+
+        const doc = new Document({
+          styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
+          sections: [{
+            properties: { ...h.pageProps, page: { ...h.pageProps.page, size: { width: 16838, height: 11906 }, margin: { top: 1000, right: 1000, bottom: 1000, left: 1000 } } },
+            headers: h.mkHeader('DB Schedule'),
+            footers: h.mkFooter('Distribution Board Schedule'),
+            children
+          }]
+        });
+        const buf = await Packer.toBuffer(doc);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.setHeader('Content-Disposition', 'attachment; filename="ManProjects-DB-Schedule.docx"');
+        return res.send(buf);
+      }
 
       const children = [h.sh(tmpl.title.toUpperCase())];
 
