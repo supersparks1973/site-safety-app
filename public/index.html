@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.5 - Add DB Schedule template with ManProjects logo in all template headers -->
+<!-- v4.6 - Branded Word templates with logo title block, maroon section bars, alternating rows + improved UI cards -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2262,30 +2262,52 @@ const SITE_TEMPLATES = [
 ];
 
 function renderSiteTemplates(c) {
+  const catColors = { 'Safety Forms': { bg: 'linear-gradient(135deg,#fee2e2,#fecaca)', accent: '#991b1b', iconBg: '#fca5a5' },
+    'Project Documents': { bg: 'linear-gradient(135deg,#dbeafe,#bfdbfe)', accent: '#1e40af', iconBg: '#93c5fd' },
+    'Electrical Documents': { bg: 'linear-gradient(135deg,#fef3c7,#fde68a)', accent: '#92400e', iconBg: '#fcd34d' } };
+
   c.innerHTML = `
-    <div style="margin-bottom:20px">
-      <h2 style="margin-bottom:4px">📄 Site Templates</h2>
-      <p style="color:var(--text-light);font-size:14px">Download branded ManProjects templates — ready to print or fill in digitally</p>
+    <div style="margin-bottom:28px;display:flex;align-items:center;gap:16px">
+      <div style="width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#8B1A1A,#b91c1c);display:flex;align-items:center;justify-content:center">
+        <span style="font-size:28px;filter:brightness(1.5)">📄</span>
+      </div>
+      <div>
+        <h2 style="margin-bottom:2px;font-size:22px">Site Templates</h2>
+        <p style="color:var(--text-light);font-size:14px;margin:0">Download branded ManProjects templates — ready to print or fill in digitally</p>
+      </div>
     </div>
-    ${SITE_TEMPLATES.map(cat => `
-      <div style="margin-bottom:24px">
-        <h3 style="margin-bottom:12px;color:#8B1A1A">${cat.icon} ${esc(cat.category)}</h3>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">
+    ${SITE_TEMPLATES.map(cat => {
+      const cc = catColors[cat.category] || catColors['Project Documents'];
+      return `
+      <div style="margin-bottom:32px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:8px;border-bottom:2px solid ${cc.accent}20">
+          <span style="font-size:20px">${cat.icon}</span>
+          <h3 style="color:${cc.accent};font-size:17px;font-weight:700;letter-spacing:0.3px">${esc(cat.category)}</h3>
+          <span style="font-size:12px;color:${cc.accent};background:${cc.accent}15;padding:2px 10px;border-radius:10px;font-weight:600">${cat.templates.length} template${cat.templates.length>1?'s':''}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px">
           ${cat.templates.map(t => `
-            <div class="card" style="display:flex;flex-direction:column;justify-content:space-between">
-              <div>
-                <div style="font-size:28px;margin-bottom:8px">${t.icon}</div>
-                <h4 style="margin-bottom:6px">${esc(t.name)}</h4>
-                <p style="font-size:13px;color:var(--text-light);margin-bottom:16px">${esc(t.desc)}</p>
+            <div style="border-radius:14px;border:1px solid #e5e7eb;overflow:hidden;display:flex;flex-direction:column;transition:all 0.2s ease;box-shadow:0 1px 3px rgba(0,0,0,0.06);cursor:default"
+                 onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.12)'"
+                 onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 1px 3px rgba(0,0,0,0.06)'">
+              <div style="background:${cc.bg};padding:20px 20px 16px;position:relative">
+                <div style="width:48px;height:48px;border-radius:12px;background:white;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 2px 8px rgba(0,0,0,0.1);margin-bottom:12px">${t.icon}</div>
+                <h4 style="margin:0 0 4px;font-size:16px;font-weight:700;color:#1f2937">${esc(t.name)}</h4>
+                <p style="font-size:12.5px;color:#6b7280;margin:0;line-height:1.4">${esc(t.desc)}</p>
               </div>
-              <button class="btn btn-primary" style="width:100%" onclick="downloadTemplate('${t.key}','${t.name.replace(/'/g,"\\'")}')">
-                📄 Download Word Template
-              </button>
+              <div style="padding:14px 20px;background:white;border-top:1px solid #f3f4f6;margin-top:auto">
+                <button style="width:100%;padding:10px 16px;border:none;border-radius:10px;background:${cc.accent};color:white;font-weight:600;font-size:13.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity 0.15s"
+                        onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'"
+                        onclick="downloadTemplate('${t.key}','${t.name.replace(/'/g,"\\'")}')">
+                  <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Download Template
+                </button>
+              </div>
             </div>
           `).join('')}
         </div>
-      </div>
-    `).join('')}
+      </div>`;
+    }).join('')}
   `;
 }
 

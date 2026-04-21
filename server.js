@@ -371,7 +371,7 @@ async function startApp() {
     const pageProps = {
       page: { size: { width: 11906, height: 16838 }, margin: { top: 1200, right: 1200, bottom: 1200, left: 1200 } }
     };
-    return { maroon, grey, bds, cm, pw, lbl, val, condCell, sh, mkHeader, mkFooter, pageProps };
+    return { maroon, grey, bds, cm, pw, lbl, val, condCell, sh, mkHeader, mkFooter, pageProps, logoData };
   };
 
   // Near-miss Word doc
@@ -1290,31 +1290,62 @@ async function startApp() {
         return res.send(buf);
       }
 
-      const children = [h.sh(tmpl.title.toUpperCase())];
+      // ── Branded title block with logo ──
+      const titleChildren = [];
+      if (h.logoData) {
+        titleChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 100, after: 80 },
+          children: [new ImageRun({ data: h.logoData, transformation: { width: 180, height: 70 }, type: 'png' })] }));
+      }
+      titleChildren.push(
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: h.logoData ? 40 : 200, after: 0 },
+          children: [new TextRun({ text: "MANPROJECTS LTD", bold: true, font: "Arial", size: 34, color: h.maroon })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 40, after: 20 },
+          children: [new TextRun({ text: "Electrical & Mechanical Building Services", font: "Arial", size: 20, color: "999999", italics: true })] }),
+        new Paragraph({ spacing: { before: 20, after: 20 }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: h.maroon, space: 0 } }, children: [] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 180, after: 200 },
+          children: [new TextRun({ text: tmpl.title.toUpperCase(), bold: true, font: "Arial", size: 30, color: "333333" })] })
+      );
+
+      const children = [...titleChildren];
 
       for (const sec of tmpl.sections) {
-        children.push(h.sh(sec.header));
+        // Maroon bar section header
+        children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
+          new TableRow({ children: [
+            new TableCell({ borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+              shading: { fill: h.maroon, type: ShadingType.CLEAR },
+              margins: { top: 60, bottom: 60, left: 140, right: 140 },
+              children: [new Paragraph({ children: [new TextRun({ text: sec.header, bold: true, font: "Arial", size: 22, color: "FFFFFF" })] })] })
+          ] })
+        ] }));
+        children.push(new Paragraph({ spacing: { after: 80 }, children: [] }));
 
         if (sec.rows) {
-          // Key-value pair rows
           const halfW = h.pw / 2;
-          const tableRows = sec.rows.map(([label, value]) =>
-            new TableRow({ children: [h.lbl(label, halfW), h.val(value || ' ', halfW)] })
+          const tableRows = sec.rows.map(([label, value], idx) =>
+            new TableRow({ children: [
+              new TableCell({ borders: h.bds, width: { size: halfW, type: WidthType.DXA },
+                shading: { fill: "F3E8E8", type: ShadingType.CLEAR }, margins: h.cm,
+                children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, font: "Arial", size: 20, color: h.maroon })] })] }),
+              new TableCell({ borders: h.bds, width: { size: halfW, type: WidthType.DXA },
+                shading: idx % 2 === 0 ? { fill: "FAFAFA", type: ShadingType.CLEAR } : undefined, margins: h.cm,
+                children: [new Paragraph({ children: [new TextRun({ text: value || ' ', font: "Arial", size: 20 })] })] })
+            ] })
           );
           children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: tableRows }));
         }
 
         if (sec.table) {
-          // Full table with headers
           const colW = Math.floor(h.pw / sec.table.heads.length);
           const headerRow = new TableRow({ children: sec.table.heads.map(head =>
             new TableCell({ borders: h.bds, width: { size: colW, type: WidthType.DXA },
               shading: { fill: "8B1A1A", type: ShadingType.CLEAR }, margins: h.cm,
               children: [new Paragraph({ children: [new TextRun({ text: head, bold: true, font: "Arial", size: 18, color: "FFFFFF" })] })] })
           ) });
-          const dataRows = sec.table.rows.map(row =>
+          const dataRows = sec.table.rows.map((row, idx) =>
             new TableRow({ children: row.map(cell =>
-              new TableCell({ borders: h.bds, width: { size: colW, type: WidthType.DXA }, margins: h.cm,
+              new TableCell({ borders: h.bds, width: { size: colW, type: WidthType.DXA },
+                shading: idx % 2 === 1 ? { fill: "F9F5F5", type: ShadingType.CLEAR } : undefined, margins: h.cm,
                 children: [new Paragraph({ children: [new TextRun({ text: cell || ' ', font: "Arial", size: 18 })] })] })
             ) })
           );
@@ -1322,15 +1353,16 @@ async function startApp() {
         }
 
         if (sec.freeText) {
-          // Empty lined area for writing
           for (let i = 0; i < (sec.lines || 4); i++) {
             children.push(new Paragraph({
-              spacing: { after: 80 },
-              border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC", space: 6 } },
-              children: [new TextRun({ text: ' ', font: "Arial", size: 20 })]
+              spacing: { after: 100 },
+              border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: "D5C5C5", space: 8 } },
+              children: [new TextRun({ text: ' ', font: "Arial", size: 22 })]
             }));
           }
         }
+
+        children.push(new Paragraph({ spacing: { after: 100 }, children: [] }));
       }
 
       const doc = new Document({
