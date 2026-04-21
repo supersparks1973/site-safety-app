@@ -1246,12 +1246,12 @@ async function startApp() {
         );
 
         const blankLogoRuns = [];
-        if (h.logoData) blankLogoRuns.push(new ImageRun({ data: h.logoData, transformation: { width: 180, height: 70 }, type: 'png' }));
+        if (h.logoData) blankLogoRuns.push(new ImageRun({ data: h.logoData, transformation: { width: 260, height: 100 }, type: 'png' }));
         if (h.logoData && h.niceicData) blankLogoRuns.push(new TextRun({ text: "      ", font: "Arial", size: 22 }));
-        if (h.niceicData) blankLogoRuns.push(new ImageRun({ data: h.niceicData, transformation: { width: 110, height: 52 }, type: 'png' }));
+        if (h.niceicData) blankLogoRuns.push(new ImageRun({ data: h.niceicData, transformation: { width: 150, height: 70 }, type: 'png' }));
 
         const children = [
-          ...(blankLogoRuns.length ? [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 100, after: 80 }, children: blankLogoRuns })] : []),
+          ...(blankLogoRuns.length ? [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 100, after: 80 }, children: blankLogoRuns })] : []),
           new Paragraph({ spacing: { before: 20, after: 20 }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: h.maroon, space: 0 } }, children: [] }),
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 180, after: 200 },
             children: [new TextRun({ text: "DISTRIBUTION BOARD SCHEDULE", bold: true, font: "Arial", size: 30, color: "333333" })] }),
@@ -1403,10 +1403,10 @@ async function startApp() {
 
       const titleChildren = [];
       const logoRuns = [];
-      if (h.logoData) logoRuns.push(new ImageRun({ data: h.logoData, transformation: { width: 180, height: 70 }, type: 'png' }));
+      if (h.logoData) logoRuns.push(new ImageRun({ data: h.logoData, transformation: { width: 260, height: 100 }, type: 'png' }));
       if (h.logoData && h.niceicData) logoRuns.push(new TextRun({ text: "      ", font: "Arial", size: 22 }));
-      if (h.niceicData) logoRuns.push(new ImageRun({ data: h.niceicData, transformation: { width: 110, height: 52 }, type: 'png' }));
-      if (logoRuns.length) titleChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 100, after: 80 }, children: logoRuns }));
+      if (h.niceicData) logoRuns.push(new ImageRun({ data: h.niceicData, transformation: { width: 150, height: 70 }, type: 'png' }));
+      if (logoRuns.length) titleChildren.push(new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 100, after: 80 }, children: logoRuns }));
       titleChildren.push(
         new Paragraph({ spacing: { before: 20, after: 20 }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: h.maroon, space: 0 } }, children: [] }),
         new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 180, after: 200 },
@@ -1497,12 +1497,12 @@ async function startApp() {
       const hasLogo = fs.existsSync(logoPath);
       const hasNiceic = fs.existsSync(niceicPath);
       if (hasLogo && hasNiceic) {
-        doc.image(logoPath, (doc.page.width / 2) - 100, 30, { width: 120 });
-        doc.image(niceicPath, (doc.page.width / 2) + 30, 34, { width: 80 });
-        doc.moveDown(2.5);
+        doc.image(logoPath, 40, 30, { width: 180 });
+        doc.image(niceicPath, 235, 40, { width: 110 });
+        doc.moveDown(3.5);
       } else if (hasLogo) {
-        doc.image(logoPath, (doc.page.width / 2) - 60, 30, { width: 120 });
-        doc.moveDown(2.5);
+        doc.image(logoPath, 40, 30, { width: 180 });
+        doc.moveDown(3.5);
       }
 
       // Title (logos only, no company text for DB Schedule)
