@@ -2024,8 +2024,8 @@ async function startApp() {
         'INSERT INTO purchase_orders (quote_id, po_number, client_name, project_name, po_date, po_value, notes, status, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
         [d.quote_id||null, d.po_number, d.client_name, d.project_name, d.po_date, d.po_value||0, d.notes, d.status||'active', req.user.id]
       );
-      // Update quote status to 'accepted' if linked
-      if (d.quote_id) await pool.query("UPDATE quotes SET status='accepted', updated_at=CURRENT_TIMESTAMP WHERE id=$1", [d.quote_id]);
+      // Archive the linked quote
+      if (d.quote_id) await pool.query("UPDATE quotes SET status='archived', updated_at=CURRENT_TIMESTAMP WHERE id=$1", [d.quote_id]);
       res.json(rows[0]);
     } catch(e) { res.status(500).json({ error: e.message }); }
   });

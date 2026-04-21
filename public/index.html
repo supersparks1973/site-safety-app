@@ -2268,8 +2268,8 @@ function renderQuoting(c) {
       </div>
     </div>
     <div style="display:flex;gap:6px;margin-bottom:20px;border-bottom:2px solid var(--border);padding-bottom:0">
-      ${['quotes','purchase-orders','invoices'].map(t => {
-        const labels = { quotes:'Quotes', 'purchase-orders':'Purchase Orders', invoices:'Invoices' };
+      ${['quotes','purchase-orders','invoices','archive'].map(t => {
+        const labels = { quotes:'Quotes', 'purchase-orders':'Purchase Orders', invoices:'Invoices', archive:'Archive' };
         return `<button onclick="_qTab='${t}';renderQuotingTab()" id="qtab-${t}" style="padding:10px 20px;border:none;border-bottom:3px solid ${_qTab===t?'var(--primary)':'transparent'};background:none;font-weight:${_qTab===t?'700':'500'};color:${_qTab===t?'var(--primary)':'var(--text-light)'};cursor:pointer;font-size:14px;transition:all .2s">${labels[t]}</button>`;
       }).join('')}
     </div>
@@ -2292,7 +2292,7 @@ async function loadQuotingData() {
 
 function renderQuotingTab() {
   // Update tab styles
-  ['quotes','purchase-orders','invoices'].forEach(t => {
+  ['quotes','purchase-orders','invoices','archive'].forEach(t => {
     const btn = document.getElementById('qtab-'+t);
     if (btn) { btn.style.borderBottomColor = _qTab===t?'var(--primary)':'transparent'; btn.style.fontWeight = _qTab===t?'700':'500'; btn.style.color = _qTab===t?'var(--primary)':'var(--text-light)'; }
   });
@@ -2300,11 +2300,12 @@ function renderQuotingTab() {
   if (!el) return;
   if (_qTab === 'quotes') renderQuotesTab(el);
   else if (_qTab === 'purchase-orders') renderPOsTab(el);
-  else renderInvoicesTab(el);
+  else if (_qTab === 'invoices') renderInvoicesTab(el);
+  else if (_qTab === 'archive') renderArchiveTab(el);
 }
 
 function statusBadge(status) {
-  const colors = { draft:'#f59e0b', sent:'#3b82f6', accepted:'#16a34a', declined:'#dc2626', invoiced:'#8b5cf6', active:'#16a34a', closed:'#6b7280', paid:'#16a34a', overdue:'#dc2626', 'part-paid':'#f59e0b' };
+  const colors = { draft:'#f59e0b', sent:'#3b82f6', accepted:'#16a34a', declined:'#dc2626', invoiced:'#8b5cf6', archived:'#6b7280', active:'#16a34a', closed:'#6b7280', paid:'#16a34a', overdue:'#dc2626', 'part-paid':'#f59e0b' };
   const bg = colors[status] || '#6b7280';
   return `<span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600;text-transform:uppercase;background:${bg}18;color:${bg}">${esc(status)}</span>`;
 }
@@ -2313,18 +2314,19 @@ function money(v) { return '£' + Number(v||0).toFixed(2); }
 
 // ── QUOTES TAB ──
 function renderQuotesTab(el) {
+  const active = _quotes.filter(q => q.status !== 'archived');
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <p style="color:var(--text-light);font-size:13px;margin:0">${_quotes.length} quote${_quotes.length!==1?'s':''}</p>
+      <p style="color:var(--text-light);font-size:13px;margin:0">${active.length} quote${active.length!==1?'s':''}</p>
       <button class="btn btn-primary btn-sm" onclick="showQuoteForm()">+ New Quote</button>
     </div>
-    ${_quotes.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--text-light)">No quotes yet. Create your first quote above.</div>' :
-    _quotes.map(q => `
+    ${active.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--text-light)">No active quotes. Create a new quote above.</div>' :
+    active.map(q => `
       <div class="card" style="margin-bottom:10px;cursor:pointer" onclick="viewQuote(${q.id})">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div>
             <div style="font-weight:700;font-size:15px">${esc(q.quote_number)}</div>
-            <div style="color:var(--text-light);font-size:13px">${esc(q.client_name||'')} — ${esc(q.project_name||'')}</div>
+            <div style="color:var(--text-light);font-size:13px">${esc(q.client_name||'')}${q.project_name ? ' — '+esc(q.project_name) : ''}</div>
           </div>
           <div style="text-align:right">
             ${statusBadge(q.status)}
@@ -2334,6 +2336,44 @@ function renderQuotesTab(el) {
       </div>
     `).join('')}
   `;
+}
+
+// ── ARCHIVE TAB ──
+function renderArchiveTab(el) {
+  const archived = _quotes.filter(q => q.status === 'archived');
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <p style="color:var(--text-light);font-size:13px;margin:0">${archived.length} archived quote${archived.length!==1?'s':''}</p>
+    </div>
+    ${archived.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--text-light)">No archived quotes. Quotes are automatically archived when a purchase order is recorded against them.</div>' :
+    archived.map(q => `
+      <div class="card" style="margin-bottom:10px;border-left:4px solid #6b7280">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="font-weight:700;font-size:15px">${esc(q.quote_number)}</div>
+            <div style="color:var(--text-light);font-size:13px">${esc(q.client_name||'')}${q.project_name ? ' — '+esc(q.project_name) : ''}</div>
+            ${q.description ? `<div style="color:var(--text-light);font-size:12px;margin-top:4px">${esc(q.description).substring(0,80)}${q.description.length>80?'...':''}</div>` : ''}
+          </div>
+          <div style="text-align:right">
+            <span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600;text-transform:uppercase;background:#6b728018;color:#6b7280">archived</span>
+            <div style="font-weight:700;font-size:16px;color:var(--primary);margin-top:4px">${money(q.grand_total)}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
+          <button class="btn btn-sm" onclick="downloadQuotePdf(${q.id})" style="background:#dc2626;color:white;font-size:12px;padding:6px 12px">PDF</button>
+          <button class="btn btn-sm btn-outline" onclick="deleteArchivedQuote(${q.id})" style="color:var(--danger);border-color:var(--danger);font-size:12px;padding:6px 12px">Delete</button>
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+async function deleteArchivedQuote(id) {
+  if (!confirm('Permanently delete this archived quote?')) return;
+  try {
+    await fetch(API+'/api/quotes/'+id, { method:'DELETE', headers: headers() });
+    await loadQuotingData();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 // ── PURCHASE ORDERS TAB ──
