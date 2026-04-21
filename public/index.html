@@ -2369,7 +2369,7 @@ function renderDBScheduleEditor(c) {
         <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">PFC (kA)</label><input id="db-pfc" class="form-control" placeholder="e.g. 25.00"></div>
         <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Project / Site</label><input id="db-project" class="form-control" placeholder="e.g. GSK Stevenage"></div>
         <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Date</label><input id="db-date" type="date" class="form-control"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Pod Room</label><input id="db-podRoom" class="form-control" placeholder="e.g. TX-71471"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Fed From</label><input id="db-podRoom" class="form-control" placeholder="e.g. TX-71471"></div>
         <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">ZDB ID</label><input id="db-zdbId" class="form-control" placeholder=""></div>
       </div>
     </div>
@@ -2523,7 +2523,7 @@ function dbPreview() {
       ${detailRow('Board Size & Rating', b.boardSize)}${detailRow('Manufacturer', b.manufacturer)}
       ${detailRow('Supply Cable Ref', b.supplyCableRef)}${detailRow('PFC (kA)', b.pfc)}
       ${detailRow('Project / Site', b.project)}${detailRow('Date', b.date)}
-      ${detailRow('Pod Room', b.podRoom)}${detailRow('ZDB ID', b.zdbId)}
+      ${detailRow('Fed From', b.podRoom)}${detailRow('ZDB ID', b.zdbId)}
     </table>
 
     <div style="background:#8B1A1A;color:white;padding:8px 14px;font-weight:700;font-size:13px;border-radius:4px 4px 0 0">CIRCUIT SCHEDULE</div>

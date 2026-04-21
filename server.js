@@ -1262,7 +1262,7 @@ async function startApp() {
             new TableRow({ children: [h.lbl("Board Size & Rating", 2340), h.val('', 2340), h.lbl("Manufacturer", 2340), h.val('', 2340)] }),
             new TableRow({ children: [h.lbl("Supply Cable Ref", 2340), h.val('', 2340), h.lbl("PFC (kA)", 2340), h.val('', 2340)] }),
             new TableRow({ children: [h.lbl("Project / Site", 2340), h.val('', 2340), h.lbl("Date", 2340), h.val('', 2340)] }),
-            new TableRow({ children: [h.lbl("Pod Room", 2340), h.val('', 2340), h.lbl("ZDB ID", 2340), h.val('', 2340)] }),
+            new TableRow({ children: [h.lbl("Fed From", 2340), h.val('', 2340), h.lbl("ZDB ID", 2340), h.val('', 2340)] }),
           ] }),
 
           h.sh("CIRCUIT SCHEDULE"),
@@ -1428,7 +1428,7 @@ async function startApp() {
         new TableRow({ children: [h.lbl("Board Size & Rating", 2340), h.val(b.boardSize||'', 2340), h.lbl("Manufacturer", 2340), h.val(b.manufacturer||'', 2340)] }),
         new TableRow({ children: [h.lbl("Supply Cable Ref", 2340), h.val(b.supplyCableRef||'', 2340), h.lbl("PFC (kA)", 2340), h.val(b.pfc||'', 2340)] }),
         new TableRow({ children: [h.lbl("Project / Site", 2340), h.val(b.project||'', 2340), h.lbl("Date", 2340), h.val(b.date||'', 2340)] }),
-        new TableRow({ children: [h.lbl("Pod Room", 2340), h.val(b.podRoom||'', 2340), h.lbl("ZDB ID", 2340), h.val(b.zdbId||'', 2340)] }),
+        new TableRow({ children: [h.lbl("Fed From", 2340), h.val(b.podRoom||'', 2340), h.lbl("ZDB ID", 2340), h.val(b.zdbId||'', 2340)] }),
       ] });
 
       const headerRow = new TableRow({ children: colHeads.map((head, i) =>
@@ -1539,7 +1539,7 @@ async function startApp() {
       drawDetailRow([['Board Size & Rating', b.boardSize], ['Manufacturer', b.manufacturer]]);
       drawDetailRow([['Supply Cable Ref', b.supplyCableRef], ['PFC (kA)', b.pfc]]);
       drawDetailRow([['Project / Site', b.project], ['Date', b.date]]);
-      drawDetailRow([['Pod Room', b.podRoom], ['ZDB ID', b.zdbId]]);
+      drawDetailRow([['Fed From', b.podRoom], ['ZDB ID', b.zdbId]]);
       doc.moveDown(0.5);
 
       // Circuit table
