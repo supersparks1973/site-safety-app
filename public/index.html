@@ -2328,6 +2328,7 @@ function renderQuotesTab(el) {
           <div>
             <div style="font-weight:700;font-size:15px">${esc(q.quote_number)}</div>
             <div style="color:var(--text-light);font-size:13px">${esc(q.client_name||'')}${q.company ? ' — '+esc(q.company) : ''}</div>
+            ${q.description ? `<div style="color:var(--text-light);font-size:12px;margin-top:4px">${esc(q.description).substring(0,100)}${q.description.length>100?'...':''}</div>` : ''}
           </div>
           <div style="text-align:right">
             ${statusBadge(q.status)}
