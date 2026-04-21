@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.7 - Fix docx reference error in template endpoint -->
+<!-- v3.8 - Add Project Manager role -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -588,10 +588,11 @@ function showApp() {
   // Sidebar user info
   const name = state.user.name || state.user.username || 'User';
   document.getElementById('sidebarName').textContent = name;
-  document.getElementById('sidebarRole').textContent = state.user.role;
+  document.getElementById('sidebarRole').textContent = state.user.role === 'project_manager' ? 'Project Manager' : state.user.role.charAt(0).toUpperCase() + state.user.role.slice(1);
   document.getElementById('sidebarAvatar').textContent = name.charAt(0).toUpperCase();
 
-  if (state.user.role === 'admin') {
+  const isAdmin = state.user.role === 'admin' || state.user.role === 'project_manager';
+  if (isAdmin) {
     document.getElementById('adminNav').classList.remove('hidden');
     document.getElementById('operativeNav').classList.add('hidden');
     document.getElementById('sidebarAdminNav').classList.remove('hidden');
@@ -1510,7 +1511,7 @@ async function renderAdminUsers(c) {
         <div class="form-group"><label>Username</label><input type="text" id="newUsername" placeholder="e.g. jsmith" autocapitalize="none"></div>
         <div class="form-group"><label>Password</label><input type="password" id="newPassword" placeholder="Min 6 characters"></div>
         <div class="form-group"><label>Role</label>
-          <select id="newRole"><option value="operative">Operative</option><option value="admin">Admin</option></select>
+          <select id="newRole"><option value="operative">Operative</option><option value="project_manager">Project Manager</option><option value="admin">Admin</option></select>
         </div>
         <button class="btn btn-primary btn-sm" onclick="addUser()">Add User</button>
       </div>
@@ -1519,13 +1520,13 @@ async function renderAdminUsers(c) {
         <div class="card">
           <div class="card-header">
             <h3>${u.full_name}</h3>
-            <span class="badge" style="background:#e2e8f0">${u.role}</span>
+            <span class="badge" style="background:${u.role==='admin'?'#fee2e2':u.role==='project_manager'?'#dbeafe':'#e2e8f0'};color:${u.role==='admin'?'#991b1b':u.role==='project_manager'?'#1e40af':'#475569'}">${u.role==='project_manager'?'Project Manager':u.role.charAt(0).toUpperCase()+u.role.slice(1)}</span>
           </div>
           <div class="card-body">
             <p><strong>Username:</strong> ${u.username}</p>
             <p><strong>Created:</strong> ${new Date(u.created_at).toLocaleDateString()}</p>
           </div>
-          ${u.role !== 'admin' ? `<button class="btn btn-outline btn-sm" style="margin-top:8px;color:var(--danger);border-color:var(--danger)" onclick="deleteUser(${u.id})">Remove</button>` : ''}
+          ${u.role === 'operative' ? `<button class="btn btn-outline btn-sm" style="margin-top:8px;color:var(--danger);border-color:var(--danger)" onclick="deleteUser(${u.id})">Remove</button>` : ''}
         </div>
       `).join('')}
     `;
@@ -1912,7 +1913,7 @@ async function renderTBList(container) {
               <td style="display:flex;gap:6px;flex-wrap:wrap">
                 <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="tbViewTalk(${t.id})">View</button>
                 <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="downloadTalkDocx(${t.id},'${esc(t.topic)}')">📄 Word</button>
-                ${state.user.role === 'admin' ? `<button class="btn" style="font-size:12px;padding:4px 10px;background:#dc2626;color:#fff" onclick="tbDeleteTalk(${t.id})">Delete</button>` : ''}
+                ${(state.user.role === 'admin' || state.user.role === 'project_manager') ? `<button class="btn" style="font-size:12px;padding:4px 10px;background:#dc2626;color:#fff" onclick="tbDeleteTalk(${t.id})">Delete</button>` : ''}
               </td>
             </tr>`;
           }).join('')}
@@ -2106,7 +2107,7 @@ async function renderTBDetail(container) {
     <div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-secondary" onclick="tbTalksView='list';renderToolboxTalks(document.getElementById('appContent'))">← Back to Talks</button>
       <button class="btn btn-primary" onclick="downloadTalkDocx(${talk.id},'${esc(talk.topic)}')">📄 Download Word Doc</button>
-      ${state.user.role === 'admin' ? `<button class="btn" style="background:#dc2626;color:#fff" onclick="tbDeleteTalk(${talk.id})">🗑 Delete</button>` : ''}
+      ${(state.user.role === 'admin' || state.user.role === 'project_manager') ? `<button class="btn" style="background:#dc2626;color:#fff" onclick="tbDeleteTalk(${talk.id})">🗑 Delete</button>` : ''}
     </div>
     <div class="card">
       <h2 style="color:#8B1A1A;margin-bottom:16px">${esc(talk.topic)}</h2>

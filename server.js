@@ -182,7 +182,7 @@ async function startApp() {
   }
 
   function adminOnly(req, res, next) {
-    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+    if (req.user.role !== 'admin' && req.user.role !== 'project_manager') return res.status(403).json({ error: 'Admin access required' });
     next();
   }
 
@@ -216,7 +216,7 @@ async function startApp() {
   });
 
   app.delete('/api/users/:id', authenticate, adminOnly, async (req, res) => {
-    await pool.query('DELETE FROM users WHERE id = $1 AND role != $2', [req.params.id, 'admin']);
+    await pool.query("DELETE FROM users WHERE id = $1 AND role NOT IN ('admin', 'project_manager')", [req.params.id]);
     res.json({ success: true });
   });
 
@@ -236,7 +236,7 @@ async function startApp() {
   });
 
   app.get('/api/near-miss', authenticate, async (req, res) => {
-    if (req.user.role === 'admin') {
+    if (req.user.role === 'admin' || req.user.role === 'project_manager') {
       const { rows } = await pool.query('SELECT n.*, u.full_name as reported_by FROM near_miss_reports n JOIN users u ON n.user_id = u.id ORDER BY n.created_at DESC');
       res.json(rows);
     } else {
