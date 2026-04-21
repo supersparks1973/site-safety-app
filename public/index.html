@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.2 - Hide training form and delete for External View -->
+<!-- v4.3 - Fix rescue plan detail spacing and layout -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2895,33 +2895,68 @@ window.showRescuePlanDetail = async function(id) {
   try { checklist = JSON.parse(p.checklist || '{}'); } catch {}
   const checkIcon = (key) => checklist[key] === 'Yes' ? '✅' : '❌';
 
+  const pStyle = 'margin:6px 0;line-height:1.6';
+  const sectionTitle = 'font-weight:700;font-size:14px;color:var(--primary);margin:14px 0 8px;text-transform:uppercase;letter-spacing:0.5px';
+  const checkGrid = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px 16px;font-size:13px;line-height:1.8';
+
   document.body.insertAdjacentHTML('beforeend', `
     <div class="modal-overlay" onclick="if(event.target===this)this.remove()">
-      <div class="modal">
-        <h3>🆘 Rescue Plan — ${p.project_name}</h3>
-        <p><strong>Client:</strong> ${p.client_name}</p>
-        <p><strong>Location:</strong> ${p.location}</p>
-        <p><strong>Operation:</strong> ${p.operation}</p>
-        <p><strong>Project Manager:</strong> ${p.project_manager}</p>
-        <p><strong>Date:</strong> ${p.date}</p>
-        <hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
-        <p><strong>Rescue Supervisor:</strong> ${p.rescue_supervisor}</p>
-        <p><strong>Attendant:</strong> ${p.attendant || '—'}</p>
-        <p><strong>Rescue Team:</strong> ${p.rescue_team || '—'}</p>
-        <hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
-        <p><strong>Comms Method:</strong> ${p.comms_method}</p>
-        <p><strong>Nearest Hospital:</strong> ${p.nearest_hospital}</p>
-        <p><strong>Rescue Method:</strong> ${p.rescue_method}</p>
-        ${p.scene_protection ? `<p><strong>Scene Protection:</strong> ${p.scene_protection}</p>` : ''}
-        <hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
-        <p><strong>Pre-Rescue Checklist:</strong></p>
-        <p style="font-size:13px">${checkIcon('check_team_briefed')} Team briefed &nbsp; ${checkIcon('check_equipment_checked')} Equipment checked &nbsp; ${checkIcon('check_comms_tested')} Comms tested</p>
-        <p style="font-size:13px">${checkIcon('check_first_aid')} First aid confirmed &nbsp; ${checkIcon('check_access_routes')} Access routes &nbsp; ${checkIcon('check_emergency_services')} Emergency access</p>
-        <p style="margin-top:8px"><strong>Equipment:</strong></p>
-        <p style="font-size:13px">${checkIcon('equip_harness')} Harness &nbsp; ${checkIcon('equip_lanyard')} Lanyard &nbsp; ${checkIcon('equip_tripod')} Tripod &nbsp; ${checkIcon('equip_winch')} Winch</p>
-        <p style="font-size:13px">${checkIcon('equip_first_aid')} First aid &nbsp; ${checkIcon('equip_stretcher')} Stretcher &nbsp; ${checkIcon('equip_radio')} Radios &nbsp; ${checkIcon('equip_gas_monitor')} Gas monitor</p>
-        ${p.signature ? `<div style="margin-top:12px"><strong>Signature:</strong><br><img src="${p.signature}" style="max-width:200px;max-height:80px;border:1px solid var(--border);border-radius:4px;margin-top:4px"></div>` : ''}
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+      <div class="modal" style="max-width:640px">
+        <h3 style="margin-bottom:16px">🆘 Rescue Plan — ${p.project_name}</h3>
+
+        <div style="${sectionTitle}">Project Details</div>
+        <p style="${pStyle}"><strong>Client:</strong> ${p.client_name}</p>
+        <p style="${pStyle}"><strong>Location:</strong> ${p.location}</p>
+        <p style="${pStyle}"><strong>Operation:</strong> ${p.operation}</p>
+        <p style="${pStyle}"><strong>Project Manager:</strong> ${p.project_manager}</p>
+        <p style="${pStyle}"><strong>Date:</strong> ${p.date}</p>
+
+        <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
+
+        <div style="${sectionTitle}">Persons Responsible</div>
+        <p style="${pStyle}"><strong>Rescue Supervisor:</strong> ${p.rescue_supervisor}</p>
+        <p style="${pStyle}"><strong>Attendant:</strong> ${p.attendant || '—'}</p>
+        <p style="${pStyle}"><strong>Rescue Team:</strong> ${p.rescue_team || '—'}</p>
+
+        <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
+
+        <div style="${sectionTitle}">Communication & Emergency</div>
+        <p style="${pStyle}"><strong>Comms Method:</strong> ${p.comms_method}</p>
+        <p style="${pStyle}"><strong>Nearest Hospital:</strong> ${p.nearest_hospital}</p>
+
+        <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
+
+        <div style="${sectionTitle}">Rescue Procedure</div>
+        <p style="${pStyle};white-space:pre-line"><strong>Rescue Method:</strong><br>${p.rescue_method}</p>
+        ${p.scene_protection ? `<p style="${pStyle};white-space:pre-line;margin-top:10px"><strong>Scene Protection:</strong><br>${p.scene_protection}</p>` : ''}
+
+        <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
+
+        <div style="${sectionTitle}">Pre-Rescue Checklist</div>
+        <div style="${checkGrid}">
+          <span>${checkIcon('check_team_briefed')} Team briefed</span>
+          <span>${checkIcon('check_equipment_checked')} Equipment checked</span>
+          <span>${checkIcon('check_comms_tested')} Comms tested</span>
+          <span>${checkIcon('check_first_aid')} First aid confirmed</span>
+          <span>${checkIcon('check_access_routes')} Access routes</span>
+          <span>${checkIcon('check_emergency_services')} Emergency access</span>
+        </div>
+
+        <div style="${sectionTitle};margin-top:16px">Equipment Available</div>
+        <div style="${checkGrid}">
+          <span>${checkIcon('equip_harness')} Harness</span>
+          <span>${checkIcon('equip_lanyard')} Lanyard</span>
+          <span>${checkIcon('equip_tripod')} Tripod</span>
+          <span>${checkIcon('equip_winch')} Winch</span>
+          <span>${checkIcon('equip_first_aid')} First aid kit</span>
+          <span>${checkIcon('equip_stretcher')} Stretcher</span>
+          <span>${checkIcon('equip_radio')} Radios</span>
+          <span>${checkIcon('equip_gas_monitor')} Gas monitor</span>
+        </div>
+
+        ${p.signature ? `<div style="margin-top:16px"><strong>Signature:</strong><br><img src="${p.signature}" style="max-width:200px;max-height:80px;border:1px solid var(--border);border-radius:4px;margin-top:6px"></div>` : ''}
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
           <button class="btn btn-outline btn-sm" onclick="exportPDF('rescue-plan', ${JSON.stringify(p).replace(/'/g, "\\'").replace(/"/g, '&quot;')})">📄 PDF</button>
           <button class="btn btn-outline btn-sm" onclick="downloadRescueDocx(${p.id}, '${(p.project_name||'Rescue_Plan').replace(/'/g, "\\'")}')">📝 Word Doc</button>
           <button class="btn btn-outline btn-sm" onclick="this.closest('.modal-overlay').remove()">Close</button>
