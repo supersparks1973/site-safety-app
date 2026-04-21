@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v5.11 - Separate Client Name/Company, auto-archive 12 months -->
+<!-- v5.12 - Ready to Invoice button on POs, PO archiving -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2530,18 +2530,20 @@ async function deleteArchivedQuote(id) {
 
 // ── PURCHASE ORDERS TAB ──
 function renderPOsTab(el) {
+  const activePOs = _pos.filter(po => po.status !== 'archived');
+  const archivedPOs = _pos.filter(po => po.status === 'archived');
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <p style="color:var(--text-light);font-size:13px;margin:0">${_pos.length} purchase order${_pos.length!==1?'s':''}</p>
+      <p style="color:var(--text-light);font-size:13px;margin:0">${activePOs.length} active purchase order${activePOs.length!==1?'s':''}${archivedPOs.length ? ', '+archivedPOs.length+' archived' : ''}</p>
       <button class="btn btn-primary btn-sm" onclick="showPOForm()">+ Record PO</button>
     </div>
-    ${_pos.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--text-light)">No purchase orders recorded yet.</div>' :
-    _pos.map(po => `
+    ${activePOs.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--text-light)">No active purchase orders.</div>' :
+    activePOs.map(po => `
       <div class="card" style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div>
             <div style="font-weight:700;font-size:15px">PO: ${esc(po.po_number)}</div>
-            <div style="color:var(--text-light);font-size:13px">${esc(po.client_name||'')} — ${esc(po.project_name||'')}</div>
+            <div style="color:var(--text-light);font-size:13px">${esc(po.client_name||'')} \u2014 ${esc(po.project_name||'')}</div>
             ${po.quote_number ? `<div style="font-size:12px;color:var(--text-light);margin-top:2px">Quote ref: ${esc(po.quote_number)}</div>` : ''}
           </div>
           <div style="text-align:right">
@@ -2550,10 +2552,32 @@ function renderPOsTab(el) {
           </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
+          <button class="btn btn-sm" onclick="readyToInvoice(${po.id})" style="background:#166534;color:white;font-size:12px;padding:6px 14px">Ready to Invoice</button>
           <button class="btn btn-sm btn-outline" onclick="deletePO(${po.id})" style="color:var(--danger);border-color:var(--danger)">Delete</button>
         </div>
       </div>
     `).join('')}
+
+    ${archivedPOs.length > 0 ? `
+    <h4 style="color:#6b7280;font-size:14px;margin:24px 0 10px 0;padding-bottom:6px;border-bottom:2px solid #d1d5db">ARCHIVED PURCHASE ORDERS</h4>
+    ${archivedPOs.map(po => `
+      <div class="card" style="margin-bottom:10px;border-left:4px solid #6b7280;opacity:0.8">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="font-weight:700;font-size:15px">PO: ${esc(po.po_number)}</div>
+            <div style="color:var(--text-light);font-size:13px">${esc(po.client_name||'')} \u2014 ${esc(po.project_name||'')}</div>
+            ${po.quote_number ? `<div style="font-size:12px;color:var(--text-light);margin-top:2px">Quote ref: ${esc(po.quote_number)}</div>` : ''}
+          </div>
+          <div style="text-align:right">
+            <span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600;text-transform:uppercase;background:#6b728018;color:#6b7280">archived</span>
+            <div style="font-weight:700;font-size:16px;color:var(--primary);margin-top:4px">${money(po.po_value)}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
+          <button class="btn btn-sm btn-outline" onclick="deletePO(${po.id})" style="color:var(--danger);border-color:var(--danger);font-size:12px;padding:6px 12px">Delete</button>
+        </div>
+      </div>
+    `).join('')}` : ''}
   `;
 }
 
@@ -2789,6 +2813,44 @@ async function deletePO(id) {
     await fetch(API+'/api/purchase-orders/'+id, { method:'DELETE', headers: headers() });
     await loadQuotingData();
   } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function readyToInvoice(poId) {
+  const po = _pos.find(p => p.id == poId);
+  if (!po) return;
+  // Find linked quote if any
+  const q = po.quote_id ? _quotes.find(x => x.id == po.quote_id) : null;
+  // Ask about archiving PO
+  const archivePO = confirm('Move this Purchase Order to Archives?');
+  if (archivePO) {
+    try {
+      await fetch(API+'/api/purchase-orders/'+poId, {
+        method: 'PUT',
+        headers: { ...headers(), 'Content-Type':'application/json' },
+        body: JSON.stringify({ ...po, status: 'archived' })
+      });
+    } catch(e) { /* continue anyway */ }
+  }
+  // Switch to invoices tab and open new invoice form pre-filled
+  _qTab = 'invoices';
+  await loadQuotingData();
+  // Build a pre-filled invoice object from the PO + quote data
+  const prefill = {
+    quote_id: po.quote_id || null,
+    po_id: po.id,
+    client_name: q ? ((q.client_name||'') + (q.company ? ' \u2014 '+q.company : '')) : (po.client_name||''),
+    client_address: q ? (q.client_address||'') : '',
+    project_name: po.project_name || (q ? q.project_name : '') || '',
+    invoice_date: today(),
+    status: 'draft',
+    subtotal_labour: q ? Number(q.subtotal_labour||0) : 0,
+    subtotal_materials: q ? Number(q.subtotal_materials||0) : 0,
+    subtotal_plant: q ? Number(q.subtotal_plant||0) : 0,
+    payment_terms: 'N/A',
+    amount_paid: 0,
+    notes: 'PO ref: ' + po.po_number
+  };
+  showInvoiceForm(prefill);
 }
 
 // ── INVOICE FORM ──
