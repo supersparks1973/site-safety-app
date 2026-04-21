@@ -1231,8 +1231,8 @@ async function startApp() {
 
       // ── Custom DB Schedule template ──
       if (tmpl.custom && key === 'db-schedule') {
-        const colWidths = [700, 900, 900, 900, 3060, 1100, 900, 900];
-        const colHeads = ['Cct No','Cct Ref','MCB Rating (A)','MCB Type','Supply/ng','Cable Type','Cable Size','CPC Size'];
+        const colWidths = [550, 650, 600, 500, 600, 750, 2200, 800, 650, 650];
+        const colHeads = ['Cct No','Cct Phase','BS (EN)','Type','Rating (A)','Short-circuit capacity (kA)','Supply/ng','Cable Type','Cable Size','CPC Size'];
         const headerRow = new TableRow({ children: colHeads.map((head, i) =>
           new TableCell({ borders: h.bds, width: { size: colWidths[i], type: WidthType.DXA },
             shading: { fill: "8B1A1A", type: ShadingType.CLEAR }, margins: h.cm,
@@ -1398,8 +1398,8 @@ async function startApp() {
     try {
       const { board, circuits } = req.body;
       const h = docxHelpers();
-      const colWidths = [700, 900, 900, 900, 3060, 1100, 900, 900];
-      const colHeads = ['Cct No','Cct Ref','MCB Rating (A)','MCB Type','Supply/ng','Cable Type','Cable Size','CPC Size'];
+      const colWidths = [550, 650, 600, 500, 600, 750, 2200, 800, 650, 650];
+      const colHeads = ['Cct No','Cct Phase','BS (EN)','Type','Rating (A)','Short-circuit capacity (kA)','Supply/ng','Cable Type','Cable Size','CPC Size'];
 
       const titleChildren = [];
       const logoRuns = [];
@@ -1437,7 +1437,7 @@ async function startApp() {
           children: [new Paragraph({ children: [new TextRun({ text: head, bold: true, font: "Arial", size: 16, color: "FFFFFF" })] })] })
       ) });
       const rows = (circuits || []).map((row, idx) =>
-        new TableRow({ children: [row.cctNo,row.cctRef,row.mcbRating,row.mcbType,row.supplying,row.cableType,row.cableSize,row.cpcSize].map((cell, i) =>
+        new TableRow({ children: [row.cctNo,row.cctPhase,row.bsEn,row.type,row.ratingA,row.scCapacity,row.supplying,row.cableType,row.cableSize,row.cpcSize].map((cell, i) =>
           new TableCell({ borders: h.bds, width: { size: colWidths[i], type: WidthType.DXA },
             shading: idx % 2 === 1 ? { fill: "F9F5F5", type: ShadingType.CLEAR } : undefined, margins: h.cm,
             children: [new Paragraph({ children: [new TextRun({ text: (cell||'').toString() || ' ', font: "Arial", size: 16 })] })] })
@@ -1476,8 +1476,8 @@ async function startApp() {
     try {
       const { board, circuits } = req.body;
       const b = board || {};
-      const colHeads = ['Cct No','Cct Ref','MCB (A)','MCB Type','Supply/ng','Cable Type','Cable Size','CPC Size'];
-      const colW = [40, 50, 45, 50, 220, 60, 50, 50];
+      const colHeads = ['Cct No','Cct Phase','BS (EN)','Type','Rating (A)','SC (kA)','Supply/ng','Cable Type','Cable Size','CPC Size'];
+      const colW = [35, 40, 40, 35, 42, 40, 175, 50, 42, 42];
       const tableX = 40;
       const maroon = [139, 26, 26];
 
@@ -1560,7 +1560,7 @@ async function startApp() {
         if (doc.y > doc.page.height - 60) { doc.addPage(); drawTableHeader(); }
         let x = tableX;
         const y = doc.y;
-        const vals = [row.cctNo, row.cctRef, row.mcbRating, row.mcbType, row.supplying, row.cableType, row.cableSize, row.cpcSize];
+        const vals = [row.cctNo, row.cctPhase, row.bsEn, row.type, row.ratingA, row.scCapacity, row.supplying, row.cableType, row.cableSize, row.cpcSize];
         vals.forEach((cell, i) => {
           if (idx % 2 === 1) doc.rect(x, y, colW[i], 15).fill(249, 245, 245);
           doc.rect(x, y, colW[i], 15).strokeColor(200,200,200).stroke();

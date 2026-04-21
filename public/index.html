@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v5.1 - Official NICEIC Approved Contractor logo -->
+<!-- v5.2 - Updated DB Schedule columns: Cct Phase, BS (EN), Type, Rating (A), SC (kA) -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2330,7 +2330,7 @@ function renderSiteTemplates(c) {
 // DB SCHEDULE EDITOR
 // ═══════════════════════════════════════
 function renderDBScheduleEditor(c) {
-  const defaultCircuits = Array.from({length:6}, (_,i) => ({ cctNo:String(i+1), cctRef:'', mcbRating:'', mcbType:'B', supplying:'', cableType:'', cableSize:'', cpcSize:'' }));
+  const defaultCircuits = Array.from({length:6}, (_,i) => ({ cctNo:String(i+1), cctPhase:'', bsEn:'', type:'B', ratingA:'', scCapacity:'', supplying:'', cableType:'', cableSize:'', cpcSize:'' }));
 
   c.innerHTML = `
     <div style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
@@ -2385,10 +2385,12 @@ function renderDBScheduleEditor(c) {
           <thead>
             <tr style="background:#8B1A1A;color:white">
               <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">Cct No</th>
-              <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">Cct Ref</th>
-              <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">MCB (A)</th>
-              <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">MCB Type</th>
-              <th style="padding:8px 6px;text-align:left;font-weight:600;min-width:200px">Supply/ng</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">Cct Phase</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">BS (EN)</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">Type</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">Rating (A)</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">SC (kA)</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;min-width:180px">Supply/ng</th>
               <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">Cable Type</th>
               <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">Cable Size</th>
               <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">CPC Size</th>
@@ -2433,13 +2435,15 @@ function dbRenderRows() {
   tbody.innerHTML = window._dbCircuits.map((r, i) => `
     <tr style="background:${i%2===1?'#fdf8f8':'white'};border-bottom:1px solid #f3f4f6">
       <td style="padding:4px 3px"><input value="${esc(r.cctNo)}" onchange="window._dbCircuits[${i}].cctNo=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;text-align:center" /></td>
-      <td style="padding:4px 3px"><input value="${esc(r.cctRef)}" onchange="window._dbCircuits[${i}].cctRef=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px" /></td>
-      <td style="padding:4px 3px"><input value="${esc(r.mcbRating)}" onchange="window._dbCircuits[${i}].mcbRating=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;text-align:center" placeholder="A" /></td>
+      <td style="padding:4px 3px"><input value="${esc(r.cctPhase)}" onchange="window._dbCircuits[${i}].cctPhase=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px" placeholder="L1/L2/L3" /></td>
+      <td style="padding:4px 3px"><input value="${esc(r.bsEn)}" onchange="window._dbCircuits[${i}].bsEn=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px" placeholder="e.g. 60898" /></td>
       <td style="padding:4px 3px">
-        <select onchange="window._dbCircuits[${i}].mcbType=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;background:white">
-          <option ${r.mcbType==='B'?'selected':''}>B</option><option ${r.mcbType==='C'?'selected':''}>C</option><option ${r.mcbType==='D'?'selected':''}>D</option>
+        <select onchange="window._dbCircuits[${i}].type=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;background:white">
+          <option ${r.type==='B'?'selected':''}>B</option><option ${r.type==='C'?'selected':''}>C</option><option ${r.type==='D'?'selected':''}>D</option>
         </select>
       </td>
+      <td style="padding:4px 3px"><input value="${esc(r.ratingA)}" onchange="window._dbCircuits[${i}].ratingA=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;text-align:center" placeholder="A" /></td>
+      <td style="padding:4px 3px"><input value="${esc(r.scCapacity)}" onchange="window._dbCircuits[${i}].scCapacity=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;text-align:center" placeholder="kA" /></td>
       <td style="padding:4px 3px"><input value="${esc(r.supplying)}" onchange="window._dbCircuits[${i}].supplying=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px" placeholder="Description of supply" /></td>
       <td style="padding:4px 3px"><input value="${esc(r.cableType)}" onchange="window._dbCircuits[${i}].cableType=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px" placeholder="e.g. SWA" /></td>
       <td style="padding:4px 3px"><input value="${esc(r.cableSize)}" onchange="window._dbCircuits[${i}].cableSize=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px" placeholder="mm²" /></td>
@@ -2451,7 +2455,7 @@ function dbRenderRows() {
 
 function dbAddRow() {
   const n = window._dbCircuits.length + 1;
-  window._dbCircuits.push({ cctNo: String(n), cctRef:'', mcbRating:'', mcbType:'B', supplying:'', cableType:'', cableSize:'', cpcSize:'' });
+  window._dbCircuits.push({ cctNo: String(n), cctPhase:'', bsEn:'', type:'B', ratingA:'', scCapacity:'', supplying:'', cableType:'', cableSize:'', cpcSize:'' });
   dbRenderRows();
   // Scroll to bottom of table
   const tbody = document.getElementById('dbCircuitBody');
@@ -2529,17 +2533,20 @@ function dbPreview() {
     <div style="background:#8B1A1A;color:white;padding:8px 14px;font-weight:700;font-size:13px;border-radius:4px 4px 0 0">CIRCUIT SCHEDULE</div>
     <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px">
       <thead><tr style="background:#8B1A1A;color:white">
-        <th style="padding:6px 8px;text-align:left">Cct No</th><th style="padding:6px 8px;text-align:left">Cct Ref</th>
-        <th style="padding:6px 8px;text-align:left">MCB (A)</th><th style="padding:6px 8px;text-align:left">MCB Type</th>
+        <th style="padding:6px 8px;text-align:left">Cct No</th><th style="padding:6px 8px;text-align:left">Cct Phase</th>
+        <th style="padding:6px 8px;text-align:left">BS (EN)</th><th style="padding:6px 8px;text-align:left">Type</th>
+        <th style="padding:6px 8px;text-align:left">Rating (A)</th><th style="padding:6px 8px;text-align:left">SC (kA)</th>
         <th style="padding:6px 8px;text-align:left">Supply/ng</th><th style="padding:6px 8px;text-align:left">Cable Type</th>
         <th style="padding:6px 8px;text-align:left">Cable Size</th><th style="padding:6px 8px;text-align:left">CPC Size</th>
       </tr></thead>
       <tbody>
         ${data.circuits.map((r, i) => `<tr style="background:${i%2===1?'#fdf8f8':'white'}">
           <td style="padding:5px 8px;border:1px solid #eee">${esc(r.cctNo)}</td>
-          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.cctRef)}</td>
-          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.mcbRating)}</td>
-          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.mcbType)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.cctPhase)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.bsEn)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.type)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.ratingA)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.scCapacity)}</td>
           <td style="padding:5px 8px;border:1px solid #eee">${esc(r.supplying)}</td>
           <td style="padding:5px 8px;border:1px solid #eee">${esc(r.cableType)}</td>
           <td style="padding:5px 8px;border:1px solid #eee">${esc(r.cableSize)}</td>
