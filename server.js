@@ -2188,6 +2188,107 @@ async function startApp() {
     } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
   });
 
+  // ── Matrix PDF ──
+  app.post('/api/quotes/matrix/pdf', authenticate, adminOnly, async (req, res) => {
+    try {
+      const { rows: matrixRows } = req.body;
+      const maroon = [139, 26, 26];
+      const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margins: { top: 50, bottom: 50, left: 40, right: 40 } });
+      const chunks = [];
+      doc.on('data', c => chunks.push(c));
+      doc.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="ManProjects-Quote-PO-Matrix.pdf"');
+        res.send(buf);
+      });
+      const logoPath = path.join(__dirname, 'public', 'logo.png');
+      const niceicPath = path.join(__dirname, 'public', 'niceic-logo.png');
+      if (fs.existsSync(logoPath)) doc.image(logoPath, 40, 25, { width: 140 });
+      if (fs.existsSync(niceicPath)) doc.image(niceicPath, 195, 32, { width: 80 });
+      doc.moveDown(3);
+      doc.strokeColor(...maroon).lineWidth(2).moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke();
+      doc.moveDown(0.4);
+      doc.fillColor(50,50,50).fontSize(14).font('Helvetica-Bold').text('QUOTES & PURCHASE ORDERS MATRIX', { align: 'center' });
+      doc.fillColor(170,170,170).fontSize(7).font('Helvetica-Oblique').text('ManProjects Ltd \u2014 Generated ' + new Date().toLocaleDateString('en-GB'), { align: 'center' });
+      doc.moveDown(0.6);
+
+      const colW = [58, 80, 110, 48, 48, 48, 52, 42, 54, 52, 52, 52];
+      const heads = ['Quote No.','Client','Description','Labour','Materials','Other','Total','Status','PO Number','PO Value','Invoice','Invoiced'];
+      const tableX = 40;
+      const totalW = colW.reduce((a,b)=>a+b,0);
+
+      const drawHeader = () => {
+        const y = doc.y;
+        doc.roundedRect(tableX, y, totalW, 16, 2).fill(...maroon);
+        let x = tableX;
+        heads.forEach((h, i) => {
+          doc.fillColor(255,255,255).fontSize(5.5).font('Helvetica-Bold').text(h, x + 3, y + 4, { width: colW[i] - 6 });
+          x += colW[i];
+        });
+        doc.y = y + 17;
+      };
+      drawHeader();
+
+      const fmt = v => '\u00a3' + Number(v||0).toFixed(2);
+      let totLabour = 0, totMat = 0, totOther = 0, totGrand = 0, totPO = 0, totInv = 0;
+
+      (matrixRows || []).forEach((r, idx) => {
+        if (doc.y > doc.page.height - 60) { doc.addPage(); drawHeader(); }
+        const q = r.quote || {};
+        const po = r.po;
+        const inv = r.invoice;
+        const y = doc.y; const rH = 14;
+        if (idx % 2 === 1) doc.rect(tableX, y, totalW, rH).fill(250,246,246);
+        else doc.rect(tableX, y, totalW, rH).fill(255,255,255);
+        doc.strokeColor(235,235,235).lineWidth(0.3).moveTo(tableX, y + rH).lineTo(tableX + totalW, y + rH).stroke();
+        let x = tableX;
+        const vals = [
+          q.quote_number || '',
+          (q.client_name || '').substring(0, 18),
+          (q.description || '').substring(0, 24),
+          fmt(q.subtotal_labour),
+          fmt(q.subtotal_materials),
+          fmt(q.subtotal_plant),
+          fmt(q.grand_total),
+          (q.status || '').toUpperCase(),
+          po ? (po.po_number || '') : '\u2014',
+          po ? fmt(po.po_value) : '\u2014',
+          inv ? (inv.invoice_number || '') : '\u2014',
+          inv ? fmt(inv.grand_total) : '\u2014'
+        ];
+        vals.forEach((cell, i) => {
+          const isNum = [3,4,5,6,9,11].includes(i);
+          const clr = (i >= 8 && i <= 9 && po) ? [22,101,52] : (i >= 10 && inv) ? [30,64,175] : (!po && i >= 8) ? [200,200,200] : [50,50,50];
+          doc.fillColor(...clr).fontSize(5.5).font(i === 6 || i === 7 ? 'Helvetica-Bold' : 'Helvetica').text(cell, x + 3, y + 3.5, { width: colW[i] - 6, align: isNum ? 'right' : 'left' });
+          x += colW[i];
+        });
+        doc.y = y + rH;
+        totLabour += Number(q.subtotal_labour||0); totMat += Number(q.subtotal_materials||0);
+        totOther += Number(q.subtotal_plant||0); totGrand += Number(q.grand_total||0);
+        if (po) totPO += Number(po.po_value||0);
+        if (inv) totInv += Number(inv.grand_total||0);
+      });
+
+      // Totals row
+      const ty = doc.y; const tH = 16;
+      doc.rect(tableX, ty, totalW, tH).fill(245,237,237);
+      doc.strokeColor(...maroon).lineWidth(1).moveTo(tableX, ty).lineTo(tableX + totalW, ty).stroke();
+      let tx = tableX;
+      const totVals = ['TOTALS','','', fmt(totLabour), fmt(totMat), fmt(totOther), fmt(totGrand), '', '', fmt(totPO), '', fmt(totInv)];
+      totVals.forEach((cell, i) => {
+        const isNum = [3,4,5,6,9,11].includes(i);
+        doc.fillColor(...maroon).fontSize(6).font('Helvetica-Bold').text(cell, tx + 3, ty + 4.5, { width: colW[i] - 6, align: isNum ? 'right' : 'left' });
+        tx += colW[i];
+      });
+
+      const footY = doc.page.height - 30;
+      doc.strokeColor(200,200,200).lineWidth(0.5).moveTo(40, footY).lineTo(doc.page.width - 40, footY).stroke();
+      doc.fillColor(170,170,170).fontSize(6).font('Helvetica').text('ManProjects Ltd \u2014 Quotes & PO Matrix', 40, footY + 4, { align: 'center', width: doc.page.width - 80 });
+      doc.end();
+    } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
+  });
+
   // ── Invoice PDF ──
   app.get('/api/invoices/:id/pdf', authenticate, adminOnly, async (req, res) => {
     try {
