@@ -9,6 +9,7 @@ const nodemailer = require('nodemailer');
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
         Header, Footer, AlignmentType, BorderStyle, WidthType,
         ShadingType, PageNumber, PageBreak, ImageRun } = require('docx');
+const PDFDocument = require('pdfkit');
 
 
 const app = express();
@@ -1379,6 +1380,194 @@ async function startApp() {
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', `attachment; filename="ManProjects-${tmpl.title.replace(/\s+/g, '-')}.docx"`);
       res.send(buf);
+    } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
+  });
+
+  // ═══════ DB SCHEDULE — FILLED DOCX ═══════
+  app.post('/api/db-schedule/docx', authenticate, async (req, res) => {
+    try {
+      const { board, circuits } = req.body;
+      const h = docxHelpers();
+      const colWidths = [700, 900, 900, 900, 3060, 1100, 900, 900];
+      const colHeads = ['Cct No','Cct Ref','MCB Rating (A)','MCB Type','Supply/ng','Cable Type','Cable Size','CPC Size'];
+
+      const titleChildren = [];
+      if (h.logoData) {
+        titleChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 100, after: 80 },
+          children: [new ImageRun({ data: h.logoData, transformation: { width: 180, height: 70 }, type: 'png' })] }));
+      }
+      titleChildren.push(
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: h.logoData ? 40 : 200, after: 0 },
+          children: [new TextRun({ text: "MANPROJECTS LTD", bold: true, font: "Arial", size: 34, color: h.maroon })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 40, after: 20 },
+          children: [new TextRun({ text: "Electrical & Mechanical Building Services", font: "Arial", size: 20, color: "999999", italics: true })] }),
+        new Paragraph({ spacing: { before: 20, after: 20 }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: h.maroon, space: 0 } }, children: [] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 180, after: 200 },
+          children: [new TextRun({ text: "DISTRIBUTION BOARD SCHEDULE", bold: true, font: "Arial", size: 30, color: "333333" })] })
+      );
+
+      // Board details section bar
+      const secBar = (text) => new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
+        new TableRow({ children: [
+          new TableCell({ borders: { top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE} },
+            shading: { fill: h.maroon, type: ShadingType.CLEAR }, margins: { top: 60, bottom: 60, left: 140, right: 140 },
+            children: [new Paragraph({ children: [new TextRun({ text, bold: true, font: "Arial", size: 22, color: "FFFFFF" })] })] })
+        ] })
+      ] });
+
+      const b = board || {};
+      const boardTable = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
+        new TableRow({ children: [h.lbl("DB-Ref", 2340), h.val(b.dbRef||'', 2340), h.lbl("Location", 2340), h.val(b.location||'', 2340)] }),
+        new TableRow({ children: [h.lbl("Board Size & Rating", 2340), h.val(b.boardSize||'', 2340), h.lbl("Manufacturer", 2340), h.val(b.manufacturer||'', 2340)] }),
+        new TableRow({ children: [h.lbl("Supply Cable Ref", 2340), h.val(b.supplyCableRef||'', 2340), h.lbl("PFC (kA)", 2340), h.val(b.pfc||'', 2340)] }),
+        new TableRow({ children: [h.lbl("Project / Site", 2340), h.val(b.project||'', 2340), h.lbl("Date", 2340), h.val(b.date||'', 2340)] }),
+        new TableRow({ children: [h.lbl("Pod Room", 2340), h.val(b.podRoom||'', 2340), h.lbl("ZDB ID", 2340), h.val(b.zdbId||'', 2340)] }),
+      ] });
+
+      const headerRow = new TableRow({ children: colHeads.map((head, i) =>
+        new TableCell({ borders: h.bds, width: { size: colWidths[i], type: WidthType.DXA },
+          shading: { fill: "8B1A1A", type: ShadingType.CLEAR }, margins: h.cm,
+          children: [new Paragraph({ children: [new TextRun({ text: head, bold: true, font: "Arial", size: 16, color: "FFFFFF" })] })] })
+      ) });
+      const rows = (circuits || []).map((row, idx) =>
+        new TableRow({ children: [row.cctNo,row.cctRef,row.mcbRating,row.mcbType,row.supplying,row.cableType,row.cableSize,row.cpcSize].map((cell, i) =>
+          new TableCell({ borders: h.bds, width: { size: colWidths[i], type: WidthType.DXA },
+            shading: idx % 2 === 1 ? { fill: "F9F5F5", type: ShadingType.CLEAR } : undefined, margins: h.cm,
+            children: [new Paragraph({ children: [new TextRun({ text: (cell||'').toString() || ' ', font: "Arial", size: 16 })] })] })
+        ) })
+      );
+
+      const children = [
+        ...titleChildren,
+        secBar("BOARD DETAILS"), new Paragraph({ spacing: { after: 80 }, children: [] }), boardTable,
+        new Paragraph({ spacing: { after: 100 }, children: [] }),
+        secBar("CIRCUIT SCHEDULE"), new Paragraph({ spacing: { after: 80 }, children: [] }),
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...rows] }),
+        new Paragraph({ spacing: { after: 100 }, children: [] }),
+        secBar("SIGN-OFF"), new Paragraph({ spacing: { after: 80 }, children: [] }),
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
+          new TableRow({ children: [h.lbl("Completed By", h.pw/2), h.val(b.completedBy||'', h.pw/2)] }),
+          new TableRow({ children: [h.lbl("Checked By", h.pw/2), h.val(b.checkedBy||'', h.pw/2)] }),
+          new TableRow({ children: [h.lbl("Date", h.pw/2), h.val(b.signoffDate||'', h.pw/2)] }),
+        ] }),
+      ];
+
+      const doc = new Document({
+        styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
+        sections: [{ properties: { ...h.pageProps, page: { ...h.pageProps.page, size: { width: 16838, height: 11906 }, margin: { top: 1000, right: 1000, bottom: 1000, left: 1000 } } },
+          headers: h.mkHeader('DB Schedule'), footers: h.mkFooter('Distribution Board Schedule'), children }]
+      });
+      const buf = await Packer.toBuffer(doc);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', 'attachment; filename="ManProjects-DB-Schedule.docx"');
+      res.send(buf);
+    } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
+  });
+
+  // ═══════ DB SCHEDULE — PDF ═══════
+  app.post('/api/db-schedule/pdf', authenticate, async (req, res) => {
+    try {
+      const { board, circuits } = req.body;
+      const b = board || {};
+      const colHeads = ['Cct No','Cct Ref','MCB (A)','MCB Type','Supply/ng','Cable Type','Cable Size','CPC Size'];
+      const colW = [40, 50, 45, 50, 220, 60, 50, 50];
+      const tableX = 40;
+      const maroon = [139, 26, 26];
+
+      const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margins: { top: 50, bottom: 50, left: 40, right: 40 } });
+      const chunks = [];
+      doc.on('data', c => chunks.push(c));
+      doc.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="ManProjects-DB-Schedule.pdf"');
+        res.send(buf);
+      });
+
+      // Logo
+      const logoPath = path.join(__dirname, 'public', 'logo.png');
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, (doc.page.width / 2) - 60, 30, { width: 120 });
+        doc.moveDown(2.5);
+      }
+
+      // Title
+      doc.fillColor(...maroon).fontSize(18).font('Helvetica-Bold').text('MANPROJECTS LTD', { align: 'center' });
+      doc.fillColor(150,150,150).fontSize(10).font('Helvetica-Oblique').text('Electrical & Mechanical Building Services', { align: 'center' });
+      doc.moveDown(0.3);
+      doc.strokeColor(...maroon).lineWidth(2).moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke();
+      doc.moveDown(0.5);
+      doc.fillColor(50,50,50).fontSize(14).font('Helvetica-Bold').text('DISTRIBUTION BOARD SCHEDULE', { align: 'center' });
+      doc.moveDown(0.8);
+
+      // Board details
+      const drawSectionBar = (text) => {
+        const y = doc.y;
+        doc.rect(40, y, doc.page.width - 80, 20).fill(...maroon);
+        doc.fillColor(255,255,255).fontSize(10).font('Helvetica-Bold').text(text, 48, y + 4, { width: doc.page.width - 100 });
+        doc.y = y + 26;
+      };
+
+      const drawDetailRow = (pairs) => {
+        const y = doc.y;
+        const cellH = 18;
+        const totalW = doc.page.width - 80;
+        const pairW = totalW / pairs.length;
+        pairs.forEach(([label, value], i) => {
+          const x = 40 + i * pairW;
+          doc.rect(x, y, pairW * 0.4, cellH).fill(243, 232, 232);
+          doc.fillColor(...maroon).fontSize(8).font('Helvetica-Bold').text(label, x + 4, y + 4, { width: pairW * 0.4 - 8 });
+          doc.rect(x + pairW * 0.4, y, pairW * 0.6, cellH).fill(250,250,250).stroke(200,200,200);
+          doc.fillColor(30,30,30).fontSize(8).font('Helvetica').text(value || '', x + pairW * 0.4 + 4, y + 4, { width: pairW * 0.6 - 8 });
+        });
+        doc.y = y + cellH;
+      };
+
+      drawSectionBar('BOARD DETAILS');
+      drawDetailRow([['DB-Ref', b.dbRef], ['Location', b.location]]);
+      drawDetailRow([['Board Size & Rating', b.boardSize], ['Manufacturer', b.manufacturer]]);
+      drawDetailRow([['Supply Cable Ref', b.supplyCableRef], ['PFC (kA)', b.pfc]]);
+      drawDetailRow([['Project / Site', b.project], ['Date', b.date]]);
+      drawDetailRow([['Pod Room', b.podRoom], ['ZDB ID', b.zdbId]]);
+      doc.moveDown(0.5);
+
+      // Circuit table
+      drawSectionBar('CIRCUIT SCHEDULE');
+      const drawTableHeader = () => {
+        let x = tableX;
+        const y = doc.y;
+        colHeads.forEach((head, i) => {
+          doc.rect(x, y, colW[i], 16).fill(...maroon);
+          doc.fillColor(255,255,255).fontSize(7).font('Helvetica-Bold').text(head, x + 2, y + 4, { width: colW[i] - 4 });
+          x += colW[i];
+        });
+        doc.y = y + 16;
+      };
+      drawTableHeader();
+
+      (circuits || []).forEach((row, idx) => {
+        if (doc.y > doc.page.height - 60) { doc.addPage(); drawTableHeader(); }
+        let x = tableX;
+        const y = doc.y;
+        const vals = [row.cctNo, row.cctRef, row.mcbRating, row.mcbType, row.supplying, row.cableType, row.cableSize, row.cpcSize];
+        vals.forEach((cell, i) => {
+          if (idx % 2 === 1) doc.rect(x, y, colW[i], 15).fill(249, 245, 245);
+          doc.rect(x, y, colW[i], 15).strokeColor(200,200,200).stroke();
+          doc.fillColor(30,30,30).fontSize(7).font('Helvetica').text((cell||'').toString(), x + 2, y + 4, { width: colW[i] - 4 });
+          x += colW[i];
+        });
+        doc.y = y + 15;
+      });
+
+      doc.moveDown(0.5);
+      drawSectionBar('SIGN-OFF');
+      drawDetailRow([['Completed By', b.completedBy], ['Checked By', b.checkedBy]]);
+      drawDetailRow([['Date', b.signoffDate], ['', '']]);
+
+      // Footer
+      doc.fillColor(150,150,150).fontSize(7).font('Helvetica').text('ManProjects Ltd — Distribution Board Schedule', 40, doc.page.height - 30, { align: 'center', width: doc.page.width - 80 });
+
+      doc.end();
     } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
   });
 

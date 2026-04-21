@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.6 - Branded Word templates with logo title block, maroon section bars, alternating rows + improved UI cards -->
+<!-- v4.7 - Interactive DB Schedule editor with preview, Word and PDF download -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -712,6 +712,7 @@ function renderPage(page) {
     'loto': renderLOTO,
     'toolbox-talks': renderToolboxTalks,
     'site-templates': renderSiteTemplates,
+    'db-schedule': renderDBScheduleEditor,
   };
   if (pages[page]) {
     if (state.readOnly) {
@@ -2295,13 +2296,27 @@ function renderSiteTemplates(c) {
                 <h4 style="margin:0 0 4px;font-size:16px;font-weight:700;color:#1f2937">${esc(t.name)}</h4>
                 <p style="font-size:12.5px;color:#6b7280;margin:0;line-height:1.4">${esc(t.desc)}</p>
               </div>
-              <div style="padding:14px 20px;background:white;border-top:1px solid #f3f4f6;margin-top:auto">
-                <button style="width:100%;padding:10px 16px;border:none;border-radius:10px;background:${cc.accent};color:white;font-weight:600;font-size:13.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity 0.15s"
+              <div style="padding:14px 20px;background:white;border-top:1px solid #f3f4f6;margin-top:auto;display:flex;gap:8px">
+                ${t.key === 'db-schedule' ? `
+                <button style="flex:1;padding:10px 16px;border:none;border-radius:10px;background:${cc.accent};color:white;font-weight:600;font-size:13.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity 0.15s"
+                        onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'"
+                        onclick="renderPage('db-schedule')">
+                  <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  Open Editor
+                </button>
+                <button style="padding:10px 14px;border:1px solid ${cc.accent};border-radius:10px;background:white;color:${cc.accent};font-weight:600;font-size:13.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:opacity 0.15s"
+                        onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"
+                        onclick="downloadTemplate('${t.key}','${t.name.replace(/'/g,"\\'")}')">
+                  <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </button>
+                ` : `
+                <button style="flex:1;padding:10px 16px;border:none;border-radius:10px;background:${cc.accent};color:white;font-weight:600;font-size:13.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity 0.15s"
                         onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'"
                         onclick="downloadTemplate('${t.key}','${t.name.replace(/'/g,"\\'")}')">
                   <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                   Download Template
                 </button>
+                `}
               </div>
             </div>
           `).join('')}
@@ -2309,6 +2324,238 @@ function renderSiteTemplates(c) {
       </div>`;
     }).join('')}
   `;
+}
+
+// ═══════════════════════════════════════
+// DB SCHEDULE EDITOR
+// ═══════════════════════════════════════
+function renderDBScheduleEditor(c) {
+  const defaultCircuits = Array.from({length:6}, (_,i) => ({ cctNo:String(i+1), cctRef:'', mcbRating:'', mcbType:'B', supplying:'', cableType:'', cableSize:'', cpcSize:'' }));
+
+  c.innerHTML = `
+    <div style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div style="display:flex;align-items:center;gap:14px">
+        <button class="btn" onclick="renderPage('site-templates')" style="padding:8px 12px;font-size:13px">← Back</button>
+        <div>
+          <h2 style="margin-bottom:2px;font-size:20px">🔌 DB Schedule Editor</h2>
+          <p style="color:var(--text-light);font-size:13px;margin:0">Fill in the distribution board details, then preview or download</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" onclick="dbPreview()" style="background:#f3f4f6;border:1px solid #d1d5db;font-weight:600;display:flex;align-items:center;gap:6px">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          Preview
+        </button>
+        <button class="btn btn-primary" onclick="dbDownloadDocx()" style="display:flex;align-items:center;gap:6px">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Word Doc
+        </button>
+        <button class="btn" onclick="dbDownloadPdf()" style="background:#dc2626;color:white;border:none;font-weight:600;display:flex;align-items:center;gap:6px">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- BOARD DETAILS -->
+    <div class="card" style="margin-bottom:20px">
+      <h3 style="color:#8B1A1A;font-size:15px;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #8B1A1A">BOARD DETAILS</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">DB-Ref</label><input id="db-dbRef" class="form-control" placeholder="e.g. SP-79141"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Location</label><input id="db-location" class="form-control" placeholder="e.g. Building 1 Basement"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Board Size & Rating</label><input id="db-boardSize" class="form-control" placeholder="e.g. 63 Way TP & N"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Manufacturer</label><input id="db-manufacturer" class="form-control" placeholder="e.g. Hager / Schneider"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Supply Cable Ref</label><input id="db-supplyCableRef" class="form-control" placeholder="e.g. 39538"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">PFC (kA)</label><input id="db-pfc" class="form-control" placeholder="e.g. 25.00"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Project / Site</label><input id="db-project" class="form-control" placeholder="e.g. GSK Stevenage"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Date</label><input id="db-date" type="date" class="form-control"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Pod Room</label><input id="db-podRoom" class="form-control" placeholder="e.g. TX-71471"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">ZDB ID</label><input id="db-zdbId" class="form-control" placeholder=""></div>
+      </div>
+    </div>
+
+    <!-- CIRCUIT SCHEDULE -->
+    <div class="card" style="margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #8B1A1A">
+        <h3 style="color:#8B1A1A;font-size:15px;margin:0">CIRCUIT SCHEDULE</h3>
+        <button class="btn btn-primary" onclick="dbAddRow()" style="font-size:12px;padding:6px 14px">+ Add Circuit</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px" id="dbCircuitTable">
+          <thead>
+            <tr style="background:#8B1A1A;color:white">
+              <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">Cct No</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">Cct Ref</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">MCB (A)</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">MCB Type</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;min-width:200px">Supply/ng</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">Cable Type</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">Cable Size</th>
+              <th style="padding:8px 6px;text-align:left;font-weight:600;white-space:nowrap">CPC Size</th>
+              <th style="padding:8px 6px;width:40px"></th>
+            </tr>
+          </thead>
+          <tbody id="dbCircuitBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SIGN-OFF -->
+    <div class="card" style="margin-bottom:20px">
+      <h3 style="color:#8B1A1A;font-size:15px;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #8B1A1A">SIGN-OFF</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Completed By</label><input id="db-completedBy" class="form-control"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Checked By</label><input id="db-checkedBy" class="form-control"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Date</label><input id="db-signoffDate" type="date" class="form-control"></div>
+      </div>
+    </div>
+
+    <!-- PREVIEW MODAL -->
+    <div id="dbPreviewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;overflow-y:auto;padding:30px">
+      <div style="max-width:1100px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+        <div style="padding:16px 24px;background:#f9fafb;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
+          <h3 style="margin:0;font-size:16px">Preview — DB Schedule</h3>
+          <button onclick="document.getElementById('dbPreviewModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280">✕</button>
+        </div>
+        <div id="dbPreviewContent" style="padding:30px"></div>
+      </div>
+    </div>
+  `;
+
+  // Populate circuit rows
+  window._dbCircuits = defaultCircuits;
+  dbRenderRows();
+}
+
+function dbRenderRows() {
+  const tbody = document.getElementById('dbCircuitBody');
+  if (!tbody) return;
+  tbody.innerHTML = window._dbCircuits.map((r, i) => `
+    <tr style="background:${i%2===1?'#fdf8f8':'white'};border-bottom:1px solid #f3f4f6">
+      <td style="padding:4px 3px"><input value="${esc(r.cctNo)}" onchange="window._dbCircuits[${i}].cctNo=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;text-align:center" /></td>
+      <td style="padding:4px 3px"><input value="${esc(r.cctRef)}" onchange="window._dbCircuits[${i}].cctRef=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px" /></td>
+      <td style="padding:4px 3px"><input value="${esc(r.mcbRating)}" onchange="window._dbCircuits[${i}].mcbRating=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;text-align:center" placeholder="A" /></td>
+      <td style="padding:4px 3px">
+        <select onchange="window._dbCircuits[${i}].mcbType=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;background:white">
+          <option ${r.mcbType==='B'?'selected':''}>B</option><option ${r.mcbType==='C'?'selected':''}>C</option><option ${r.mcbType==='D'?'selected':''}>D</option>
+        </select>
+      </td>
+      <td style="padding:4px 3px"><input value="${esc(r.supplying)}" onchange="window._dbCircuits[${i}].supplying=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px" placeholder="Description of supply" /></td>
+      <td style="padding:4px 3px"><input value="${esc(r.cableType)}" onchange="window._dbCircuits[${i}].cableType=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px" placeholder="e.g. SWA" /></td>
+      <td style="padding:4px 3px"><input value="${esc(r.cableSize)}" onchange="window._dbCircuits[${i}].cableSize=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px" placeholder="mm²" /></td>
+      <td style="padding:4px 3px"><input value="${esc(r.cpcSize)}" onchange="window._dbCircuits[${i}].cpcSize=this.value" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px" placeholder="mm²" /></td>
+      <td style="padding:4px 3px;text-align:center"><button onclick="dbRemoveRow(${i})" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:16px" title="Remove">🗑️</button></td>
+    </tr>
+  `).join('');
+}
+
+function dbAddRow() {
+  const n = window._dbCircuits.length + 1;
+  window._dbCircuits.push({ cctNo: String(n), cctRef:'', mcbRating:'', mcbType:'B', supplying:'', cableType:'', cableSize:'', cpcSize:'' });
+  dbRenderRows();
+  // Scroll to bottom of table
+  const tbody = document.getElementById('dbCircuitBody');
+  if (tbody && tbody.lastElementChild) tbody.lastElementChild.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function dbRemoveRow(idx) {
+  if (window._dbCircuits.length <= 1) return;
+  window._dbCircuits.splice(idx, 1);
+  dbRenderRows();
+}
+
+function dbGetFormData() {
+  const g = id => (document.getElementById(id) || {}).value || '';
+  return {
+    board: { dbRef: g('db-dbRef'), location: g('db-location'), boardSize: g('db-boardSize'), manufacturer: g('db-manufacturer'),
+             supplyCableRef: g('db-supplyCableRef'), pfc: g('db-pfc'), project: g('db-project'), date: g('db-date'),
+             podRoom: g('db-podRoom'), zdbId: g('db-zdbId'), completedBy: g('db-completedBy'), checkedBy: g('db-checkedBy'), signoffDate: g('db-signoffDate') },
+    circuits: window._dbCircuits
+  };
+}
+
+async function dbDownloadDocx() {
+  const data = dbGetFormData();
+  try {
+    const res = await fetch(API + '/api/db-schedule/docx', { method:'POST', headers:{ ...headers(), 'Content-Type':'application/json' }, body: JSON.stringify(data) });
+    if (!res.ok) throw new Error('Download failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'ManProjects-DB-Schedule.docx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  } catch(e) { alert('Download error: ' + e.message); }
+}
+
+async function dbDownloadPdf() {
+  const data = dbGetFormData();
+  try {
+    const res = await fetch(API + '/api/db-schedule/pdf', { method:'POST', headers:{ ...headers(), 'Content-Type':'application/json' }, body: JSON.stringify(data) });
+    if (!res.ok) throw new Error('Download failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'ManProjects-DB-Schedule.pdf';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  } catch(e) { alert('Download error: ' + e.message); }
+}
+
+function dbPreview() {
+  const data = dbGetFormData();
+  const b = data.board;
+  const modal = document.getElementById('dbPreviewModal');
+  const content = document.getElementById('dbPreviewContent');
+  if (!modal || !content) return;
+
+  const detailRow = (label, val) => `<tr><td style="padding:6px 12px;background:#f3e8e8;font-weight:700;color:#8B1A1A;border:1px solid #e5e7eb;width:180px;font-size:13px">${esc(label)}</td><td style="padding:6px 12px;border:1px solid #e5e7eb;font-size:13px">${esc(val) || '—'}</td></tr>`;
+
+  content.innerHTML = `
+    <div style="text-align:center;margin-bottom:20px">
+      <img src="/logo.png" alt="ManProjects" style="height:50px;margin-bottom:8px" onerror="this.style.display='none'">
+      <h2 style="color:#8B1A1A;margin:0;font-size:20px">MANPROJECTS LTD</h2>
+      <p style="color:#999;font-size:12px;font-style:italic;margin:2px 0 8px">Electrical & Mechanical Building Services</p>
+      <div style="height:3px;background:#8B1A1A;margin:0 auto;width:100%"></div>
+      <h3 style="color:#333;margin:16px 0 0;font-size:17px">DISTRIBUTION BOARD SCHEDULE</h3>
+    </div>
+
+    <div style="background:#8B1A1A;color:white;padding:8px 14px;font-weight:700;font-size:13px;border-radius:4px 4px 0 0;margin-top:16px">BOARD DETAILS</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+      ${detailRow('DB-Ref', b.dbRef)}${detailRow('Location', b.location)}
+      ${detailRow('Board Size & Rating', b.boardSize)}${detailRow('Manufacturer', b.manufacturer)}
+      ${detailRow('Supply Cable Ref', b.supplyCableRef)}${detailRow('PFC (kA)', b.pfc)}
+      ${detailRow('Project / Site', b.project)}${detailRow('Date', b.date)}
+      ${detailRow('Pod Room', b.podRoom)}${detailRow('ZDB ID', b.zdbId)}
+    </table>
+
+    <div style="background:#8B1A1A;color:white;padding:8px 14px;font-weight:700;font-size:13px;border-radius:4px 4px 0 0">CIRCUIT SCHEDULE</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px">
+      <thead><tr style="background:#8B1A1A;color:white">
+        <th style="padding:6px 8px;text-align:left">Cct No</th><th style="padding:6px 8px;text-align:left">Cct Ref</th>
+        <th style="padding:6px 8px;text-align:left">MCB (A)</th><th style="padding:6px 8px;text-align:left">MCB Type</th>
+        <th style="padding:6px 8px;text-align:left">Supply/ng</th><th style="padding:6px 8px;text-align:left">Cable Type</th>
+        <th style="padding:6px 8px;text-align:left">Cable Size</th><th style="padding:6px 8px;text-align:left">CPC Size</th>
+      </tr></thead>
+      <tbody>
+        ${data.circuits.map((r, i) => `<tr style="background:${i%2===1?'#fdf8f8':'white'}">
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.cctNo)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.cctRef)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.mcbRating)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.mcbType)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.supplying)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.cableType)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.cableSize)}</td>
+          <td style="padding:5px 8px;border:1px solid #eee">${esc(r.cpcSize)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+
+    <div style="background:#8B1A1A;color:white;padding:8px 14px;font-weight:700;font-size:13px;border-radius:4px 4px 0 0">SIGN-OFF</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+      ${detailRow('Completed By', b.completedBy)}${detailRow('Checked By', b.checkedBy)}${detailRow('Date', b.signoffDate)}
+    </table>
+
+    <p style="text-align:center;color:#999;font-size:11px;margin-top:20px">ManProjects Ltd — Distribution Board Schedule</p>
+  `;
+
+  modal.style.display = 'block';
 }
 
 // ═══════════════════════════════════════
