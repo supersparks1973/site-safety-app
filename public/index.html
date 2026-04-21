@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.9 - Add External View role for client auditing -->
+<!-- v4.0 - Restrict External View to audit-only sections -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -44,6 +44,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .btn-danger{background:var(--danger);color:#fff}
 .read-only-banner{background:#fef3c7;border:1px solid #f59e0b;color:#92400e;padding:10px 16px;border-radius:8px;margin-bottom:16px;font-size:14px;display:flex;align-items:center;gap:8px}
 body.read-only-mode .hide-readonly{display:none!important}
+.sidebar-nav a.disabled-link,.bottom-nav button.disabled-link{opacity:0.35;pointer-events:none;cursor:default}
 .btn-success{background:var(--success);color:#fff}
 .btn-warning{background:var(--warning);color:#fff}
 .btn-outline{background:transparent;border:2px solid var(--border);color:var(--text)}.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
@@ -607,10 +608,22 @@ function showApp() {
     document.getElementById('operativeNav').classList.add('hidden');
     document.getElementById('sidebarAdminNav').classList.remove('hidden');
     document.getElementById('sidebarOpNav').classList.add('hidden');
-    // Hide Admin section (Users) for external_view
-    const adminSection = document.querySelector('#sidebarAdminNav .sidebar-section:last-child');
-    if (state.readOnly && adminSection) adminSection.style.display = 'none';
-    navigate('dashboard');
+
+    if (state.readOnly) {
+      // External View: only allow specific pages
+      const allowedPages = ['reports', 'closed', 'inspections', 'training', 'toolbox-talks'];
+      // Grey out disallowed sidebar links
+      document.querySelectorAll('#sidebarAdminNav .sidebar-nav a[data-page]').forEach(a => {
+        if (!allowedPages.includes(a.dataset.page)) a.classList.add('disabled-link');
+      });
+      // Grey out disallowed bottom nav buttons
+      document.querySelectorAll('#adminNav button[data-page]').forEach(btn => {
+        if (!allowedPages.includes(btn.dataset.page)) btn.classList.add('disabled-link');
+      });
+      navigate('reports');
+    } else {
+      navigate('dashboard');
+    }
   } else {
     document.getElementById('operativeNav').classList.remove('hidden');
     document.getElementById('adminNav').classList.add('hidden');
@@ -702,6 +715,11 @@ function renderPage(page) {
   };
   if (pages[page]) {
     if (state.readOnly) {
+      const allowedPages = ['reports', 'closed', 'inspections', 'training', 'toolbox-talks'];
+      if (!allowedPages.includes(page)) {
+        c.innerHTML = readOnlyBanner() + '<div class="card" style="text-align:center;padding:40px 20px"><div style="font-size:48px;margin-bottom:16px">🔒</div><h3>Access Restricted</h3><p style="color:var(--text-light);margin-top:8px">This section is not available with External View access.</p></div>';
+        return;
+      }
       // Wrap content in a container with banner above
       c.innerHTML = readOnlyBanner() + '<div id="pageContent"></div>';
       pages[page](document.getElementById('pageContent'));
