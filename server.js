@@ -1951,7 +1951,7 @@ async function startApp() {
   app.get('/api/quotes', authenticate, adminOnly, async (req, res) => {
     try {
       // Auto-archive quotes older than 12 months that are still active
-      await pool.query(`UPDATE quotes SET status = 'archived' WHERE status NOT IN ('archived','invoiced') AND created_at < NOW() - INTERVAL '12 months'`);
+      await pool.query(`UPDATE quotes SET status = 'archived' WHERE status NOT IN ('archived','accepted','invoiced') AND created_at < NOW() - INTERVAL '12 months'`);
       const { rows } = await pool.query('SELECT q.*, u.full_name as created_by_name FROM quotes q LEFT JOIN users u ON q.created_by = u.id ORDER BY q.created_at DESC');
       res.json(rows);
     } catch(e) { res.status(500).json({ error: e.message }); }

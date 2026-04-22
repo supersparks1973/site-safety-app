@@ -2315,7 +2315,7 @@ function money(v) { return '£' + Number(v||0).toFixed(2); }
 
 // ── QUOTES TAB ──
 function renderQuotesTab(el) {
-  const active = _quotes.filter(q => q.status !== 'archived');
+  const active = _quotes.filter(q => q.status !== 'archived' && q.status !== 'accepted');
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <p style="color:var(--text-light);font-size:13px;margin:0">${active.length} quote${active.length!==1?'s':''}</p>
@@ -2556,6 +2556,7 @@ function renderPOsTab(el) {
           </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
+          <button class="btn btn-sm" onclick="returnToQuotes(${po.id})" style="background:#1e40af;color:white;font-size:12px;padding:6px 14px">Return to Quotes</button>
           <button class="btn btn-sm" onclick="readyToInvoice(${po.id})" style="background:#166534;color:white;font-size:12px;padding:6px 14px">Ready to Invoice</button>
           <button class="btn btn-sm btn-outline" onclick="deletePO(${po.id})" style="color:var(--danger);border-color:var(--danger)">Delete</button>
         </div>
@@ -2737,7 +2738,7 @@ async function saveQuote(existingId) {
   const vat = sub * (vatRate / 100);
   const data = {
     quote_number: g('qf-number'), client_name: g('qf-client'), company: g('qf-company'), description: g('qf-desc'),
-    valid_until: g('qf-date'), status: status === 'accepted' ? 'archived' : status, notes: g('qf-notes'),
+    valid_until: g('qf-date'), status: status, notes: g('qf-notes'),
     subtotal_labour: labour, subtotal_materials: materials, subtotal_plant: plant,
     markup_pct: 0, markup_amount: 0, net_total: sub,
     vat_rate: vatRate, vat_amount: vat, grand_total: sub + vat,
@@ -2851,6 +2852,29 @@ async function deletePO(id) {
   if (!confirm('Delete this live work?')) return;
   try {
     await fetch(API+'/api/purchase-orders/'+id, { method:'DELETE', headers: headers() });
+    await loadQuotingData();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function returnToQuotes(poId) {
+  if (!confirm('Return this to Quotes and remove from Live Works?')) return;
+  const po = _pos.find(p => p.id == poId);
+  if (!po) return;
+  try {
+    // Set linked quote back to 'sent'
+    if (po.quote_id) {
+      const q = _quotes.find(x => x.id == po.quote_id);
+      if (q) {
+        await fetch(API+'/api/quotes/'+q.id, {
+          method: 'PUT',
+          headers: { ...headers(), 'Content-Type':'application/json' },
+          body: JSON.stringify({ ...q, status: 'sent', items: [] })
+        });
+      }
+    }
+    // Delete the PO
+    await fetch(API+'/api/purchase-orders/'+poId, { method:'DELETE', headers: headers() });
+    _qTab = 'quotes';
     await loadQuotingData();
   } catch(e) { alert('Error: ' + e.message); }
 }
