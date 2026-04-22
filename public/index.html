@@ -2601,6 +2601,8 @@ function showQuoteForm(existing) {
         <div><label style="${lbl}">Quote Number *</label><input id="qf-number" class="form-control" value="${esc(q.quote_number||'')}" placeholder="e.g. Q-2026-001"></div>
         <div><label style="${lbl}">Client Name *</label><input id="qf-client" class="form-control" value="${esc(q.client_name||'')}" placeholder="e.g. John Smith"></div>
         <div><label style="${lbl}">Company</label><input id="qf-company" class="form-control" value="${esc(q.company||'')}" placeholder="e.g. ABC Construction"></div>
+        <div><label style="${lbl}">Client Address</label><input id="qf-address" class="form-control" value="${esc(q.client_address||'')}" placeholder="e.g. 123 High Street, London"></div>
+        <div><label style="${lbl}">Project Name</label><input id="qf-project" class="form-control" value="${esc(q.project_name||'')}" placeholder="e.g. Unit 5 Refurbishment"></div>
         <div><label style="${lbl}">Date of Quote</label><input id="qf-date" type="date" class="form-control" value="${esc(q.valid_until||'')}"></div>
         <div><label style="${lbl}">Status</label>
           <select id="qf-status" class="form-control" onchange="togglePOField()"><option value="sent" ${q.status==='sent'||!q.status?'selected':''}>sent</option><option value="accepted" ${q.status==='accepted'?'selected':''}>accepted</option></select>
@@ -2703,7 +2705,8 @@ async function saveQuote(existingId) {
   const vatRate = 20;
   const vat = sub * (vatRate / 100);
   const data = {
-    quote_number: g('qf-number'), client_name: g('qf-client'), company: g('qf-company'), description: g('qf-desc'),
+    quote_number: g('qf-number'), client_name: g('qf-client'), company: g('qf-company'),
+    client_address: g('qf-address'), project_name: g('qf-project'), description: g('qf-desc'),
     valid_until: g('qf-date'), status: status, notes: g('qf-notes'),
     subtotal_labour: labour, subtotal_materials: materials, subtotal_plant: plant,
     markup_pct: 0, markup_amount: 0, net_total: sub,
@@ -2722,7 +2725,7 @@ async function saveQuote(existingId) {
         po_number: poNumber,
         quote_id: savedQuote.id || existingId,
         client_name: g('qf-client') + (g('qf-company') ? ' \u2014 '+g('qf-company') : ''),
-        project_name: '',
+        project_name: g('qf-project'),
         po_date: today(),
         po_value: sub + vat,
         notes: 'Quote ref: ' + g('qf-number')
@@ -2898,7 +2901,6 @@ function showInvoiceForm(existing) {
   const inv = existing || {};
   const isEdit = !!inv.id;
   const availableQuotes = _quotes.filter(q => q.status !== 'declined');
-  const availablePOs = _pos.filter(po => po.status === 'active');
   const lbl = 'font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px';
   const el = document.getElementById('quotingContent');
   el.innerHTML = `
@@ -2914,12 +2916,6 @@ function showInvoiceForm(existing) {
           <select id="inv-quote" class="form-control" onchange="autofillInvoice()">
             <option value="">— None —</option>
             ${availableQuotes.map(q => `<option value="${q.id}" ${inv.quote_id==q.id?'selected':''}>${esc(q.quote_number)} — ${esc(q.client_name)}${q.company?' / '+esc(q.company):''}</option>`).join('')}
-          </select>
-        </div>
-        <div><label style="${lbl}">Link to PO</label>
-          <select id="inv-po" class="form-control">
-            <option value="">— None —</option>
-            ${availablePOs.map(po => `<option value="${po.id}" ${inv.po_id==po.id?'selected':''}>${esc(po.po_number)} — ${esc(po.client_name)}</option>`).join('')}
           </select>
         </div>
         <div><label style="${lbl}">Client Name *</label><input id="inv-client" class="form-control" value="${esc(inv.client_name||'')}"></div>
@@ -3052,7 +3048,7 @@ async function saveInvoice(existingId) {
   const vatRate = 20;
   const vat = sub * (vatRate / 100);
   const data = {
-    invoice_number: g('inv-number'), quote_id: g('inv-quote')||null, po_id: g('inv-po')||null,
+    invoice_number: g('inv-number'), quote_id: g('inv-quote')||null, po_id: null,
     client_name: g('inv-client'), client_address: g('inv-address'), project_name: g('inv-project'),
     invoice_date: g('inv-date'), due_date: g('inv-due'), status: g('inv-status'),
     payment_terms: g('inv-terms'),
