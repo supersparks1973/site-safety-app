@@ -2268,8 +2268,8 @@ function renderQuoting(c) {
       </div>
     </div>
     <div style="display:flex;gap:6px;margin-bottom:20px;border-bottom:2px solid var(--border);padding-bottom:0">
-      ${['quotes','purchase-orders','invoices','matrix','archive'].map(t => {
-        const labels = { quotes:'Quotes', 'purchase-orders':'Live Works', invoices:'Ready to Invoice', matrix:'Matrix', archive:'Archive' };
+      ${['quotes','purchase-orders','invoices','matrix'].map(t => {
+        const labels = { quotes:'Quotes', 'purchase-orders':'Live Works', invoices:'Ready to Invoice', matrix:'Matrix' };
         return `<button onclick="_qTab='${t}';renderQuotingTab()" id="qtab-${t}" style="padding:10px 20px;border:none;border-bottom:3px solid ${_qTab===t?'var(--primary)':'transparent'};background:none;font-weight:${_qTab===t?'700':'500'};color:${_qTab===t?'var(--primary)':'var(--text-light)'};cursor:pointer;font-size:14px;transition:all .2s">${labels[t]}</button>`;
       }).join('')}
     </div>
@@ -2292,7 +2292,7 @@ async function loadQuotingData() {
 
 function renderQuotingTab() {
   // Update tab styles
-  ['quotes','purchase-orders','invoices','matrix','archive'].forEach(t => {
+  ['quotes','purchase-orders','invoices','matrix'].forEach(t => {
     const btn = document.getElementById('qtab-'+t);
     if (btn) { btn.style.borderBottomColor = _qTab===t?'var(--primary)':'transparent'; btn.style.fontWeight = _qTab===t?'700':'500'; btn.style.color = _qTab===t?'var(--primary)':'var(--text-light)'; }
   });
@@ -2302,7 +2302,7 @@ function renderQuotingTab() {
   else if (_qTab === 'purchase-orders') renderPOsTab(el);
   else if (_qTab === 'invoices') renderInvoicesTab(el);
   else if (_qTab === 'matrix') renderMatrixTab(el);
-  else if (_qTab === 'archive') renderArchiveTab(el);
+
 }
 
 function statusBadge(status) {
@@ -2491,43 +2491,6 @@ async function downloadMatrixPdf() {
   } catch(e) { alert('Error: ' + e.message); }
 }
 
-// ── ARCHIVE TAB ──
-function renderArchiveTab(el) {
-  const archived = _quotes.filter(q => q.status === 'archived');
-  el.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <p style="color:var(--text-light);font-size:13px;margin:0">${archived.length} archived quote${archived.length!==1?'s':''}</p>
-    </div>
-    ${archived.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--text-light)">No archived quotes. Quotes are automatically archived when accepted with a PO, or after 12 months.</div>' :
-    archived.map(q => `
-      <div class="card" style="margin-bottom:10px;border-left:4px solid #6b7280">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div>
-            <div style="font-weight:700;font-size:15px">${esc(q.quote_number)}</div>
-            <div style="color:var(--text-light);font-size:13px">${esc(q.client_name||'')}${q.company ? ' — '+esc(q.company) : ''}</div>
-            ${q.description ? `<div style="color:var(--text-light);font-size:12px;margin-top:4px">${esc(q.description).substring(0,80)}${q.description.length>80?'...':''}</div>` : ''}
-          </div>
-          <div style="text-align:right">
-            <span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600;text-transform:uppercase;background:#6b728018;color:#6b7280">archived</span>
-            <div style="font-weight:700;font-size:16px;color:var(--primary);margin-top:4px">${money(q.grand_total)}</div>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
-          <button class="btn btn-sm" onclick="downloadQuotePdf(${q.id})" style="background:#dc2626;color:white;font-size:12px;padding:6px 12px">PDF</button>
-          <button class="btn btn-sm btn-outline" onclick="deleteArchivedQuote(${q.id})" style="color:var(--danger);border-color:var(--danger);font-size:12px;padding:6px 12px">Delete</button>
-        </div>
-      </div>
-    `).join('')}
-  `;
-}
-
-async function deleteArchivedQuote(id) {
-  if (!confirm('Permanently delete this archived quote?')) return;
-  try {
-    await fetch(API+'/api/quotes/'+id, { method:'DELETE', headers: headers() });
-    await loadQuotingData();
-  } catch(e) { alert('Error: ' + e.message); }
-}
 
 // ── LIVE WORKS TAB ──
 function renderPOsTab(el) {
