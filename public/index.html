@@ -2598,11 +2598,11 @@ function renderInvoicesTab(el) {
     </div>
     ${_invoices.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--text-light)">No invoices yet.</div>' :
     _invoices.map(inv => `
-      <div class="card" style="margin-bottom:10px;cursor:pointer" onclick="viewInvoice(${inv.id})">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div class="card" style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;cursor:pointer" onclick="viewInvoice(${inv.id})">
           <div>
             <div style="font-weight:700;font-size:15px">${esc(inv.invoice_number)} ${inv.is_part_invoice ? '<span style="font-size:11px;color:var(--warning)">(Part)</span>' : ''}</div>
-            <div style="color:var(--text-light);font-size:13px">${esc(inv.client_name||'')} — ${esc(inv.project_name||'')}</div>
+            <div style="color:var(--text-light);font-size:13px">${esc(inv.client_name||'')} \u2014 ${esc(inv.project_name||'')}</div>
             ${inv.quote_number ? `<div style="font-size:12px;color:var(--text-light)">Quote: ${esc(inv.quote_number)}</div>` : ''}
             ${inv.po_number ? `<div style="font-size:12px;color:var(--text-light)">PO: ${esc(inv.po_number)}</div>` : ''}
             ${inv.payment_terms && inv.payment_terms !== 'N/A' ? `<div style="font-size:12px;color:var(--text-light)">Terms: ${esc(inv.payment_terms)} Days</div>` : ''}
@@ -2612,6 +2612,9 @@ function renderInvoicesTab(el) {
             <div style="font-weight:700;font-size:16px;color:var(--primary);margin-top:4px">${money(inv.grand_total)}</div>
             ${Number(inv.amount_paid) > 0 ? `<div style="font-size:11px;color:var(--success)">Paid: ${money(inv.amount_paid)}</div>` : ''}
           </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
+          <button class="btn btn-sm" onclick="event.stopPropagation();returnToLiveWorks(${inv.id})" style="background:#1e40af;color:white;font-size:12px;padding:6px 14px">Return to Live Works</button>
         </div>
       </div>
     `).join('')}
@@ -3103,6 +3106,38 @@ async function deleteInvoice(id) {
   if (!confirm('Delete this invoice?')) return;
   try {
     await fetch(API+'/api/invoices/'+id, { method:'DELETE', headers: headers() });
+    await loadQuotingData();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function returnToLiveWorks(invId) {
+  if (!confirm('Return this to Live Works? The invoice will be deleted.')) return;
+  const inv = _invoices.find(i => i.id == invId);
+  if (!inv) return;
+  try {
+    // Re-create the PO in Live Works from the invoice data
+    const q = inv.quote_id ? _quotes.find(x => x.id == inv.quote_id) : null;
+    const poData = {
+      po_number: (inv.notes && inv.notes.match(/PO ref: (.+)/)) ? inv.notes.match(/PO ref: (.+)/)[1] : 'PO-'+inv.invoice_number,
+      quote_id: inv.quote_id || null,
+      client_name: inv.client_name || '',
+      project_name: inv.project_name || '',
+      po_date: today(),
+      po_value: Number(inv.grand_total) || 0,
+      notes: 'Returned from invoice: ' + inv.invoice_number
+    };
+    await fetch(API+'/api/purchase-orders', { method:'POST', headers: { ...headers(), 'Content-Type':'application/json' }, body: JSON.stringify(poData) });
+    // Set linked quote back to accepted if it exists
+    if (q) {
+      await fetch(API+'/api/quotes/'+q.id, {
+        method: 'PUT',
+        headers: { ...headers(), 'Content-Type':'application/json' },
+        body: JSON.stringify({ ...q, status: 'accepted', items: [] })
+      });
+    }
+    // Delete the invoice
+    await fetch(API+'/api/invoices/'+invId, { method:'DELETE', headers: headers() });
+    _qTab = 'purchase-orders';
     await loadQuotingData();
   } catch(e) { alert('Error: ' + e.message); }
 }
