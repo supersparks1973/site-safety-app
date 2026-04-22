@@ -2710,7 +2710,7 @@ async function readyToInvoice(poId) {
     const sub = labour + materials + plant;
     const vat = sub * 0.2;
     const invData = {
-      invoice_number: 'INV-' + po.po_number,
+      invoice_number: '',
       quote_id: null,
       po_id: null,
       client_name: q ? ((q.client_name||'') + (q.company ? ' \u2014 '+q.company : '')) : (po.client_name||''),
