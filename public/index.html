@@ -2882,26 +2882,20 @@ async function returnToQuotes(poId) {
 async function readyToInvoice(poId) {
   const po = _pos.find(p => p.id == poId);
   if (!po) return;
+  if (!confirm('Move to Ready to Invoice and remove from Live Works?')) return;
   // Find linked quote if any
   const q = po.quote_id ? _quotes.find(x => x.id == po.quote_id) : null;
-  // Ask about archiving PO
-  const archivePO = confirm('Move this Live Work to Archives?');
-  if (archivePO) {
-    try {
-      await fetch(API+'/api/purchase-orders/'+poId, {
-        method: 'PUT',
-        headers: { ...headers(), 'Content-Type':'application/json' },
-        body: JSON.stringify({ ...po, status: 'archived' })
-      });
-    } catch(e) { /* continue anyway */ }
-  }
+  // Delete the PO from Live Works
+  try {
+    await fetch(API+'/api/purchase-orders/'+poId, { method:'DELETE', headers: headers() });
+  } catch(e) { /* continue anyway */ }
   // Switch to invoices tab and open new invoice form pre-filled
   _qTab = 'invoices';
   await loadQuotingData();
   // Build a pre-filled invoice object from the PO + quote data
   const prefill = {
     quote_id: po.quote_id || null,
-    po_id: po.id,
+    po_id: null,
     client_name: q ? ((q.client_name||'') + (q.company ? ' \u2014 '+q.company : '')) : (po.client_name||''),
     client_address: q ? (q.client_address||'') : '',
     project_name: po.project_name || (q ? q.project_name : '') || '',
