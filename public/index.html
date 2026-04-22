@@ -2264,12 +2264,12 @@ function renderQuoting(c) {
       </div>
       <div>
         <h2 style="margin-bottom:2px;font-size:22px">Quoting &amp; Invoicing</h2>
-        <p style="color:var(--text-light);font-size:14px;margin:0">Create quotes, record purchase orders, and raise invoices</p>
+        <p style="color:var(--text-light);font-size:14px;margin:0">Create quotes, manage live works, and raise invoices</p>
       </div>
     </div>
     <div style="display:flex;gap:6px;margin-bottom:20px;border-bottom:2px solid var(--border);padding-bottom:0">
       ${['quotes','purchase-orders','invoices','matrix','archive'].map(t => {
-        const labels = { quotes:'Quotes', 'purchase-orders':'Purchase Orders', invoices:'Invoices', matrix:'Matrix', archive:'Archive' };
+        const labels = { quotes:'Quotes', 'purchase-orders':'Live Works', invoices:'Invoices', matrix:'Matrix', archive:'Archive' };
         return `<button onclick="_qTab='${t}';renderQuotingTab()" id="qtab-${t}" style="padding:10px 20px;border:none;border-bottom:3px solid ${_qTab===t?'var(--primary)':'transparent'};background:none;font-weight:${_qTab===t?'700':'500'};color:${_qTab===t?'var(--primary)':'var(--text-light)'};cursor:pointer;font-size:14px;transition:all .2s">${labels[t]}</button>`;
       }).join('')}
     </div>
@@ -2461,7 +2461,7 @@ function printMatrix() {
   if (!table) return;
   const win = window.open('','_blank');
   win.document.write('<html><head><title>ManProjects — Quotes & PO Matrix</title><style>body{font-family:Arial,sans-serif;padding:20px}table{width:100%;border-collapse:collapse;font-size:11px}th{background:#8B1A1A;color:white;padding:8px 6px;text-align:left;font-weight:700}td{padding:6px;border-bottom:1px solid #eee}tfoot td{background:#f3e8e8;font-weight:700;border-top:2px solid #8B1A1A}h2{color:#8B1A1A;margin-bottom:4px}p{color:#666;font-size:12px;margin-bottom:16px}@media print{body{padding:10px}}</style></head><body>');
-  win.document.write('<h2>ManProjects Ltd — Quotes & Purchase Orders Matrix</h2>');
+  win.document.write('<h2>ManProjects Ltd — Quotes & Live Works Matrix</h2>');
   win.document.write('<p>Printed: ' + new Date().toLocaleDateString('en-GB') + '</p>');
   win.document.write(table.outerHTML);
   win.document.write('</body></html>');
@@ -2498,7 +2498,7 @@ function renderArchiveTab(el) {
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <p style="color:var(--text-light);font-size:13px;margin:0">${archived.length} archived quote${archived.length!==1?'s':''}</p>
     </div>
-    ${archived.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--text-light)">No archived quotes. Quotes are automatically archived when a purchase order is recorded against them, or after 12 months.</div>' :
+    ${archived.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--text-light)">No archived quotes. Quotes are automatically archived when accepted with a PO, or after 12 months.</div>' :
     archived.map(q => `
       <div class="card" style="margin-bottom:10px;border-left:4px solid #6b7280">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -2529,16 +2529,16 @@ async function deleteArchivedQuote(id) {
   } catch(e) { alert('Error: ' + e.message); }
 }
 
-// ── PURCHASE ORDERS TAB ──
+// ── LIVE WORKS TAB ──
 function renderPOsTab(el) {
   const activePOs = _pos.filter(po => po.status !== 'archived');
   const archivedPOs = _pos.filter(po => po.status === 'archived');
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <p style="color:var(--text-light);font-size:13px;margin:0">${activePOs.length} active purchase order${activePOs.length!==1?'s':''}${archivedPOs.length ? ', '+archivedPOs.length+' archived' : ''}</p>
-      <button class="btn btn-primary btn-sm" onclick="showPOForm()">+ Record PO</button>
+      <p style="color:var(--text-light);font-size:13px;margin:0">${activePOs.length} live work${activePOs.length!==1?'s':''}${archivedPOs.length ? ', '+archivedPOs.length+' archived' : ''}</p>
+      <button class="btn btn-primary btn-sm" onclick="showPOForm()">+ Record Live Work</button>
     </div>
-    ${activePOs.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--text-light)">No active purchase orders.</div>' :
+    ${activePOs.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--text-light)">No active live works.</div>' :
     activePOs.map(po => `
       <div class="card" style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -2560,7 +2560,7 @@ function renderPOsTab(el) {
     `).join('')}
 
     ${archivedPOs.length > 0 ? `
-    <h4 style="color:#6b7280;font-size:14px;margin:24px 0 10px 0;padding-bottom:6px;border-bottom:2px solid #d1d5db">ARCHIVED PURCHASE ORDERS</h4>
+    <h4 style="color:#6b7280;font-size:14px;margin:24px 0 10px 0;padding-bottom:6px;border-bottom:2px solid #d1d5db">ARCHIVED LIVE WORKS</h4>
     ${archivedPOs.map(po => `
       <div class="card" style="margin-bottom:10px;border-left:4px solid #6b7280;opacity:0.8">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -2743,7 +2743,7 @@ async function saveQuote(existingId) {
     const res = await fetch(url, { method, headers: { ...headers(), 'Content-Type':'application/json' }, body: JSON.stringify(data) });
     if (!res.ok) throw new Error('Save failed');
     const savedQuote = await res.json();
-    // If accepted with PO number, auto-create the purchase order
+    // If accepted with PO number, auto-create the live work
     if (status === 'accepted' && poNumber) {
       const poData = {
         po_number: poNumber,
@@ -2794,7 +2794,7 @@ function showPOForm() {
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
       <button class="btn btn-sm" onclick="renderQuotingTab()" style="padding:6px 12px">← Back</button>
-      <h3 style="margin:0;font-size:18px">Record Purchase Order</h3>
+      <h3 style="margin:0;font-size:18px">Record Live Work</h3>
     </div>
     <div class="card">
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
@@ -2842,7 +2842,7 @@ async function savePO() {
 }
 
 async function deletePO(id) {
-  if (!confirm('Delete this purchase order?')) return;
+  if (!confirm('Delete this live work?')) return;
   try {
     await fetch(API+'/api/purchase-orders/'+id, { method:'DELETE', headers: headers() });
     await loadQuotingData();
@@ -2855,7 +2855,7 @@ async function readyToInvoice(poId) {
   // Find linked quote if any
   const q = po.quote_id ? _quotes.find(x => x.id == po.quote_id) : null;
   // Ask about archiving PO
-  const archivePO = confirm('Move this Purchase Order to Archives?');
+  const archivePO = confirm('Move this Live Work to Archives?');
   if (archivePO) {
     try {
       await fetch(API+'/api/purchase-orders/'+poId, {
