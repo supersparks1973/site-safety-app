@@ -2851,30 +2851,46 @@ async function readyToInvoice(poId) {
   if (!confirm('Move to Ready to Invoice and remove from Live Works?')) return;
   // Find linked quote if any
   const q = po.quote_id ? _quotes.find(x => x.id == po.quote_id) : null;
-  // Delete the PO from Live Works
   try {
+    // Auto-save a draft invoice immediately so it persists in the Ready to Invoice tab
+    const labour = q ? Number(q.subtotal_labour||0) : 0;
+    const materials = q ? Number(q.subtotal_materials||0) : 0;
+    const plant = q ? Number(q.subtotal_plant||0) : 0;
+    const sub = labour + materials + plant;
+    const vat = sub * 0.2;
+    const invData = {
+      invoice_number: 'INV-' + po.po_number,
+      quote_id: po.quote_id || null,
+      po_id: null,
+      client_name: q ? ((q.client_name||'') + (q.company ? ' \u2014 '+q.company : '')) : (po.client_name||''),
+      client_address: q ? (q.client_address||'') : '',
+      project_name: po.project_name || (q ? q.project_name : '') || '',
+      invoice_date: today(),
+      due_date: '',
+      status: 'draft',
+      payment_terms: 'N/A',
+      subtotal_labour: labour, subtotal_materials: materials, subtotal_plant: plant,
+      subtotal: sub, vat_rate: 20, vat_amount: vat, grand_total: sub + vat,
+      amount_paid: 0,
+      is_part_invoice: false, part_description: '',
+      notes: 'PO ref: ' + po.po_number,
+      items: []
+    };
+    await fetch(API+'/api/invoices', { method:'POST', headers: { ...headers(), 'Content-Type':'application/json' }, body: JSON.stringify(invData) });
+    // Update quote status to invoiced
+    if (q) {
+      await fetch(API+'/api/quotes/'+q.id, {
+        method: 'PUT',
+        headers: { ...headers(), 'Content-Type':'application/json' },
+        body: JSON.stringify({ ...q, status: 'invoiced', items: [] })
+      });
+    }
+    // Delete the PO from Live Works
     await fetch(API+'/api/purchase-orders/'+poId, { method:'DELETE', headers: headers() });
-  } catch(e) { /* continue anyway */ }
-  // Switch to invoices tab and open new invoice form pre-filled
+  } catch(e) { alert('Error: ' + e.message); }
+  // Switch to Ready to Invoice tab
   _qTab = 'invoices';
   await loadQuotingData();
-  // Build a pre-filled invoice object from the PO + quote data
-  const prefill = {
-    quote_id: po.quote_id || null,
-    po_id: null,
-    client_name: q ? ((q.client_name||'') + (q.company ? ' \u2014 '+q.company : '')) : (po.client_name||''),
-    client_address: q ? (q.client_address||'') : '',
-    project_name: po.project_name || (q ? q.project_name : '') || '',
-    invoice_date: today(),
-    status: 'draft',
-    subtotal_labour: q ? Number(q.subtotal_labour||0) : 0,
-    subtotal_materials: q ? Number(q.subtotal_materials||0) : 0,
-    subtotal_plant: q ? Number(q.subtotal_plant||0) : 0,
-    payment_terms: 'N/A',
-    amount_paid: 0,
-    notes: 'PO ref: ' + po.po_number
-  };
-  showInvoiceForm(prefill);
 }
 
 // ── INVOICE FORM ──
