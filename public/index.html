@@ -2571,6 +2571,7 @@ async function saveQuote(existingId) {
         po_number: poNumber,
         quote_id: savedQuote.id || existingId,
         client_name: g('qf-client') + (g('qf-company') ? ' \u2014 '+g('qf-company') : ''),
+        client_address: '',
         project_name: '',
         po_date: today(),
         po_value: sub + vat,
@@ -2628,6 +2629,7 @@ function showPOForm() {
           </select>
         </div>
         <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Client Name</label><input id="po-client" class="form-control"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Client Address</label><input id="po-address" class="form-control"></div>
         <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Project Name</label><input id="po-project" class="form-control"></div>
         <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">PO Date</label><input id="po-date" type="date" class="form-control" value="${today()}"></div>
         <div><label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">PO Value (£)</label><input id="po-value" type="number" class="form-control" min="0" step="0.01"></div>
@@ -2654,7 +2656,7 @@ function autofillPO() {
 async function savePO() {
   const g = id => (document.getElementById(id)||{}).value||'';
   if (!g('po-number')) { alert('PO number is required.'); return; }
-  const data = { po_number: g('po-number'), quote_id: g('po-quote')||null, client_name: g('po-client'), project_name: g('po-project'), po_date: g('po-date'), po_value: Number(g('po-value'))||0, notes: g('po-notes') };
+  const data = { po_number: g('po-number'), quote_id: g('po-quote')||null, client_name: g('po-client'), client_address: g('po-address'), project_name: g('po-project'), po_date: g('po-date'), po_value: Number(g('po-value'))||0, notes: g('po-notes') };
   try {
     const res = await fetch(API+'/api/purchase-orders', { method:'POST', headers: { ...headers(), 'Content-Type':'application/json' }, body: JSON.stringify(data) });
     if (!res.ok) throw new Error('Save failed');
@@ -2712,8 +2714,8 @@ async function readyToInvoice(poId) {
       quote_id: null,
       po_id: null,
       client_name: q ? ((q.client_name||'') + (q.company ? ' \u2014 '+q.company : '')) : (po.client_name||''),
-      client_address: q ? (q.client_address||'') : '',
-      project_name: po.project_name || (q ? q.project_name : '') || '',
+      client_address: po.client_address || '',
+      project_name: po.project_name || '',
       invoice_date: today(),
       due_date: '',
       status: 'draft',
@@ -2937,6 +2939,7 @@ async function returnToLiveWorks(invId) {
       po_number: (inv.notes && inv.notes.match(/PO ref: (.+)/)) ? inv.notes.match(/PO ref: (.+)/)[1] : 'PO-'+inv.invoice_number,
       quote_id: null,
       client_name: inv.client_name || '',
+      client_address: inv.client_address || '',
       project_name: inv.project_name || '',
       po_date: today(),
       po_value: Number(inv.grand_total) || 0,

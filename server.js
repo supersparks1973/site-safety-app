@@ -246,6 +246,7 @@ async function startApp() {
 
   // Add payment_terms and cost breakdown to invoices
   try { await pool.query("ALTER TABLE quotes ADD COLUMN IF NOT EXISTS company TEXT DEFAULT ''"); } catch(e) {}
+  try { await pool.query("ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS client_address TEXT DEFAULT ''"); } catch(e) {}
   try { await pool.query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_terms TEXT DEFAULT 'N/A'"); } catch(e) {}
   try { await pool.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS subtotal_labour NUMERIC(12,2) DEFAULT 0'); } catch(e) {}
   try { await pool.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS subtotal_materials NUMERIC(12,2) DEFAULT 0'); } catch(e) {}
@@ -2030,8 +2031,8 @@ async function startApp() {
     try {
       const d = req.body;
       const { rows } = await pool.query(
-        'INSERT INTO purchase_orders (quote_id, po_number, client_name, project_name, po_date, po_value, notes, status, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
-        [d.quote_id||null, d.po_number, d.client_name, d.project_name, d.po_date, d.po_value||0, d.notes, d.status||'active', req.user.id]
+        'INSERT INTO purchase_orders (quote_id, po_number, client_name, client_address, project_name, po_date, po_value, notes, status, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *',
+        [d.quote_id||null, d.po_number, d.client_name, d.client_address||'', d.project_name, d.po_date, d.po_value||0, d.notes, d.status||'active', req.user.id]
       );
       // Archive the linked quote
       if (d.quote_id) await pool.query("UPDATE quotes SET status='archived', updated_at=CURRENT_TIMESTAMP WHERE id=$1", [d.quote_id]);
@@ -2043,8 +2044,8 @@ async function startApp() {
     try {
       const d = req.body;
       const { rows } = await pool.query(
-        'UPDATE purchase_orders SET po_number=$1, client_name=$2, project_name=$3, po_date=$4, po_value=$5, notes=$6, status=$7 WHERE id=$8 RETURNING *',
-        [d.po_number, d.client_name, d.project_name, d.po_date, d.po_value||0, d.notes, d.status||'active', req.params.id]
+        'UPDATE purchase_orders SET po_number=$1, client_name=$2, client_address=$3, project_name=$4, po_date=$5, po_value=$6, notes=$7, status=$8 WHERE id=$9 RETURNING *',
+        [d.po_number, d.client_name, d.client_address||'', d.project_name, d.po_date, d.po_value||0, d.notes, d.status||'active', req.params.id]
       );
       res.json(rows[0]);
     } catch(e) { res.status(500).json({ error: e.message }); }
