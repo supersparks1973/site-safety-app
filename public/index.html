@@ -2712,6 +2712,7 @@ async function readyToInvoice(poId) {
     const invData = {
       invoice_number: '',
       quote_id: null,
+      quote_ref: q ? (q.quote_number||'') : '',
       po_id: null,
       client_name: q ? ((q.client_name||'') + (q.company ? ' \u2014 '+q.company : '')) : (po.client_name||''),
       client_address: po.client_address || '',
@@ -2744,7 +2745,6 @@ async function readyToInvoice(poId) {
 function showInvoiceForm(existing) {
   const inv = existing || {};
   const isEdit = !!inv.id;
-  const availableQuotes = _quotes.filter(q => q.status !== 'declined');
   const lbl = 'font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px';
   const el = document.getElementById('quotingContent');
   el.innerHTML = `
@@ -2756,12 +2756,7 @@ function showInvoiceForm(existing) {
       <h3 style="color:var(--primary);font-size:14px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--primary)">INVOICE DETAILS</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
         <div><label style="${lbl}">Invoice Number *</label><input id="inv-number" class="form-control" value="${esc(inv.invoice_number||'')}" placeholder="e.g. INV-2026-001"></div>
-        <div><label style="${lbl}">Link to Quote</label>
-          <select id="inv-quote" class="form-control" onchange="autofillInvoice()">
-            <option value="">— None —</option>
-            ${availableQuotes.map(q => `<option value="${q.id}" ${inv.quote_id==q.id?'selected':''}>${esc(q.quote_number)} — ${esc(q.client_name)}${q.company?' / '+esc(q.company):''}</option>`).join('')}
-          </select>
-        </div>
+        <div><label style="${lbl}">Link to Quote</label><input id="inv-quoteref" class="form-control" value="${esc(inv.quote_ref||'')}" placeholder="e.g. Q-2026-001"></div>
         <div><label style="${lbl}">Client Name *</label><input id="inv-client" class="form-control" value="${esc(inv.client_name||'')}"></div>
         <div><label style="${lbl}">Client Address</label><input id="inv-address" class="form-control" value="${esc(inv.client_address||'')}"></div>
         <div><label style="${lbl}">Project Name</label><input id="inv-project" class="form-control" value="${esc(inv.project_name||'')}"></div>
@@ -2865,22 +2860,6 @@ function recalcInvoice() {
   `;
 }
 
-function autofillInvoice() {
-  const qId = document.getElementById('inv-quote').value;
-  if (!qId) return;
-  const q = _quotes.find(x => x.id == qId);
-  if (!q) return;
-  document.getElementById('inv-client').value = (q.client_name||'') + (q.company ? ' — '+q.company : '');
-  document.getElementById('inv-address').value = q.client_address || '';
-  document.getElementById('inv-project').value = q.project_name || '';
-  document.getElementById('inv-labour').value = Number(q.subtotal_labour||0);
-  document.getElementById('inv-materials').value = Number(q.subtotal_materials||0);
-  document.getElementById('inv-plant').value = Number(q.subtotal_plant||0);
-  recalcInvoice();
-  // Find linked PO
-  const linkedPO = _pos.find(po => po.quote_id == qId);
-  if (linkedPO) document.getElementById('inv-po').value = linkedPO.id;
-}
 
 async function saveInvoice(existingId) {
   const g = id => (document.getElementById(id)||{}).value||'';
@@ -2892,7 +2871,7 @@ async function saveInvoice(existingId) {
   const vatRate = 20;
   const vat = sub * (vatRate / 100);
   const data = {
-    invoice_number: g('inv-number'), quote_id: g('inv-quote')||null, po_id: null,
+    invoice_number: g('inv-number'), quote_id: null, quote_ref: g('inv-quoteref'), po_id: null,
     client_name: g('inv-client'), client_address: g('inv-address'), project_name: g('inv-project'),
     invoice_date: g('inv-date'), due_date: g('inv-due'), status: g('inv-status'),
     payment_terms: g('inv-terms'),

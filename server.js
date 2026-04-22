@@ -247,6 +247,7 @@ async function startApp() {
   // Add payment_terms and cost breakdown to invoices
   try { await pool.query("ALTER TABLE quotes ADD COLUMN IF NOT EXISTS company TEXT DEFAULT ''"); } catch(e) {}
   try { await pool.query("ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS client_address TEXT DEFAULT ''"); } catch(e) {}
+  try { await pool.query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS quote_ref TEXT DEFAULT ''"); } catch(e) {}
   try { await pool.query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_terms TEXT DEFAULT 'N/A'"); } catch(e) {}
   try { await pool.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS subtotal_labour NUMERIC(12,2) DEFAULT 0'); } catch(e) {}
   try { await pool.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS subtotal_materials NUMERIC(12,2) DEFAULT 0'); } catch(e) {}
@@ -2079,11 +2080,11 @@ async function startApp() {
     try {
       const d = req.body;
       const { rows } = await pool.query(
-        `INSERT INTO invoices (invoice_number, quote_id, po_id, client_name, client_address, project_name, invoice_date, due_date, status,
+        `INSERT INTO invoices (invoice_number, quote_id, quote_ref, po_id, client_name, client_address, project_name, invoice_date, due_date, status,
          subtotal, vat_rate, vat_amount, grand_total, amount_paid, notes, is_part_invoice, part_description, payment_terms,
          subtotal_labour, subtotal_materials, subtotal_plant, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`,
-        [d.invoice_number, d.quote_id||null, d.po_id||null, d.client_name, d.client_address, d.project_name, d.invoice_date, d.due_date, d.status||'draft',
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING *`,
+        [d.invoice_number, d.quote_id||null, d.quote_ref||'', d.po_id||null, d.client_name, d.client_address, d.project_name, d.invoice_date, d.due_date, d.status||'draft',
          d.subtotal||0, d.vat_rate||20, d.vat_amount||0, d.grand_total||0, d.amount_paid||0, d.notes, d.is_part_invoice||false, d.part_description,
          d.payment_terms||'N/A', d.subtotal_labour||0, d.subtotal_materials||0, d.subtotal_plant||0, req.user.id]
       );
@@ -2104,10 +2105,10 @@ async function startApp() {
     try {
       const d = req.body;
       const { rows } = await pool.query(
-        `UPDATE invoices SET invoice_number=$1, client_name=$2, client_address=$3, project_name=$4, invoice_date=$5, due_date=$6, status=$7,
-         subtotal=$8, vat_rate=$9, vat_amount=$10, grand_total=$11, amount_paid=$12, notes=$13, is_part_invoice=$14, part_description=$15,
-         payment_terms=$16, subtotal_labour=$17, subtotal_materials=$18, subtotal_plant=$19, updated_at=CURRENT_TIMESTAMP WHERE id=$20 RETURNING *`,
-        [d.invoice_number, d.client_name, d.client_address, d.project_name, d.invoice_date, d.due_date, d.status||'draft',
+        `UPDATE invoices SET invoice_number=$1, quote_ref=$2, client_name=$3, client_address=$4, project_name=$5, invoice_date=$6, due_date=$7, status=$8,
+         subtotal=$9, vat_rate=$10, vat_amount=$11, grand_total=$12, amount_paid=$13, notes=$14, is_part_invoice=$15, part_description=$16,
+         payment_terms=$17, subtotal_labour=$18, subtotal_materials=$19, subtotal_plant=$20, updated_at=CURRENT_TIMESTAMP WHERE id=$21 RETURNING *`,
+        [d.invoice_number, d.quote_ref||'', d.client_name, d.client_address, d.project_name, d.invoice_date, d.due_date, d.status||'draft',
          d.subtotal||0, d.vat_rate||20, d.vat_amount||0, d.grand_total||0, d.amount_paid||0, d.notes, d.is_part_invoice||false, d.part_description,
          d.payment_terms||'N/A', d.subtotal_labour||0, d.subtotal_materials||0, d.subtotal_plant||0, req.params.id]
       );
