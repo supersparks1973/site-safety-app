@@ -2269,7 +2269,7 @@ function renderQuoting(c) {
     </div>
     <div style="display:flex;gap:6px;margin-bottom:20px;border-bottom:2px solid var(--border);padding-bottom:0">
       ${['quotes','purchase-orders','invoices','matrix','archive'].map(t => {
-        const labels = { quotes:'Quotes', 'purchase-orders':'Live Works', invoices:'Invoices', matrix:'Matrix', archive:'Archive' };
+        const labels = { quotes:'Quotes', 'purchase-orders':'Live Works', invoices:'Ready to Invoice', matrix:'Matrix', archive:'Archive' };
         return `<button onclick="_qTab='${t}';renderQuotingTab()" id="qtab-${t}" style="padding:10px 20px;border:none;border-bottom:3px solid ${_qTab===t?'var(--primary)':'transparent'};background:none;font-weight:${_qTab===t?'700':'500'};color:${_qTab===t?'var(--primary)':'var(--text-light)'};cursor:pointer;font-size:14px;transition:all .2s">${labels[t]}</button>`;
       }).join('')}
     </div>
