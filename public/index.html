@@ -2860,7 +2860,7 @@ async function readyToInvoice(poId) {
     const vat = sub * 0.2;
     const invData = {
       invoice_number: 'INV-' + po.po_number,
-      quote_id: po.quote_id || null,
+      quote_id: null,
       po_id: null,
       client_name: q ? ((q.client_name||'') + (q.company ? ' \u2014 '+q.company : '')) : (po.client_name||''),
       client_address: q ? (q.client_address||'') : '',
@@ -2877,13 +2877,9 @@ async function readyToInvoice(poId) {
       items: []
     };
     await fetch(API+'/api/invoices', { method:'POST', headers: { ...headers(), 'Content-Type':'application/json' }, body: JSON.stringify(invData) });
-    // Update quote status to invoiced
+    // Delete the quote from Quotes
     if (q) {
-      await fetch(API+'/api/quotes/'+q.id, {
-        method: 'PUT',
-        headers: { ...headers(), 'Content-Type':'application/json' },
-        body: JSON.stringify({ ...q, status: 'invoiced', items: [] })
-      });
+      await fetch(API+'/api/quotes/'+q.id, { method:'DELETE', headers: headers() });
     }
     // Delete the PO from Live Works
     await fetch(API+'/api/purchase-orders/'+poId, { method:'DELETE', headers: headers() });
@@ -3088,10 +3084,9 @@ async function returnToLiveWorks(invId) {
   if (!inv) return;
   try {
     // Re-create the PO in Live Works from the invoice data
-    const q = inv.quote_id ? _quotes.find(x => x.id == inv.quote_id) : null;
     const poData = {
       po_number: (inv.notes && inv.notes.match(/PO ref: (.+)/)) ? inv.notes.match(/PO ref: (.+)/)[1] : 'PO-'+inv.invoice_number,
-      quote_id: inv.quote_id || null,
+      quote_id: null,
       client_name: inv.client_name || '',
       project_name: inv.project_name || '',
       po_date: today(),
@@ -3099,14 +3094,6 @@ async function returnToLiveWorks(invId) {
       notes: 'Returned from invoice: ' + inv.invoice_number
     };
     await fetch(API+'/api/purchase-orders', { method:'POST', headers: { ...headers(), 'Content-Type':'application/json' }, body: JSON.stringify(poData) });
-    // Set linked quote back to accepted if it exists
-    if (q) {
-      await fetch(API+'/api/quotes/'+q.id, {
-        method: 'PUT',
-        headers: { ...headers(), 'Content-Type':'application/json' },
-        body: JSON.stringify({ ...q, status: 'accepted', items: [] })
-      });
-    }
     // Delete the invoice
     await fetch(API+'/api/invoices/'+invId, { method:'DELETE', headers: headers() });
     _qTab = 'purchase-orders';
