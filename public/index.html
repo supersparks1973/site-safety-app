@@ -2539,13 +2539,16 @@ function renderPOsTab(el) {
       <button class="btn btn-primary btn-sm" onclick="showPOForm()">+ Record Live Work</button>
     </div>
     ${activePOs.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--text-light)">No active live works.</div>' :
-    activePOs.map(po => `
+    activePOs.map(po => {
+      const linkedQ = po.quote_id ? _quotes.find(q => q.id == po.quote_id) : null;
+      return `
       <div class="card" style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div>
             <div style="font-weight:700;font-size:15px">PO: ${esc(po.po_number)}</div>
             <div style="color:var(--text-light);font-size:13px">${esc(po.client_name||'')} \u2014 ${esc(po.project_name||'')}</div>
             ${po.quote_number ? `<div style="font-size:12px;color:var(--text-light);margin-top:2px">Quote ref: ${esc(po.quote_number)}</div>` : ''}
+            ${linkedQ && linkedQ.description ? `<div style="color:var(--text-light);font-size:12px;margin-top:4px">${esc(linkedQ.description).substring(0,100)}${linkedQ.description.length>100?'...':''}</div>` : ''}
           </div>
           <div style="text-align:right">
             ${statusBadge(po.status)}
@@ -2557,17 +2560,20 @@ function renderPOsTab(el) {
           <button class="btn btn-sm btn-outline" onclick="deletePO(${po.id})" style="color:var(--danger);border-color:var(--danger)">Delete</button>
         </div>
       </div>
-    `).join('')}
+    `}).join('')}
 
     ${archivedPOs.length > 0 ? `
     <h4 style="color:#6b7280;font-size:14px;margin:24px 0 10px 0;padding-bottom:6px;border-bottom:2px solid #d1d5db">ARCHIVED LIVE WORKS</h4>
-    ${archivedPOs.map(po => `
+    ${archivedPOs.map(po => {
+      const linkedQ = po.quote_id ? _quotes.find(q => q.id == po.quote_id) : null;
+      return `
       <div class="card" style="margin-bottom:10px;border-left:4px solid #6b7280;opacity:0.8">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div>
             <div style="font-weight:700;font-size:15px">PO: ${esc(po.po_number)}</div>
             <div style="color:var(--text-light);font-size:13px">${esc(po.client_name||'')} \u2014 ${esc(po.project_name||'')}</div>
             ${po.quote_number ? `<div style="font-size:12px;color:var(--text-light);margin-top:2px">Quote ref: ${esc(po.quote_number)}</div>` : ''}
+            ${linkedQ && linkedQ.description ? `<div style="color:var(--text-light);font-size:12px;margin-top:4px">${esc(linkedQ.description).substring(0,100)}${linkedQ.description.length>100?'...':''}</div>` : ''}
           </div>
           <div style="text-align:right">
             <span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600;text-transform:uppercase;background:#6b728018;color:#6b7280">archived</span>
@@ -2578,7 +2584,7 @@ function renderPOsTab(el) {
           <button class="btn btn-sm btn-outline" onclick="deletePO(${po.id})" style="color:var(--danger);border-color:var(--danger);font-size:12px;padding:6px 12px">Delete</button>
         </div>
       </div>
-    `).join('')}` : ''}
+    `}).join('')}` : ''}
   `;
 }
 
