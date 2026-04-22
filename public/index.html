@@ -2630,7 +2630,15 @@ function showQuoteForm(existing) {
         <div><label style="${lbl}">Company</label><input id="qf-company" class="form-control" value="${esc(q.company||'')}" placeholder="e.g. ABC Construction"></div>
         <div><label style="${lbl}">Date of Quote</label><input id="qf-date" type="date" class="form-control" value="${esc(q.valid_until||'')}"></div>
         <div><label style="${lbl}">Status</label>
-          <select id="qf-status" class="form-control"><option ${q.status==='draft'||!q.status?'selected':''}>draft</option><option ${q.status==='sent'?'selected':''}>sent</option><option ${q.status==='accepted'?'selected':''}>accepted</option><option ${q.status==='declined'?'selected':''}>declined</option><option ${q.status==='invoiced'?'selected':''}>invoiced</option></select>
+          <select id="qf-status" class="form-control" onchange="togglePOField()"><option value="sent" ${q.status==='sent'||!q.status?'selected':''}>sent</option><option value="accepted" ${q.status==='accepted'?'selected':''}>accepted</option></select>
+        </div>
+      </div>
+      <div id="qf-po-row" style="margin-top:12px;display:${q.status==='accepted'?'block':'none'}">
+        <div class="card" style="background:#f0fdf4;border:1px solid #bbf7d0;padding:14px">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <label style="font-size:13px;font-weight:700;color:#166534;white-space:nowrap">PO Number Received:</label>
+            <input id="qf-po-number" class="form-control" value="" placeholder="e.g. PO-12345" style="flex:1;min-width:180px;border:2px solid #bbf7d0">
+          </div>
         </div>
       </div>
       <div style="margin-top:12px"><label style="${lbl}">Description of Works</label><textarea id="qf-desc" class="form-control" rows="3" placeholder="Describe the scope of work quoted for...">${esc(q.description||'')}</textarea></div>
@@ -2681,6 +2689,12 @@ function showQuoteForm(existing) {
   recalcQuote();
 }
 
+function togglePOField() {
+  const status = (document.getElementById('qf-status')||{}).value;
+  const poRow = document.getElementById('qf-po-row');
+  if (poRow) poRow.style.display = status === 'accepted' ? 'block' : 'none';
+}
+
 function recalcQuote() {
   const labour = Number((document.getElementById('qf-labour')||{}).value||0);
   const materials = Number((document.getElementById('qf-materials')||{}).value||0);
@@ -2705,6 +2719,10 @@ function recalcQuote() {
 async function saveQuote(existingId) {
   const g = id => (document.getElementById(id)||{}).value||'';
   if (!g('qf-number') || !g('qf-client')) { alert('Quote number and client name are required.'); return; }
+  const status = g('qf-status');
+  const poNumber = g('qf-po-number');
+  // If accepted, PO number is required
+  if (status === 'accepted' && !poNumber) { alert('Please enter the PO number received.'); return; }
   const labour = Number(g('qf-labour'))||0;
   const materials = Number(g('qf-materials'))||0;
   const plant = Number(g('qf-plant'))||0;
@@ -2713,7 +2731,7 @@ async function saveQuote(existingId) {
   const vat = sub * (vatRate / 100);
   const data = {
     quote_number: g('qf-number'), client_name: g('qf-client'), company: g('qf-company'), description: g('qf-desc'),
-    valid_until: g('qf-date'), status: g('qf-status'), notes: g('qf-notes'),
+    valid_until: g('qf-date'), status: status === 'accepted' ? 'archived' : status, notes: g('qf-notes'),
     subtotal_labour: labour, subtotal_materials: materials, subtotal_plant: plant,
     markup_pct: 0, markup_amount: 0, net_total: sub,
     vat_rate: vatRate, vat_amount: vat, grand_total: sub + vat,
@@ -2724,6 +2742,21 @@ async function saveQuote(existingId) {
     const method = existingId ? 'PUT' : 'POST';
     const res = await fetch(url, { method, headers: { ...headers(), 'Content-Type':'application/json' }, body: JSON.stringify(data) });
     if (!res.ok) throw new Error('Save failed');
+    const savedQuote = await res.json();
+    // If accepted with PO number, auto-create the purchase order
+    if (status === 'accepted' && poNumber) {
+      const poData = {
+        po_number: poNumber,
+        quote_id: savedQuote.id || existingId,
+        client_name: g('qf-client') + (g('qf-company') ? ' \u2014 '+g('qf-company') : ''),
+        project_name: '',
+        po_date: today(),
+        po_value: sub + vat,
+        notes: 'Quote ref: ' + g('qf-number')
+      };
+      await fetch(API+'/api/purchase-orders', { method:'POST', headers: { ...headers(), 'Content-Type':'application/json' }, body: JSON.stringify(poData) });
+    }
+    _qTab = status === 'accepted' ? 'purchase-orders' : 'quotes';
     await loadQuotingData();
   } catch(e) { alert('Error: ' + e.message); }
 }
