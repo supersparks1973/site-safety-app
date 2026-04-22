@@ -2601,8 +2601,6 @@ function showQuoteForm(existing) {
         <div><label style="${lbl}">Quote Number *</label><input id="qf-number" class="form-control" value="${esc(q.quote_number||'')}" placeholder="e.g. Q-2026-001"></div>
         <div><label style="${lbl}">Client Name *</label><input id="qf-client" class="form-control" value="${esc(q.client_name||'')}" placeholder="e.g. John Smith"></div>
         <div><label style="${lbl}">Company</label><input id="qf-company" class="form-control" value="${esc(q.company||'')}" placeholder="e.g. ABC Construction"></div>
-        <div><label style="${lbl}">Client Address</label><input id="qf-address" class="form-control" value="${esc(q.client_address||'')}" placeholder="e.g. 123 High Street, London"></div>
-        <div><label style="${lbl}">Project Name</label><input id="qf-project" class="form-control" value="${esc(q.project_name||'')}" placeholder="e.g. Unit 5 Refurbishment"></div>
         <div><label style="${lbl}">Date of Quote</label><input id="qf-date" type="date" class="form-control" value="${esc(q.valid_until||'')}"></div>
         <div><label style="${lbl}">Status</label>
           <select id="qf-status" class="form-control" onchange="togglePOField()"><option value="sent" ${q.status==='sent'||!q.status?'selected':''}>sent</option><option value="accepted" ${q.status==='accepted'?'selected':''}>accepted</option></select>
@@ -2705,8 +2703,7 @@ async function saveQuote(existingId) {
   const vatRate = 20;
   const vat = sub * (vatRate / 100);
   const data = {
-    quote_number: g('qf-number'), client_name: g('qf-client'), company: g('qf-company'),
-    client_address: g('qf-address'), project_name: g('qf-project'), description: g('qf-desc'),
+    quote_number: g('qf-number'), client_name: g('qf-client'), company: g('qf-company'), description: g('qf-desc'),
     valid_until: g('qf-date'), status: status, notes: g('qf-notes'),
     subtotal_labour: labour, subtotal_materials: materials, subtotal_plant: plant,
     markup_pct: 0, markup_amount: 0, net_total: sub,
@@ -2725,7 +2722,7 @@ async function saveQuote(existingId) {
         po_number: poNumber,
         quote_id: savedQuote.id || existingId,
         client_name: g('qf-client') + (g('qf-company') ? ' \u2014 '+g('qf-company') : ''),
-        project_name: g('qf-project'),
+        project_name: '',
         po_date: today(),
         po_value: sub + vat,
         notes: 'Quote ref: ' + g('qf-number')
