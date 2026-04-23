@@ -2523,63 +2523,7 @@ function printMatrix() {
 
 // ── ARCHIVE TAB ──
 function renderArchiveTab(el) {
-  const archivedQuotes = _quotes.filter(q => q.status === 'archived');
-  const archivedPOs = _pos.filter(p => p.status === 'archived');
-  const archivedInvs = _invoices.filter(i => i.status === 'archived');
-  el.innerHTML = `
-    <p style="color:var(--text-light);font-size:13px;margin:0 0 16px 0">${archivedQuotes.length} quote${archivedQuotes.length!==1?'s':''}, ${archivedPOs.length} approved work${archivedPOs.length!==1?'s':''}, ${archivedInvs.length} invoice${archivedInvs.length!==1?'s':''}</p>
-
-    ${archivedQuotes.length > 0 ? `
-    <h4 style="color:#6b7280;font-size:14px;margin:0 0 8px 0;padding-bottom:6px;border-bottom:2px solid #d1d5db">ARCHIVED QUOTES</h4>
-    ${archivedQuotes.map(q => `
-      <div class="card" style="margin-bottom:8px;border-left:4px solid #6b7280;opacity:0.8">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-weight:700;font-size:14px">${esc(q.quote_number)}</div>
-            <div style="color:var(--text-light);font-size:12px">${esc(q.client_name||'')}${q.company ? ' \u2014 '+esc(q.company) : ''}</div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-weight:700;color:var(--primary)">${money(q.grand_total)}</div>
-          </div>
-        </div>
-      </div>
-    `).join('')}` : ''}
-
-    ${archivedPOs.length > 0 ? `
-    <h4 style="color:#6b7280;font-size:14px;margin:20px 0 8px 0;padding-bottom:6px;border-bottom:2px solid #d1d5db">ARCHIVED APPROVED WORKS</h4>
-    ${archivedPOs.map(po => `
-      <div class="card" style="margin-bottom:8px;border-left:4px solid #6b7280;opacity:0.8">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-weight:700;font-size:14px">PO: ${esc(po.po_number)}</div>
-            <div style="color:var(--text-light);font-size:12px">${esc(po.client_name||'')}</div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-weight:700;color:var(--primary)">${money(po.po_value)}</div>
-          </div>
-        </div>
-      </div>
-    `).join('')}` : ''}
-
-    ${archivedInvs.length > 0 ? `
-    <h4 style="color:#6b7280;font-size:14px;margin:20px 0 8px 0;padding-bottom:6px;border-bottom:2px solid #d1d5db">ARCHIVED INVOICES</h4>
-    ${archivedInvs.map(inv => `
-      <div class="card" style="margin-bottom:8px;border-left:4px solid #6b7280;opacity:0.8">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-weight:700;font-size:14px">${esc(inv.invoice_number||'')}</div>
-            <div style="color:var(--text-light);font-size:12px">${esc(inv.client_name||'')}</div>
-          </div>
-          <div style="text-align:right">
-            ${statusBadge(inv.status)}
-            <div style="font-weight:700;color:var(--primary)">${money(inv.grand_total)}</div>
-          </div>
-        </div>
-      </div>
-    `).join('')}` : ''}
-
-    ${archivedQuotes.length === 0 && archivedPOs.length === 0 && archivedInvs.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--text-light)">No archived items.</div>' : ''}
-  `;
+  el.innerHTML = `<div class="card" style="text-align:center;padding:40px;color:var(--text-light)">No archived items.</div>`;
 }
 
 // ── QUOTE FORM ──
