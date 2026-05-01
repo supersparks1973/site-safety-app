@@ -295,15 +295,6 @@ body.read-only-mode .hide-readonly{display:none!important}
         </ul>
       </div>
       <div class="sidebar-section">
-        <div class="sidebar-section-title">Projects</div>
-        <ul class="sidebar-nav">
-          <li><a data-page="projects"><span class="nav-icon">🏗️</span>Projects</a></li>
-          <li><a data-page="rfi"><span class="nav-icon">📩</span>RFI Manager</a></li>
-          <li><a data-page="documents"><span class="nav-icon">📁</span>Document Library</a></li>
-          <li><a data-page="om-manager"><span class="nav-icon">📘</span>O&amp;M Manager</a></li>
-        </ul>
-      </div>
-      <div class="sidebar-section">
         <div class="sidebar-section-title">Site Templates</div>
         <ul class="sidebar-nav">
           <li><a data-page="site-templates"><span class="nav-icon">📄</span>Templates</a></li>
@@ -704,11 +695,6 @@ function renderPage(page) {
     'rescue-plans': renderAdminRescuePlans,
     'training': renderAdminTraining,
     'users': renderAdminUsers,
-    // Portal modules
-    'projects': renderProjects,
-    'rfi': renderRFI,
-    'documents': renderDocuments,
-    'om-manager': renderOMManager,
     'loto': renderLOTO,
     'toolbox-talks': renderToolboxTalks,
     'site-templates': renderSiteTemplates,
