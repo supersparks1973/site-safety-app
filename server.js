@@ -188,7 +188,11 @@ async function startApp() {
   }
 
   function adminOnly(req, res, next) {
-    const allowed = ['admin', 'project_manager', 'external_view'];
+    // Defense-in-depth: external_view (read-only auditor) may use GET admin endpoints,
+    // but never write endpoints — even if the upstream write-block is ever removed.
+    const writeAllowed = ['admin', 'project_manager'];
+    const readAllowed = ['admin', 'project_manager', 'external_view'];
+    const allowed = req.method === 'GET' ? readAllowed : writeAllowed;
     if (!allowed.includes(req.user.role)) return res.status(403).json({ error: 'Admin access required' });
     next();
   }
@@ -233,13 +237,15 @@ async function startApp() {
   });
 
   app.post('/api/near-miss', authenticate, async (req, res) => {
-    const d = req.body;
-    const { rows } = await pool.query(
-      'INSERT INTO near_miss_reports (user_id, date, time, location, description, potential_severity, immediate_actions, weather_conditions, witnesses, photos, signature) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id',
-      [req.user.id, d.date, d.time, d.location, d.description, d.potential_severity, d.immediate_actions || '', d.weather_conditions || '', d.witnesses || '', d.photos || '', d.signature || '']);
-    sendAdminEmail(`New Near Miss Report #${rows[0].id}`,
-      `<h2>Near Miss Report</h2><p><strong>Reported by:</strong> ${req.user.full_name}</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Severity:</strong> ${d.potential_severity}</p><p><strong>Description:</strong> ${d.description}</p>`);
-    res.json({ id: rows[0].id, message: 'Near miss report submitted' });
+    try {
+      const d = req.body;
+      const { rows } = await pool.query(
+        'INSERT INTO near_miss_reports (user_id, date, time, location, description, potential_severity, immediate_actions, weather_conditions, witnesses, photos, signature) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id',
+        [req.user.id, d.date, d.time, d.location, d.description, d.potential_severity, d.immediate_actions || '', d.weather_conditions || '', d.witnesses || '', d.photos || '', d.signature || '']);
+      sendAdminEmail(`New Near Miss Report #${rows[0].id}`,
+        `<h2>Near Miss Report</h2><p><strong>Reported by:</strong> ${req.user.full_name}</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Severity:</strong> ${d.potential_severity}</p><p><strong>Description:</strong> ${d.description}</p>`);
+      res.json({ id: rows[0].id, message: 'Near miss report submitted' });
+    } catch(e) { console.error('POST /api/near-miss', e); res.status(500).json({ error: e.message }); }
   });
 
   app.get('/api/near-miss', authenticate, async (req, res) => {
@@ -253,25 +259,31 @@ async function startApp() {
   });
 
   app.patch('/api/near-miss/:id', authenticate, adminOnly, async (req, res) => {
-    const { status, admin_notes } = req.body;
-    await pool.query('UPDATE near_miss_reports SET status = $1, admin_notes = $2 WHERE id = $3', [status, admin_notes, req.params.id]);
-    res.json({ success: true });
+    try {
+      const { status, admin_notes } = req.body;
+      await pool.query('UPDATE near_miss_reports SET status = $1, admin_notes = $2 WHERE id = $3', [status, admin_notes, req.params.id]);
+      res.json({ success: true });
+    } catch(e) { console.error('PATCH /api/near-miss/:id', e); res.status(500).json({ error: e.message }); }
   });
 
   app.delete('/api/near-miss/:id', authenticate, adminOnly, async (req, res) => {
-    await pool.query('DELETE FROM near_miss_reports WHERE id = $1', [req.params.id]);
-    res.json({ success: true });
+    try {
+      await pool.query('DELETE FROM near_miss_reports WHERE id = $1', [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { console.error('DELETE /api/near-miss/:id', e); res.status(500).json({ error: e.message }); }
   });
 
   app.post('/api/ladder-inspection', authenticate, async (req, res) => {
-    const d = req.body;
-    const { rows } = await pool.query(
-      'INSERT INTO ladder_inspections (user_id, date, ladder_id, ladder_type, location, stiles_condition, rungs_condition, feet_condition, locking_mechanism, labels_visible, general_condition, safe_to_use, defects_found, actions_taken, photos, signature) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id',
-      [req.user.id, d.date, d.ladder_id, d.ladder_type, d.location, d.stiles_condition, d.rungs_condition, d.feet_condition, d.locking_mechanism, d.labels_visible, d.general_condition, d.safe_to_use, d.defects_found || '', d.actions_taken || '', d.photos || '', d.signature || '']);
-    const safetyFlag = d.safe_to_use === 'No' ? ' ⚠️ UNSAFE' : '';
-    sendAdminEmail(`Ladder Inspection #${rows[0].id}${safetyFlag}`,
-      `<h2>Ladder Inspection</h2><p><strong>Inspected by:</strong> ${req.user.full_name}</p><p><strong>Ladder:</strong> ${d.ladder_id} (${d.ladder_type})</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Safe to use:</strong> ${d.safe_to_use}</p>${d.defects_found ? `<p><strong>Defects:</strong> ${d.defects_found}</p>` : ''}`);
-    res.json({ id: rows[0].id, message: 'Ladder inspection submitted' });
+    try {
+      const d = req.body;
+      const { rows } = await pool.query(
+        'INSERT INTO ladder_inspections (user_id, date, ladder_id, ladder_type, location, stiles_condition, rungs_condition, feet_condition, locking_mechanism, labels_visible, general_condition, safe_to_use, defects_found, actions_taken, photos, signature) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id',
+        [req.user.id, d.date, d.ladder_id, d.ladder_type, d.location, d.stiles_condition, d.rungs_condition, d.feet_condition, d.locking_mechanism, d.labels_visible, d.general_condition, d.safe_to_use, d.defects_found || '', d.actions_taken || '', d.photos || '', d.signature || '']);
+      const safetyFlag = d.safe_to_use === 'No' ? ' ⚠️ UNSAFE' : '';
+      sendAdminEmail(`Ladder Inspection #${rows[0].id}${safetyFlag}`,
+        `<h2>Ladder Inspection</h2><p><strong>Inspected by:</strong> ${req.user.full_name}</p><p><strong>Ladder:</strong> ${d.ladder_id} (${d.ladder_type})</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Safe to use:</strong> ${d.safe_to_use}</p>${d.defects_found ? `<p><strong>Defects:</strong> ${d.defects_found}</p>` : ''}`);
+      res.json({ id: rows[0].id, message: 'Ladder inspection submitted' });
+    } catch(e) { console.error('POST /api/ladder-inspection', e); res.status(500).json({ error: e.message }); }
   });
 
   app.get('/api/ladder-inspection', authenticate, async (req, res) => {
@@ -285,14 +297,16 @@ async function startApp() {
   });
 
   app.post('/api/tower-inspection', authenticate, async (req, res) => {
-    const d = req.body;
-    const { rows } = await pool.query(
-      'INSERT INTO tower_inspections (user_id, date, tower_id, location, base_plates_condition, castors_locked, braces_secure, platforms_condition, guardrails_fitted, toe_boards_fitted, outriggers_deployed, access_ladder_secure, safe_to_use, max_platform_height, defects_found, actions_taken, photos, signature) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id',
-      [req.user.id, d.date, d.tower_id, d.location, d.base_plates_condition, d.castors_locked, d.braces_secure, d.platforms_condition, d.guardrails_fitted, d.toe_boards_fitted, d.outriggers_deployed, d.access_ladder_secure, d.safe_to_use, d.max_platform_height || '', d.defects_found || '', d.actions_taken || '', d.photos || '', d.signature || '']);
-    const safetyFlag = d.safe_to_use === 'No' ? ' ⚠️ UNSAFE' : '';
-    sendAdminEmail(`Tower Inspection #${rows[0].id}${safetyFlag}`,
-      `<h2>Mobile Tower Inspection</h2><p><strong>Inspected by:</strong> ${req.user.full_name}</p><p><strong>Tower:</strong> ${d.tower_id}</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Safe to use:</strong> ${d.safe_to_use}</p>${d.defects_found ? `<p><strong>Defects:</strong> ${d.defects_found}</p>` : ''}`);
-    res.json({ id: rows[0].id, message: 'Tower inspection submitted' });
+    try {
+      const d = req.body;
+      const { rows } = await pool.query(
+        'INSERT INTO tower_inspections (user_id, date, tower_id, location, base_plates_condition, castors_locked, braces_secure, platforms_condition, guardrails_fitted, toe_boards_fitted, outriggers_deployed, access_ladder_secure, safe_to_use, max_platform_height, defects_found, actions_taken, photos, signature) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id',
+        [req.user.id, d.date, d.tower_id, d.location, d.base_plates_condition, d.castors_locked, d.braces_secure, d.platforms_condition, d.guardrails_fitted, d.toe_boards_fitted, d.outriggers_deployed, d.access_ladder_secure, d.safe_to_use, d.max_platform_height || '', d.defects_found || '', d.actions_taken || '', d.photos || '', d.signature || '']);
+      const safetyFlag = d.safe_to_use === 'No' ? ' ⚠️ UNSAFE' : '';
+      sendAdminEmail(`Tower Inspection #${rows[0].id}${safetyFlag}`,
+        `<h2>Mobile Tower Inspection</h2><p><strong>Inspected by:</strong> ${req.user.full_name}</p><p><strong>Tower:</strong> ${d.tower_id}</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Safe to use:</strong> ${d.safe_to_use}</p>${d.defects_found ? `<p><strong>Defects:</strong> ${d.defects_found}</p>` : ''}`);
+      res.json({ id: rows[0].id, message: 'Tower inspection submitted' });
+    } catch(e) { console.error('POST /api/tower-inspection', e); res.status(500).json({ error: e.message }); }
   });
 
   app.get('/api/tower-inspection', authenticate, async (req, res) => {
@@ -306,14 +320,16 @@ async function startApp() {
   });
 
   app.post('/api/mewp-inspection', authenticate, async (req, res) => {
-    const d = req.body;
-    const { rows } = await pool.query(
-      'INSERT INTO mewp_inspections (user_id, date, mewp_id, mewp_type, location, controls_functional, emergency_controls, guardrails_condition, platform_condition, hydraulics_condition, tyres_condition, outriggers_condition, harness_anchor_points, warning_devices, safe_to_use, hours_meter_reading, defects_found, actions_taken, photos, signature) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING id',
-      [req.user.id, d.date, d.mewp_id, d.mewp_type, d.location, d.controls_functional, d.emergency_controls, d.guardrails_condition, d.platform_condition, d.hydraulics_condition, d.tyres_condition, d.outriggers_condition, d.harness_anchor_points, d.warning_devices, d.safe_to_use, d.hours_meter_reading || '', d.defects_found || '', d.actions_taken || '', d.photos || '', d.signature || '']);
-    const safetyFlag = d.safe_to_use === 'No' ? ' ⚠️ UNSAFE' : '';
-    sendAdminEmail(`MEWP Inspection #${rows[0].id}${safetyFlag}`,
-      `<h2>MEWP Inspection</h2><p><strong>Inspected by:</strong> ${req.user.full_name}</p><p><strong>MEWP:</strong> ${d.mewp_id} (${d.mewp_type})</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Safe to use:</strong> ${d.safe_to_use}</p>${d.defects_found ? `<p><strong>Defects:</strong> ${d.defects_found}</p>` : ''}`);
-    res.json({ id: rows[0].id, message: 'MEWP inspection submitted' });
+    try {
+      const d = req.body;
+      const { rows } = await pool.query(
+        'INSERT INTO mewp_inspections (user_id, date, mewp_id, mewp_type, location, controls_functional, emergency_controls, guardrails_condition, platform_condition, hydraulics_condition, tyres_condition, outriggers_condition, harness_anchor_points, warning_devices, safe_to_use, hours_meter_reading, defects_found, actions_taken, photos, signature) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING id',
+        [req.user.id, d.date, d.mewp_id, d.mewp_type, d.location, d.controls_functional, d.emergency_controls, d.guardrails_condition, d.platform_condition, d.hydraulics_condition, d.tyres_condition, d.outriggers_condition, d.harness_anchor_points, d.warning_devices, d.safe_to_use, d.hours_meter_reading || '', d.defects_found || '', d.actions_taken || '', d.photos || '', d.signature || '']);
+      const safetyFlag = d.safe_to_use === 'No' ? ' ⚠️ UNSAFE' : '';
+      sendAdminEmail(`MEWP Inspection #${rows[0].id}${safetyFlag}`,
+        `<h2>MEWP Inspection</h2><p><strong>Inspected by:</strong> ${req.user.full_name}</p><p><strong>MEWP:</strong> ${d.mewp_id} (${d.mewp_type})</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Safe to use:</strong> ${d.safe_to_use}</p>${d.defects_found ? `<p><strong>Defects:</strong> ${d.defects_found}</p>` : ''}`);
+      res.json({ id: rows[0].id, message: 'MEWP inspection submitted' });
+    } catch(e) { console.error('POST /api/mewp-inspection', e); res.status(500).json({ error: e.message }); }
   });
 
   app.get('/api/mewp-inspection', authenticate, async (req, res) => {
@@ -750,21 +766,23 @@ async function startApp() {
 
   // ═══════ RESCUE PLANS ═══════
   app.post('/api/rescue-plan', authenticate, async (req, res) => {
-    const d = req.body;
-    const { rows } = await pool.query(
-      `INSERT INTO rescue_plans (user_id, date, client_name, project_name, location, operation, project_manager,
-        rescue_supervisor, attendant, rescue_team, comms_method, nearest_hospital,
-        em_site_manager_name, em_site_manager_phone, em_first_aider_name, em_first_aider_phone,
-        em_fire_marshal_name, em_fire_marshal_phone, rescue_method, scene_protection, checklist, equip_other, signature)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING id`,
-      [req.user.id, d.date, d.client_name, d.project_name, d.location, d.operation, d.project_manager,
-       d.rescue_supervisor, d.attendant || '', d.rescue_team || '', d.comms_method, d.nearest_hospital,
-       d.em_site_manager_name || '', d.em_site_manager_phone || '', d.em_first_aider_name || '', d.em_first_aider_phone || '',
-       d.em_fire_marshal_name || '', d.em_fire_marshal_phone || '', d.rescue_method, d.scene_protection || '',
-       d.checklist || '{}', d.equip_other || '', d.signature || '']);
-    sendAdminEmail(`New Rescue Plan: ${d.project_name}`,
-      `<h2>Rescue Plan Submitted</h2><p><strong>By:</strong> ${req.user.full_name}</p><p><strong>Client:</strong> ${d.client_name}</p><p><strong>Project:</strong> ${d.project_name}</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Rescue Supervisor:</strong> ${d.rescue_supervisor}</p>`);
-    res.json({ id: rows[0].id, message: 'Rescue plan submitted' });
+    try {
+      const d = req.body;
+      const { rows } = await pool.query(
+        `INSERT INTO rescue_plans (user_id, date, client_name, project_name, location, operation, project_manager,
+          rescue_supervisor, attendant, rescue_team, comms_method, nearest_hospital,
+          em_site_manager_name, em_site_manager_phone, em_first_aider_name, em_first_aider_phone,
+          em_fire_marshal_name, em_fire_marshal_phone, rescue_method, scene_protection, checklist, equip_other, signature)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING id`,
+        [req.user.id, d.date, d.client_name, d.project_name, d.location, d.operation, d.project_manager,
+         d.rescue_supervisor, d.attendant || '', d.rescue_team || '', d.comms_method, d.nearest_hospital,
+         d.em_site_manager_name || '', d.em_site_manager_phone || '', d.em_first_aider_name || '', d.em_first_aider_phone || '',
+         d.em_fire_marshal_name || '', d.em_fire_marshal_phone || '', d.rescue_method, d.scene_protection || '',
+         d.checklist || '{}', d.equip_other || '', d.signature || '']);
+      sendAdminEmail(`New Rescue Plan: ${d.project_name}`,
+        `<h2>Rescue Plan Submitted</h2><p><strong>By:</strong> ${req.user.full_name}</p><p><strong>Client:</strong> ${d.client_name}</p><p><strong>Project:</strong> ${d.project_name}</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Rescue Supervisor:</strong> ${d.rescue_supervisor}</p>`);
+      res.json({ id: rows[0].id, message: 'Rescue plan submitted' });
+    } catch(e) { console.error('POST /api/rescue-plan', e); res.status(500).json({ error: e.message }); }
   });
 
   app.get('/api/rescue-plan', authenticate, async (req, res) => {
@@ -961,9 +979,11 @@ async function startApp() {
 
   // API endpoint to trigger digest manually (admin only)
   app.post('/api/digest/:period', authenticate, adminOnly, async (req, res) => {
-    const period = req.params.period === 'weekly' ? 'weekly' : 'daily';
-    await sendDigest(period);
-    res.json({ success: true, message: `${period} digest sent` });
+    try {
+      const period = req.params.period === 'weekly' ? 'weekly' : 'daily';
+      await sendDigest(period);
+      res.json({ success: true, message: `${period} digest sent` });
+    } catch(e) { console.error('POST /api/digest/:period', e); res.status(500).json({ error: e.message }); }
   });
 
   // Auto-schedule digest: run check on each request (lightweight)
