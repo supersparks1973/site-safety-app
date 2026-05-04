@@ -1097,6 +1097,13 @@ async function startApp() {
               ]
             });
           }
+          // Sub-heading style: a line that ends with ':' and is reasonably short
+          if (line.endsWith(':') && line.length < 80) {
+            return new Paragraph({
+              spacing: { before: 160, after: 60 },
+              children: [new TextRun({ text: line, bold: true, font: 'Arial', size: 22, color: '4A4A4A' })]
+            });
+          }
           return new Paragraph({
             spacing: { after: 120 },
             children: [new TextRun({ text: line, font: 'Arial', size: 20 })]
