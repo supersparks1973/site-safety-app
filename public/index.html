@@ -178,6 +178,15 @@ body.read-only-mode .hide-readonly{display:none!important}
 .training-matrix th,.training-matrix td{padding:6px 8px;text-align:center;border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
 .training-matrix th:last-child,.training-matrix td:last-child{border-right:none}
 .training-matrix tr:last-child td{border-bottom:none}
+
+/* Generic data table */
+.data-table{width:100%;border-collapse:separate;border-spacing:0}
+.data-table th{text-align:left;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--text-light);padding:12px 14px;background:#f8fafc;border-bottom:2px solid var(--border);white-space:nowrap}
+.data-table td{padding:14px;border-bottom:1px solid var(--border);font-size:14px;color:var(--text);vertical-align:middle}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:#fafbfc}
+.data-table th:first-child,.data-table td:first-child{padding-left:18px}
+.data-table th:last-child,.data-table td:last-child{padding-right:18px;text-align:right}
 .tm-name-col{background:var(--primary);color:#fff;font-weight:700;font-size:11px;position:sticky;left:0;z-index:2;min-width:130px;text-align:left !important}
 .tm-course-col{background:var(--primary);color:#fff;font-weight:600;font-size:10px;min-width:70px;max-width:90px;white-space:normal;line-height:1.25}
 .tm-name-cell{font-weight:600;font-size:12px;color:var(--text);background:var(--card);position:sticky;left:0;z-index:1;text-align:left !important;white-space:nowrap}
