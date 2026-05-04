@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-        Header, Footer, AlignmentType, BorderStyle, WidthType,
+        Header, Footer, AlignmentType, BorderStyle, WidthType, TabStopType,
         ShadingType, PageNumber, PageBreak, ImageRun } = require('docx');
 const PDFDocument = require('pdfkit');
 
@@ -353,12 +353,11 @@ async function startApp() {
       default: new Header({ children: [
         new Paragraph({
           border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: maroon, space: 4 } },
+          tabStops: [{ type: TabStopType.RIGHT, position: 9506 }],
           children: [
-            ...(logoData ? [new ImageRun({ data: logoData, transformation: { width: 120, height: 46 }, type: 'png' }), new TextRun({ text: "  ", font: "Arial", size: 22 })] : []),
-            new TextRun({ text: "ManProjects", bold: true, font: "Arial", size: 22, color: grey }),
-            new TextRun({ text: " Ltd", font: "Arial", size: 18, color: "999999" }),
-            new TextRun({ text: "    Electrical and Mechanical Building Services", font: "Arial", size: 14, color: "999999" }),
-            ...(niceicData ? [new TextRun({ text: "    ", font: "Arial", size: 14 }), new ImageRun({ data: niceicData, transformation: { width: 80, height: 37 }, type: 'png' })] : []),
+            ...(logoData ? [new ImageRun({ data: logoData, transformation: { width: 140, height: 54 }, type: 'png' })] : []),
+            new TextRun({ text: "\t", font: "Arial", size: 22 }),
+            ...(niceicData ? [new ImageRun({ data: niceicData, transformation: { width: 90, height: 42 }, type: 'png' })] : []),
           ]
         }),
       ] })
@@ -1063,6 +1062,28 @@ async function startApp() {
       const attendees = typeof t.attendees === 'string' ? JSON.parse(t.attendees) : (t.attendees || []);
       const h = docxHelpers();
       const halfW = h.pw / 2;
+      const renderTalkContent = (raw) => {
+        if (!raw || !raw.trim()) return [new Paragraph({ children: [new TextRun({ text: 'No content recorded.', font: 'Arial', size: 20 })], spacing: { after: 200 } })];
+        const normalized = raw.replace(/\s*\u2022\s*/g, '\n\u2022 ').replace(/^\n/, '');
+        const lines = normalized.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        return lines.map(line => {
+          if (line.startsWith('\u2022')) {
+            const text = line.replace(/^\u2022\s*/, '');
+            return new Paragraph({
+              indent: { left: 360, hanging: 360 },
+              spacing: { after: 80 },
+              children: [
+                new TextRun({ text: '\u2022  ', font: 'Arial', size: 20 }),
+                new TextRun({ text, font: 'Arial', size: 20 })
+              ]
+            });
+          }
+          return new Paragraph({
+            spacing: { after: 120 },
+            children: [new TextRun({ text: line, font: 'Arial', size: 20 })]
+          });
+        });
+      };
       const doc = new Document({
         styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
         sections: [{
@@ -1079,7 +1100,7 @@ async function startApp() {
             ] }),
             new Paragraph({ spacing: { before: 200 } }),
             h.sh('TALK CONTENT'),
-            new Paragraph({ children: [new TextRun({ text: t.content || 'No content recorded.', font: 'Arial', size: 20 })], spacing: { after: 200 } }),
+            ...renderTalkContent(t.content),
             new Paragraph({ spacing: { before: 200 } }),
             h.sh('ATTENDEES'),
             new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
