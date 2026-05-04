@@ -1987,15 +1987,17 @@ async function renderTBList(container) {
           ${tbTalksData.map(t => {
             const att = typeof t.attendees === 'string' ? JSON.parse(t.attendees) : (t.attendees || []);
             return `<tr>
-              <td>${t.talk_date ? new Date(t.talk_date).toLocaleDateString('en-GB') : '—'}</td>
-              <td><div style="display:flex;align-items:center;gap:8px">${(() => { const lib = TOOLBOX_LIBRARY.find(l => l.topic === t.topic); const c = lib ? lib.color : '#8B1A1A'; const ic = lib ? lib.icon : 'megaphone'; return `<span style=\"width:28px;height:28px;border-radius:8px;background:${c};display:inline-flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0\">${tbIcon(ic, 16, '#fff')}</span>`; })()}<strong>${esc(t.topic)}</strong></div></td>
-              <td>${esc(t.presenter || '—')}</td>
+              <td style="white-space:nowrap">${t.talk_date ? new Date(t.talk_date).toLocaleDateString('en-GB') : '—'}</td>
+              <td><div style="display:flex;align-items:center;gap:8px;min-width:180px">${(() => { const lib = TOOLBOX_LIBRARY.find(l => l.topic === t.topic); const c = lib ? lib.color : '#8B1A1A'; const ic = lib ? lib.icon : 'megaphone'; return `<span style=\"width:28px;height:28px;border-radius:8px;background:${c};display:inline-flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0\">${tbIcon(ic, 16, '#fff')}</span>`; })()}<strong>${esc(t.topic)}</strong></div></td>
+              <td style="white-space:nowrap">${esc(t.presenter || '—')}</td>
               <td>${esc(t.site_project || '—')}</td>
-              <td>${att.length} attendee${att.length !== 1 ? 's' : ''}</td>
-              <td style="display:flex;gap:6px;flex-wrap:wrap">
-                <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="tbViewTalk(${t.id})">View</button>
-                <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="downloadTalkDocx(${t.id},'${esc(t.topic)}')">📄 Word</button>
-                ${(state.user.role === 'admin' || state.user.role === 'project_manager') ? `<button class="btn" style="font-size:12px;padding:4px 10px;background:#dc2626;color:#fff" onclick="tbDeleteTalk(${t.id})">Delete</button>` : ''}
+              <td style="white-space:nowrap">${att.length} attendee${att.length !== 1 ? 's' : ''}</td>
+              <td style="white-space:nowrap">
+                <div style="display:inline-flex;gap:6px;align-items:center">
+                  <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="tbViewTalk(${t.id})" title="View talk">View</button>
+                  <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="downloadTalkDocx(${t.id},'${esc(t.topic)}')" title="Download Word doc">📄</button>
+                  ${(state.user.role === 'admin' || state.user.role === 'project_manager') ? `<button class="btn" style="font-size:12px;padding:4px 10px;background:#dc2626;color:#fff" onclick="tbDeleteTalk(${t.id})" title="Delete talk">🗑</button>` : ''}
+                </div>
               </td>
             </tr>`;
           }).join('')}
