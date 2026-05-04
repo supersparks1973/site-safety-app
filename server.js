@@ -1063,7 +1063,7 @@ async function startApp() {
       const attendees = typeof t.attendees === 'string' ? JSON.parse(t.attendees) : (t.attendees || []);
       const h = docxHelpers();
       const halfW = h.pw / 2;
-      const doc = new docx.Document({
+      const doc = new Document({
         styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
         sections: [{
           properties: h.pageProps,
@@ -1098,7 +1098,7 @@ async function startApp() {
           ]
         }]
       });
-      const buf = await docx.Packer.toBuffer(doc);
+      const buf = await Packer.toBuffer(doc);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', `attachment; filename="Toolbox-Talk-${t.id}.docx"`);
       res.send(buf);
