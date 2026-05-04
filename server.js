@@ -378,6 +378,25 @@ async function startApp() {
     return { maroon, grey, bds, cm, pw, lbl, val, condCell, sh, mkHeader, mkFooter, pageProps, logoData, niceicData };
   };
 
+  // Topic metadata mirrors public/index.html TOOLBOX_LIBRARY for Word doc rendering
+  const TOOLBOX_TOPIC_META = {
+    'Working at Height':         { color: 'F97316', summary: 'Fall protection, ladders, scaffolding and MEWPs.' },
+    'Manual Handling':           { color: '0EA5E9', summary: 'Safe lifting techniques and the TILE method.' },
+    'Electrical Safety':         { color: 'EAB308', summary: 'Isolation, LOTO and live work controls.' },
+    'Fire Safety':               { color: 'DC2626', summary: 'Routes, alarms, extinguishers and hot work permits.' },
+    'PPE Requirements':          { color: 'EA580C', summary: 'Minimum site PPE and inspection.' },
+    'Confined Space Entry':      { color: '8B5CF6', summary: 'Permit, atmospheric testing and standby.' },
+    'Asbestos Awareness':        { color: '92400E', summary: 'Recognise, avoid disturbing and report ACMs.' },
+    'COSHH \u2014 Hazardous Substances': { color: '059669', summary: 'SDS, COSHH assessments and safe storage.' },
+    'Slips, Trips and Falls':    { color: 'CA8A04', summary: 'Most common workplace injury \u2014 housekeeping is key.' },
+    'Permit to Work Systems':    { color: '4F46E5', summary: 'High-risk activity authorisation and controls.' },
+    'Noise at Work':             { color: '0D9488', summary: 'Action levels, hearing protection and zones.' },
+    'Scaffold Safety':           { color: '475569', summary: 'Inspection tags, alterations and access.' },
+    'Lone Working':              { color: '06B6D4', summary: 'Check-in routines and emergency procedures.' },
+    'Hot Works':                 { color: 'B91C1C', summary: 'Welding, cutting, grinding \u2014 permit and fire watch.' },
+    'Mental Health & Wellbeing': { color: 'EC4899', summary: 'Talk, listen, signpost \u2014 it is OK not to be OK.' },
+  };
+
   // Near-miss Word doc
   app.get('/api/near-miss/:id/docx', authenticate, async (req, res) => {
     try {
@@ -1084,6 +1103,18 @@ async function startApp() {
           });
         });
       };
+      const meta = TOOLBOX_TOPIC_META[t.topic] || { color: '8B1A1A', summary: '' };
+      const bannerCell = new TableCell({
+        borders: { top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' } },
+        shading: { fill: meta.color, type: ShadingType.CLEAR },
+        margins: { top: 200, bottom: 200, left: 280, right: 280 },
+        children: [
+          new Paragraph({ children: [new TextRun({ text: 'TOOLBOX TALK', bold: true, font: 'Arial', size: 18, color: 'FFFFFF' })] }),
+          new Paragraph({ spacing: { before: 40 }, children: [new TextRun({ text: t.topic || 'Toolbox Talk', bold: true, font: 'Arial', size: 32, color: 'FFFFFF' })] }),
+          ...(meta.summary ? [new Paragraph({ spacing: { before: 40 }, children: [new TextRun({ text: meta.summary, italics: true, font: 'Arial', size: 18, color: 'FFFFFF' })] })] : []),
+        ]
+      });
+      const topicBanner = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [new TableRow({ children: [bannerCell] })] });
       const doc = new Document({
         styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
         sections: [{
@@ -1091,7 +1122,8 @@ async function startApp() {
           headers: h.mkHeader('Toolbox Talk Record'),
           footers: h.mkFooter('Toolbox Talk Record'),
           children: [
-            h.sh('TOOLBOX TALK RECORD'),
+            topicBanner,
+            new Paragraph({ spacing: { before: 240 } }),
             new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
               new TableRow({ children: [h.lbl('Topic', halfW), h.val(t.topic || '', halfW)] }),
               new TableRow({ children: [h.lbl('Date', halfW), h.val(t.talk_date ? new Date(t.talk_date).toLocaleDateString('en-GB') : '', halfW)] }),
