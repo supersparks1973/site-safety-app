@@ -357,7 +357,7 @@ body.read-only-mode .hide-readonly{display:none!important}
 
   <header class="app-header" style="background:linear-gradient(135deg,#1e293b 0%,#2d3748 100%);justify-content:flex-end">
     <div class="user-info">
-      <span id="syncIndicator" class="sync-indicator">⏳ <span id="syncCount">0</span> pending</span>
+      <button id="syncIndicator" class="sync-indicator" onclick="showPendingList()" title="View pending submissions" style="border:0;cursor:pointer">⏳ <span id="syncCount">0</span> pending</button>
       <span id="userBadge" class="user-badge"></span>
       <button class="header-btn" id="logoutBtn" title="Sign out">⏻</button>
     </div>
@@ -465,23 +465,109 @@ function updateSyncIndicator() {
     count.textContent = state.pendingSubmissions.length;
   } else {
     el.classList.remove('show');
+    const m = document.getElementById('pendingListModal'); if (m) m.remove();
   }
 }
 
+const ENDPOINT_LABELS = {
+  'near-miss': 'Near Miss Report',
+  'ladder-inspection': 'Ladder Inspection',
+  'tower-inspection': 'Tower Inspection',
+  'mewp-inspection': 'MEWP Inspection',
+  'rescue-plan': 'Rescue Plan',
+  'toolbox-talks': 'Toolbox Talk',
+  'training': 'Training Record',
+};
+
+function showPendingList() {
+  const existing = document.getElementById('pendingListModal');
+  if (existing) { existing.remove(); return; }
+  const items = state.pendingSubmissions || [];
+  if (items.length === 0) return;
+  const m = document.createElement('div');
+  m.id = 'pendingListModal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px';
+  const card = document.createElement('div');
+  card.style.cssText = 'background:#fff;border-radius:14px;max-width:520px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)';
+  card.innerHTML = `
+    <div style="padding:18px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <h3 style="margin:0;font-size:18px">Pending submissions</h3>
+        <p style="margin:4px 0 0;font-size:13px;color:#64748b">${items.length} waiting to send. ${navigator.onLine ? 'Trying now…' : 'Will send when you are back online.'}</p>
+      </div>
+      <button onclick="document.getElementById('pendingListModal').remove()" style="background:transparent;border:0;font-size:24px;cursor:pointer;color:#64748b;line-height:1">×</button>
+    </div>
+    <div style="padding:8px 12px">
+      ${items.map((it, i) => {
+        const label = ENDPOINT_LABELS[it.endpoint] || it.endpoint;
+        const when = new Date(it.timestamp || Date.now()).toLocaleString('en-GB');
+        const summary = (it.data && (it.data.location || it.data.topic || it.data.project_name || it.data.ladder_id || it.data.tower_id || it.data.mewp_id)) || '';
+        return `<div style="display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid #f1f5f9">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:14px;color:#1f2937">${label}</div>
+            <div style="font-size:12px;color:#64748b;margin-top:2px">${when}${summary ? ' · ' + esc(String(summary)) : ''}</div>
+          </div>
+          <button onclick="removePendingSubmission(${i})" style="background:#fee2e2;color:#b91c1c;border:0;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer" title="Remove without sending">Remove</button>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="padding:14px 20px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px">
+      ${navigator.onLine ? `<button onclick="syncPending();document.getElementById('pendingListModal').remove()" class="btn btn-primary" style="font-size:13px">Try sending now</button>` : ''}
+      <button onclick="document.getElementById('pendingListModal').remove()" class="btn btn-secondary" style="font-size:13px">Close</button>
+    </div>
+  `;
+  m.appendChild(card);
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+  document.body.appendChild(m);
+}
+
+window.showPendingList = showPendingList;
+window.removePendingSubmission = function(i) {
+  if (!confirm('Remove this pending submission without sending it?')) return;
+  state.pendingSubmissions.splice(i, 1);
+  localStorage.setItem('pendingSubmissions', JSON.stringify(state.pendingSubmissions));
+  updateSyncIndicator();
+  const m = document.getElementById('pendingListModal'); if (m) m.remove();
+  if (state.pendingSubmissions.length > 0) showPendingList();
+};
+
 async function syncPending() {
   if (state.pendingSubmissions.length === 0) return;
+  if (!state.token) return; // not logged in — nothing to do
+  const startedWith = state.pendingSubmissions.length;
   const remaining = [];
+  let authFailed = false;
   for (const sub of state.pendingSubmissions) {
     try {
       const res = await fetch(`${API}/api/${sub.endpoint}`, { method: 'POST', headers: headers(), body: JSON.stringify(sub.data) });
+      if (res.status === 401 || res.status === 403) {
+        // Session expired while offline — keep ALL items, ask user to re-login.
+        authFailed = true;
+        remaining.push(sub);
+        continue;
+      }
       if (!res.ok) throw new Error('Failed');
     } catch { remaining.push(sub); }
+    if (authFailed) {
+      // Don't keep retrying once we know auth is bad — preserve queue order.
+      const idx = state.pendingSubmissions.indexOf(sub);
+      if (idx >= 0) {
+        for (let i = idx + 1; i < state.pendingSubmissions.length; i++) remaining.push(state.pendingSubmissions[i]);
+      }
+      break;
+    }
   }
   state.pendingSubmissions = remaining;
   localStorage.setItem('pendingSubmissions', JSON.stringify(remaining));
   updateSyncIndicator();
-  if (remaining.length === 0 && state.pendingSubmissions.length !== remaining.length) {
+  if (authFailed) {
+    showToast('Your session has expired — log in again to send your saved reports.', 'error');
+    return;
+  }
+  if (remaining.length === 0 && startedWith > 0) {
     showToast('All pending reports synced!', 'success');
+  } else if (remaining.length < startedWith) {
+    showToast(`Synced ${startedWith - remaining.length} of ${startedWith} pending reports`, 'success');
   }
 }
 
@@ -501,20 +587,45 @@ async function submitForm(endpoint, data) {
 // ═══════════════════════════════════════
 // PHOTO HANDLING
 // ═══════════════════════════════════════
+// Compress a single image File -> JPEG data URL using a canvas. Caps the
+// longest side to maxDim so a 12MP phone shot becomes a sensible ~200-400KB JPEG.
+async function compressImage(file, maxDim = 1600, quality = 0.82) {
+  if (!file || !file.type || !file.type.startsWith('image/')) return null;
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const ratio = Math.min(maxDim / width, maxDim / height);
+        width = Math.round(width * ratio); height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => {
+        URL.revokeObjectURL(url);
+        if (!blob) return resolve(null);
+        const reader = new FileReader();
+        reader.onload = () => resolve({ dataUrl: reader.result, blob, name: (file.name || 'photo').replace(/\.\w+$/, '.jpg') });
+        reader.readAsDataURL(blob);
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+
 async function uploadPhotos(fileInput) {
   if (!fileInput.files || fileInput.files.length === 0) return '';
+  const files = Array.from(fileInput.files);
+  // Compress every photo on capture (saves bandwidth, DB space, offline storage room).
+  const compressed = (await Promise.all(files.map(f => compressImage(f)))).filter(Boolean);
   if (!navigator.onLine) {
-    // Store as base64 for offline
-    const promises = Array.from(fileInput.files).map(f => new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.readAsDataURL(f);
-    }));
-    const results = await Promise.all(promises);
-    return results.join(',');
+    return compressed.map(c => c.dataUrl).join(',');
   }
   const fd = new FormData();
-  Array.from(fileInput.files).forEach(f => fd.append('photos', f));
+  for (const c of compressed) fd.append('photos', c.blob, c.name);
   const res = await fetch(`${API}/api/upload`, { method: 'POST', headers: { 'Authorization': `Bearer ${state.token}` }, body: fd });
   const data = await res.json();
   return data.files.join(',');
@@ -2182,15 +2293,13 @@ window.tbSaveTalk = async function(e) {
   };
 
   try {
-    const res = await fetch(`${API}/api/toolbox-talks`, {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) throw new Error('Failed to save');
+    const result = await submitForm('toolbox-talks', body);
     tbCustomAttendees = [];
     tbTalkSelected = null;
     tbTalksView = 'list';
+    if (result && result.offline) {
+      showToast('Toolbox talk saved offline — will sync when connected', 'warning');
+    }
     renderToolboxTalks(document.getElementById('appContent'));
   } catch(err) {
     alert('Error saving talk: ' + err.message);
