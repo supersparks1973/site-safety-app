@@ -271,13 +271,15 @@ async function startApp() {
     try {
       const hash = bcrypt.hashSync(password, 10);
       const { rows } = await pool.query('INSERT INTO users (username, password, full_name, role) VALUES ($1, $2, $3, $4) RETURNING id', [username, hash, full_name, role || 'operative']);
+      logAudit(req, 'created', 'user', null, `User created: ${req.body.username || ''} (${req.body.role || ''})`, { full_name: req.body.full_name, username: req.body.username, role: req.body.role });
       res.json({ id: rows[0].id, username, full_name, role: role || 'operative' });
     } catch (err) { res.status(400).json({ error: 'Username already exists' }); }
   });
 
   app.delete('/api/users/:id', authenticate, adminOnly, async (req, res) => {
     await pool.query("DELETE FROM users WHERE id = $1 AND role NOT IN ('admin', 'project_manager')", [req.params.id]);
-    res.json({ success: true });
+    logAudit(req, 'deleted', 'user', req.params.id, 'User deleted', null);
+      res.json({ success: true });
   });
 
   app.post('/api/upload', authenticate, (req, res) => {
@@ -1407,6 +1409,7 @@ async function startApp() {
       if (fields.length === 1) return res.json({ success: true, noop: true });
       params.push(req.params.id);
       await pool.query(`UPDATE inspection_actions SET ${fields.join(', ')} WHERE id = $${params.length}`, params);
+      logAudit(req, d.status === 'completed' ? 'completed' : 'updated', 'action', req.params.id, d.status ? `Status: ${d.status}` : 'Action updated', d);
       res.json({ success: true });
     } catch(e) { console.error('PATCH /api/actions/:id', e); res.status(500).json({ error: e.message }); }
   });
@@ -1414,6 +1417,7 @@ async function startApp() {
   app.delete('/api/actions/:id', authenticate, adminOnly, async (req, res) => {
     try {
       await pool.query('DELETE FROM inspection_actions WHERE id = $1', [req.params.id]);
+      logAudit(req, 'deleted', 'action', req.params.id, 'Action deleted', null);
       res.json({ success: true });
     } catch(e) { res.status(500).json({ error: e.message }); }
   });
@@ -1431,6 +1435,7 @@ async function startApp() {
         created_by: req.user.id
       });
       if (d.assigned_to) await pool.query('UPDATE inspection_actions SET assigned_to = $1 WHERE id = $2', [d.assigned_to, id]);
+      logAudit(req, 'created', 'action', id, `Manual action: ${d.title}`, null);
       res.json({ id });
     } catch(e) { res.status(500).json({ error: e.message }); }
   });
@@ -1458,6 +1463,7 @@ async function startApp() {
         'INSERT INTO toolbox_talks (topic, content, presenter, site_project, talk_date, attendees, notes, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
         [d.topic, d.content || null, d.presenter, d.site_project || null, d.talk_date, JSON.stringify(d.attendees || []), d.notes || null, req.user.id]
       );
+      logAudit(req, 'created', 'toolbox-talks', rows[0].id, `Toolbox talk: ${d.topic}${d.site_project ? ' at ' + d.site_project : ''}`, null);
       res.json(rows[0]);
     } catch(e) { res.status(500).json({ error: e.message }); }
   });
@@ -1465,6 +1471,7 @@ async function startApp() {
   app.delete('/api/toolbox-talks/:id', authenticate, adminOnly, async (req, res) => {
     try {
       await pool.query('DELETE FROM toolbox_talks WHERE id = $1', [req.params.id]);
+      logAudit(req, 'deleted', 'toolbox-talks', req.params.id, 'Toolbox talk deleted', null);
       res.json({ message: 'Deleted' });
     } catch(e) { res.status(500).json({ error: e.message }); }
   });

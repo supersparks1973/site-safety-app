@@ -355,6 +355,7 @@ body.read-only-mode .hide-readonly{display:none!important}
           <li><a data-page="actions"><span class="nav-icon">🎯</span>Actions <span id="actionsBadge" class="actions-badge"></span></a></li>
           <li><a data-page="rescue-plans"><span class="nav-icon">🆘</span>Rescue Plans</a></li>
           <li><a data-page="training"><span class="nav-icon">🎓</span>Training</a></li>
+          <li><a data-page="schedule"><span class="nav-icon">📅</span>Inspection Schedule <span id="scheduleBadge" class="actions-badge"></span></a></li>
           <li><a data-page="loto"><span class="nav-icon">🔒</span>LOTO System</a></li>
           <li><a data-page="toolbox-talks"><span class="nav-icon">📢</span>Toolbox Talks</a></li>
         </ul>
@@ -369,6 +370,7 @@ body.read-only-mode .hide-readonly{display:none!important}
         <div class="sidebar-section-title">Admin</div>
         <ul class="sidebar-nav">
           <li><a data-page="users"><span class="nav-icon">👥</span>Users</a></li>
+          <li><a data-page="audit-log"><span class="nav-icon">📜</span>Audit Log</a></li>
         </ul>
       </div>
     </div>
@@ -779,7 +781,7 @@ function showApp() {
 
     if (state.readOnly) {
       // External View: only allow specific pages
-      const allowedPages = ['dashboard', 'trends', 'reports', 'closed', 'inspections', 'actions', 'training', 'toolbox-talks'];
+      const allowedPages = ['dashboard', 'trends', 'reports', 'closed', 'inspections', 'actions', 'schedule', 'training', 'toolbox-talks'];
       // Grey out disallowed sidebar links
       document.querySelectorAll('#sidebarAdminNav .sidebar-nav a[data-page]').forEach(a => {
         if (!allowedPages.includes(a.dataset.page)) a.classList.add('disabled-link');
@@ -872,6 +874,8 @@ function renderPage(page) {
     'inspections': renderAdminInspections,
     'actions': renderActions,
     'trends': renderTrends,
+    'schedule': renderSchedule,
+    'audit-log': renderAuditLog,
     'rescue-plans': renderAdminRescuePlans,
     'training': renderAdminTraining,
     'users': renderAdminUsers,
@@ -883,7 +887,7 @@ function renderPage(page) {
   };
   if (pages[page]) {
     if (state.readOnly) {
-      const allowedPages = ['dashboard', 'trends', 'reports', 'closed', 'inspections', 'actions', 'training', 'toolbox-talks'];
+      const allowedPages = ['dashboard', 'trends', 'reports', 'closed', 'inspections', 'actions', 'schedule', 'training', 'toolbox-talks'];
       if (!allowedPages.includes(page)) {
         c.innerHTML = readOnlyBanner() + '<div class="card" style="text-align:center;padding:40px 20px"><div style="font-size:48px;margin-bottom:16px">🔒</div><h3>Access Restricted</h3><p style="color:var(--text-light);margin-top:8px">This section is not available with External View access.</p></div>';
         return;
@@ -4401,6 +4405,274 @@ async function loadTrendData() {
 }
 
 window.renderTrends = renderTrends;
+
+// ═══════════════════════════════════════
+// INSPECTION SCHEDULE — equipment register with reminders
+// ═══════════════════════════════════════
+const EQ_LABELS = { ladder: 'Ladder', tower: 'Tower', mewp: 'MEWP' };
+const EQ_ICONS  = { ladder: '🪜', tower: '🏗️', mewp: '🔧' };
+
+async function refreshScheduleBadge() {
+  if (!state.token || !(state.user && (state.user.role === 'admin' || state.user.role === 'project_manager'))) return;
+  try {
+    const res = await fetch(`${API}/api/equipment/counts`, { headers: headers() });
+    if (!res.ok) return;
+    const c = await res.json();
+    const badge = document.getElementById('scheduleBadge');
+    if (!badge) return;
+    const overdue = parseInt(c.overdue || 0, 10) + parseInt(c.never_inspected || 0, 10);
+    const dueSoon = parseInt(c.due_soon || 0, 10);
+    if (overdue > 0) { badge.textContent = overdue; badge.style.background = '#dc2626'; badge.classList.add('show'); }
+    else if (dueSoon > 0) { badge.textContent = dueSoon; badge.style.background = '#f59e0b'; badge.classList.add('show'); }
+    else { badge.classList.remove('show'); }
+  } catch(e) {}
+}
+
+async function renderSchedule(c) {
+  c.innerHTML = `
+    <div style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <h2 style="margin-bottom:4px">📅 Inspection Schedule</h2>
+        <p style="color:var(--text-light);font-size:14px">Track each piece of equipment and how often it needs inspecting. The system marks an item as inspected automatically when its ID matches an inspection record.</p>
+      </div>
+      <div class="hide-readonly"><button class="btn btn-primary" onclick="openEqModal()">➕ Add Equipment</button></div>
+    </div>
+    <div id="scheduleList"><div style="text-align:center;color:var(--text-light);padding:30px">Loading…</div></div>
+  `;
+  await loadSchedule();
+  refreshScheduleBadge();
+}
+
+async function loadSchedule() {
+  const list = document.getElementById('scheduleList');
+  if (!list) return;
+  try {
+    const res = await fetch(`${API}/api/equipment`, { headers: headers() });
+    const items = await res.json();
+    if (!items.length) {
+      list.innerHTML = `<div class="card" style="text-align:center;padding:40px 20px;color:var(--text-light)"><div style="font-size:42px;margin-bottom:10px">📭</div><h3>No equipment registered yet</h3><p style="margin:8px 0">Add your ladders, towers and MEWPs here. Each item gets an inspection schedule (default 90 days).</p><button class="btn btn-primary" style="margin-top:8px" onclick="openEqModal()">➕ Add your first item</button></div>`;
+      return;
+    }
+    list.innerHTML = items.map(it => {
+      const status = it.reminder_status;
+      const colors = { never: '#94a3b8', overdue: '#dc2626', due_soon: '#f59e0b', ok: '#16a34a' };
+      const labels = { never: 'Never inspected', overdue: 'Overdue', due_soon: 'Due soon', ok: 'In date' };
+      const last = it.last_inspected_at ? new Date(it.last_inspected_at).toLocaleDateString('en-GB') : '—';
+      const next = it.next_due ? new Date(it.next_due).toLocaleDateString('en-GB') : '—';
+      let dueRel = '';
+      if (it.next_due) {
+        const diff = Math.round((new Date(it.next_due) - new Date()) / 86400000);
+        if (diff < 0) dueRel = `<span style="color:#dc2626;font-weight:600">${Math.abs(diff)} day${Math.abs(diff)===1?'':'s'} overdue</span>`;
+        else if (diff === 0) dueRel = `<span style="color:#b45309;font-weight:600">Due today</span>`;
+        else if (diff <= 7) dueRel = `<span style="color:#b45309">Due in ${diff} day${diff===1?'':'s'}</span>`;
+        else dueRel = `<span style="color:var(--text-light)">Due in ${diff} days</span>`;
+      } else {
+        dueRel = `<span style="color:#94a3b8">No inspections recorded yet</span>`;
+      }
+      return `<div class="card" style="display:flex;gap:14px;align-items:center;cursor:pointer;border-left:4px solid ${colors[status]}" onclick="openEqModal(${it.id})">
+        <div style="font-size:32px;flex-shrink:0">${EQ_ICONS[it.eq_type] || '🛠️'}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">
+            <strong style="font-size:15px">${esc(it.identifier)}</strong>
+            <span style="color:var(--text-light);font-size:13px">${EQ_LABELS[it.eq_type] || it.eq_type}${it.location ? ' · ' + esc(it.location) : ''}</span>
+            <span class="act-pill" style="background:${colors[status]}22;color:${colors[status]}">${labels[status]}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-light);margin-top:4px">Last inspected: ${last} · Schedule every ${it.schedule_days} days · Next: ${next}</div>
+          <div style="font-size:13px;margin-top:4px">${dueRel}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = `<div class="card" style="padding:30px;text-align:center;color:#b91c1c">Couldn't load schedule: ${esc(e.message)}</div>`;
+  }
+}
+
+async function openEqModal(id) {
+  let item = { eq_type: 'ladder', identifier: '', location: '', schedule_days: 90, description: '', notes: '' };
+  if (id) {
+    try {
+      const all = await fetch(`${API}/api/equipment`, { headers: headers() }).then(r => r.json());
+      item = all.find(x => x.id === id) || item;
+    } catch(e) {}
+  }
+  const m = document.createElement('div');
+  m.id = 'eqModal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px';
+  m.innerHTML = `
+    <div style="background:#fff;border-radius:14px;max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+      <div style="padding:18px 20px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
+        <h3 style="margin:0;font-size:18px">${id ? 'Edit equipment' : 'Add equipment'}</h3>
+        <button onclick="document.getElementById('eqModal').remove()" style="background:transparent;border:0;font-size:24px;cursor:pointer;color:#64748b;line-height:1">×</button>
+      </div>
+      <div style="padding:18px 20px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group"><label>Type *</label>
+            <select id="eqType" class="form-control">
+              <option value="ladder"${item.eq_type==='ladder'?' selected':''}>🪜 Ladder</option>
+              <option value="tower"${item.eq_type==='tower'?' selected':''}>🏗️ Tower</option>
+              <option value="mewp"${item.eq_type==='mewp'?' selected':''}>🔧 MEWP</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Identifier *</label><input id="eqId" class="form-control" placeholder="e.g. LDR-007" value="${esc(item.identifier)}"></div>
+        </div>
+        <div class="form-group"><label>Description</label><input id="eqDesc" class="form-control" placeholder="e.g. 6-rung fibreglass step ladder" value="${esc(item.description || '')}"></div>
+        <div class="form-group"><label>Location</label><input id="eqLoc" class="form-control" placeholder="e.g. GSK Ware — Plant Room 3" value="${esc(item.location || '')}"></div>
+        <div class="form-group"><label>Inspect every (days)</label><input id="eqDays" type="number" min="1" class="form-control" value="${item.schedule_days || 90}"><small style="color:var(--text-light)">Suggested: ladder 90, tower 30, MEWP 7</small></div>
+        <div class="form-group"><label>Notes</label><textarea id="eqNotes" class="form-control" rows="2">${esc(item.notes || '')}</textarea></div>
+      </div>
+      <div style="padding:14px 20px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;gap:8px">
+        ${id ? `<button class="btn" style="background:#fee2e2;color:#b91c1c;font-size:13px" onclick="deleteEq(${id})">Delete</button>` : '<span></span>'}
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary" style="font-size:13px" onclick="document.getElementById('eqModal').remove()">Cancel</button>
+          <button class="btn btn-primary" style="font-size:13px" onclick="saveEq(${id || 'null'})">Save</button>
+        </div>
+      </div>
+    </div>
+  `;
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+  document.body.appendChild(m);
+}
+
+async function saveEq(id) {
+  const body = {
+    eq_type: document.getElementById('eqType').value,
+    identifier: document.getElementById('eqId').value.trim(),
+    description: document.getElementById('eqDesc').value,
+    location: document.getElementById('eqLoc').value,
+    schedule_days: parseInt(document.getElementById('eqDays').value, 10) || 90,
+    notes: document.getElementById('eqNotes').value
+  };
+  if (!body.identifier) { alert('Identifier is required'); return; }
+  try {
+    const url = id ? `${API}/api/equipment/${id}` : `${API}/api/equipment`;
+    const method = id ? 'PATCH' : 'POST';
+    const res = await fetch(url, { method, headers: headers(), body: JSON.stringify(body) });
+    if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
+    showToast('Saved');
+    document.getElementById('eqModal').remove();
+    await loadSchedule();
+    refreshScheduleBadge();
+  } catch(e) { alert('Failed to save: ' + e.message); }
+}
+
+async function deleteEq(id) {
+  if (!confirm('Remove this equipment from the register? Past inspection records are kept.')) return;
+  try {
+    const res = await fetch(`${API}/api/equipment/${id}`, { method: 'DELETE', headers: headers() });
+    if (!res.ok) throw new Error('Delete failed');
+    showToast('Removed');
+    document.getElementById('eqModal').remove();
+    await loadSchedule();
+    refreshScheduleBadge();
+  } catch(e) { alert('Failed to delete: ' + e.message); }
+}
+
+window.openEqModal = openEqModal; window.saveEq = saveEq; window.deleteEq = deleteEq;
+window.refreshScheduleBadge = refreshScheduleBadge;
+setTimeout(refreshScheduleBadge, 1500);
+setInterval(refreshScheduleBadge, 5 * 60 * 1000);
+
+// ═══════════════════════════════════════
+// AUDIT LOG — who did what, when
+// ═══════════════════════════════════════
+const AUDIT_LABELS = {
+  'near-miss': 'Near miss',
+  'ladder-inspection': 'Ladder inspection',
+  'tower-inspection': 'Tower inspection',
+  'mewp-inspection': 'MEWP inspection',
+  'toolbox-talks': 'Toolbox talk',
+  'action': 'Action',
+  'equipment': 'Equipment',
+  'user': 'User',
+};
+const AUDIT_ACTION_COLORS = {
+  created: '#16a34a', updated: '#2563eb', deleted: '#dc2626', completed: '#059669'
+};
+
+let _auditFilters = { record_type: '', action: '', days: '30' };
+
+async function renderAuditLog(c) {
+  c.innerHTML = `
+    <div style="margin-bottom:18px">
+      <h2 style="margin-bottom:4px">📜 Audit Log</h2>
+      <p style="color:var(--text-light);font-size:14px">Who created, changed, or deleted what. Use this for client/HSE audits or to track down a change.</p>
+    </div>
+    <div class="tr-toolbar">
+      <select id="auditRecordType">
+        <option value="">All record types</option>
+        ${Object.entries(AUDIT_LABELS).map(([k,v]) => `<option value="${k}"${_auditFilters.record_type===k?' selected':''}>${v}</option>`).join('')}
+      </select>
+      <select id="auditAction">
+        <option value="">All actions</option>
+        <option value="created"${_auditFilters.action==='created'?' selected':''}>Created</option>
+        <option value="updated"${_auditFilters.action==='updated'?' selected':''}>Updated</option>
+        <option value="completed"${_auditFilters.action==='completed'?' selected':''}>Completed</option>
+        <option value="deleted"${_auditFilters.action==='deleted'?' selected':''}>Deleted</option>
+      </select>
+      <select id="auditDays">
+        <option value="7"${_auditFilters.days==='7'?' selected':''}>Last 7 days</option>
+        <option value="30"${_auditFilters.days==='30'?' selected':''}>Last 30 days</option>
+        <option value="90"${_auditFilters.days==='90'?' selected':''}>Last 90 days</option>
+        <option value="365"${_auditFilters.days==='365'?' selected':''}>Last year</option>
+        <option value=""${_auditFilters.days===''?' selected':''}>All time</option>
+      </select>
+    </div>
+    <div id="auditList"><div style="text-align:center;color:var(--text-light);padding:30px">Loading…</div></div>
+  `;
+  ['auditRecordType', 'auditAction', 'auditDays'].forEach(id => {
+    document.getElementById(id).addEventListener('change', (e) => {
+      const key = id === 'auditRecordType' ? 'record_type' : (id === 'auditAction' ? 'action' : 'days');
+      _auditFilters[key] = e.target.value;
+      loadAudit();
+    });
+  });
+  await loadAudit();
+}
+
+async function loadAudit() {
+  const list = document.getElementById('auditList');
+  if (!list) return;
+  const params = new URLSearchParams();
+  Object.entries(_auditFilters).forEach(([k, v]) => { if (v) params.set(k, v); });
+  try {
+    const res = await fetch(`${API}/api/audit-log?` + params, { headers: headers() });
+    const rows = await res.json();
+    if (!rows.length) {
+      list.innerHTML = `<div class="card" style="text-align:center;padding:40px 20px;color:var(--text-light)">No matching audit entries.</div>`;
+      return;
+    }
+    list.innerHTML = `<div class="card" style="padding:0;overflow-x:auto">
+      <table class="data-table" style="margin:0">
+        <thead><tr>
+          <th style="white-space:nowrap">When</th>
+          <th>User</th>
+          <th>Action</th>
+          <th>Record</th>
+          <th>Summary</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => {
+            const when = new Date(r.created_at).toLocaleString('en-GB');
+            const color = AUDIT_ACTION_COLORS[r.action] || '#64748b';
+            const recLabel = AUDIT_LABELS[r.record_type] || r.record_type;
+            return `<tr>
+              <td style="white-space:nowrap;font-size:12px;color:var(--text-light)">${when}</td>
+              <td><strong>${esc(r.user_name || '—')}</strong> <span style="color:var(--text-light);font-size:12px">${r.user_role ? '· ' + esc(r.user_role) : ''}</span></td>
+              <td><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;text-transform:uppercase;background:${color}22;color:${color}">${esc(r.action)}</span></td>
+              <td>${esc(recLabel)}${r.record_id ? ' #' + r.record_id : ''}</td>
+              <td style="font-size:13px">${esc(r.summary || '')}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  } catch(e) {
+    list.innerHTML = `<div class="card" style="padding:30px;text-align:center;color:#b91c1c">Couldn't load audit log: ${esc(e.message)}</div>`;
+  }
+}
+
+window.renderSchedule = renderSchedule;
+window.renderAuditLog = renderAuditLog;
 
 // ═══════════════════════════════════════
 // ACTIONS — defects → tracked actions
