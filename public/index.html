@@ -348,7 +348,7 @@ body.read-only-mode .hide-readonly{display:none!important}
       <div class="sidebar-section">
         <div class="sidebar-section-title">Safety &amp; Inspections</div>
         <ul class="sidebar-nav">
-          <li><a data-page="trends"><span class="nav-icon">📊</span>Trends</a></li>
+          <li><a data-page="trends"><span class="nav-icon">📈</span>Trends</a></li>
           <li><a data-page="reports"><span class="nav-icon">⚠️</span>Open Reports</a></li>
           <li><a data-page="closed"><span class="nav-icon">✅</span>Closed Reports</a></li>
           <li><a data-page="inspections"><span class="nav-icon">📋</span>Inspections</a></li>
@@ -1296,7 +1296,7 @@ async function renderDashboard(c) {
       <div class="dash-section">
         <div class="dash-section-title">🚀 Quick Actions</div>
         <div class="quick-actions">
-          <div class="quick-action" onclick="navigate('trends')"><span class="qa-icon">📊</span><span class="qa-label">Trends</span></div>
+          <div class="quick-action" onclick="navigate('trends')"><span class="qa-icon">📈</span><span class="qa-label">Trends</span></div>
           <div class="quick-action" onclick="navigate('reports')"><span class="qa-icon">⚠️</span><span class="qa-label">Open Reports</span></div>
           <div class="quick-action" onclick="navigate('inspections')"><span class="qa-icon">📋</span><span class="qa-label">Inspections</span></div>
           <div class="quick-action" onclick="navigate('actions')"><span class="qa-icon">🎯</span><span class="qa-label">Actions</span></div>
@@ -4206,7 +4206,7 @@ async function renderTrends(c) {
   c.innerHTML = `
     <div class="tr-toolbar">
       <div>
-        <h2 style="margin:0;font-size:20px">📊 Safety Trends</h2>
+        <h2 style="margin:0;font-size:20px">📈 Safety Trends</h2>
         <p style="margin:4px 0 0;font-size:13px;color:var(--text-light)">Activity, compliance and outstanding work over the chosen window. Use this to brief clients or spot drifts early.</p>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-left:auto">
