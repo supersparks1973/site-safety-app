@@ -190,6 +190,40 @@ body.read-only-mode .hide-readonly{display:none!important}
 .act-pill.completed{background:#dcfce7;color:#166534}
 .act-pill.cancelled{background:#f3f4f6;color:#6b7280}
 .act-pill.overdue-pill{background:#fee2e2;color:#b91c1c}
+.tr-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px;padding:14px;background:var(--card);border-radius:12px;box-shadow:var(--shadow)}
+.tr-toolbar select,.tr-toolbar input{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff}
+.tr-range{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.tr-range button{background:transparent;border:0;padding:8px 14px;cursor:pointer;font-size:13px;color:var(--text-light);font-weight:600}
+.tr-range button.active{background:var(--primary);color:#fff}
+.tr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:18px}
+.tr-tile{background:var(--card);border-radius:12px;padding:18px;box-shadow:var(--shadow);border-left:4px solid var(--primary)}
+.tr-tile.danger{border-left-color:var(--danger)}
+.tr-tile.warning{border-left-color:var(--warning)}
+.tr-tile.success{border-left-color:var(--success)}
+.tr-tile .tr-label{font-size:11px;text-transform:uppercase;color:var(--text-light);font-weight:700;letter-spacing:.5px;margin-bottom:6px}
+.tr-tile .tr-value{font-size:32px;font-weight:800;color:var(--text);line-height:1}
+.tr-tile .tr-sub{font-size:12px;color:var(--text-light);margin-top:6px;display:flex;align-items:center;gap:6px}
+.tr-trend{display:inline-flex;align-items:center;gap:3px;font-weight:700;padding:2px 8px;border-radius:10px;font-size:11px}
+.tr-trend.up{background:#dcfce7;color:#15803d}
+.tr-trend.down{background:#fee2e2;color:#b91c1c}
+.tr-trend.flat{background:#f1f5f9;color:#64748b}
+.tr-card{background:var(--card);border-radius:12px;padding:18px;box-shadow:var(--shadow);margin-bottom:18px}
+.tr-card h3{font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-light);margin-bottom:14px}
+.tr-locations{width:100%;border-collapse:collapse}
+.tr-locations th,.tr-locations td{text-align:left;padding:10px 12px;font-size:13px;border-bottom:1px solid var(--border)}
+.tr-locations th{background:#f8fafc;color:var(--text-light);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+.tr-locations tr:last-child td{border-bottom:0}
+.tr-bar{display:flex;align-items:center;gap:8px}
+.tr-bar-track{flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden}
+.tr-bar-fill{height:100%;background:linear-gradient(90deg,var(--primary),#B22222);border-radius:3px}
+.tr-bar-num{font-weight:700;font-size:13px;color:var(--text);min-width:24px;text-align:right}
+.tr-print-btn{margin-left:auto}
+@media print {
+  body { background: #fff !important; }
+  aside, header, nav.bottom-nav, .tr-toolbar, .hide-readonly, #installBanner, #offlineBanner, #syncIndicator, #toast { display: none !important; }
+  .app-content { margin-left: 0 !important; padding: 0 !important; }
+  .tr-card, .tr-tile { box-shadow: none !important; border: 1px solid #ddd !important; page-break-inside: avoid; }
+}
 .sync-indicator.show{display:inline-flex}
 
 /* ── Training Matrix ── */
@@ -314,6 +348,7 @@ body.read-only-mode .hide-readonly{display:none!important}
       <div class="sidebar-section">
         <div class="sidebar-section-title">Safety &amp; Inspections</div>
         <ul class="sidebar-nav">
+          <li><a data-page="trends"><span class="nav-icon">📊</span>Trends</a></li>
           <li><a data-page="reports"><span class="nav-icon">⚠️</span>Open Reports</a></li>
           <li><a data-page="closed"><span class="nav-icon">✅</span>Closed Reports</a></li>
           <li><a data-page="inspections"><span class="nav-icon">📋</span>Inspections</a></li>
@@ -744,7 +779,7 @@ function showApp() {
 
     if (state.readOnly) {
       // External View: only allow specific pages
-      const allowedPages = ['dashboard', 'reports', 'closed', 'inspections', 'actions', 'training', 'toolbox-talks'];
+      const allowedPages = ['dashboard', 'trends', 'reports', 'closed', 'inspections', 'actions', 'training', 'toolbox-talks'];
       // Grey out disallowed sidebar links
       document.querySelectorAll('#sidebarAdminNav .sidebar-nav a[data-page]').forEach(a => {
         if (!allowedPages.includes(a.dataset.page)) a.classList.add('disabled-link');
@@ -836,6 +871,7 @@ function renderPage(page) {
     'closed': renderClosedReports,
     'inspections': renderAdminInspections,
     'actions': renderActions,
+    'trends': renderTrends,
     'rescue-plans': renderAdminRescuePlans,
     'training': renderAdminTraining,
     'users': renderAdminUsers,
@@ -847,7 +883,7 @@ function renderPage(page) {
   };
   if (pages[page]) {
     if (state.readOnly) {
-      const allowedPages = ['dashboard', 'reports', 'closed', 'inspections', 'actions', 'training', 'toolbox-talks'];
+      const allowedPages = ['dashboard', 'trends', 'reports', 'closed', 'inspections', 'actions', 'training', 'toolbox-talks'];
       if (!allowedPages.includes(page)) {
         c.innerHTML = readOnlyBanner() + '<div class="card" style="text-align:center;padding:40px 20px"><div style="font-size:48px;margin-bottom:16px">🔒</div><h3>Access Restricted</h3><p style="color:var(--text-light);margin-top:8px">This section is not available with External View access.</p></div>';
         return;
@@ -1260,6 +1296,7 @@ async function renderDashboard(c) {
       <div class="dash-section">
         <div class="dash-section-title">🚀 Quick Actions</div>
         <div class="quick-actions">
+          <div class="quick-action" onclick="navigate('trends')"><span class="qa-icon">📊</span><span class="qa-label">Trends</span></div>
           <div class="quick-action" onclick="navigate('reports')"><span class="qa-icon">⚠️</span><span class="qa-label">Open Reports</span></div>
           <div class="quick-action" onclick="navigate('inspections')"><span class="qa-icon">📋</span><span class="qa-label">Inspections</span></div>
           <div class="quick-action" onclick="navigate('actions')"><span class="qa-icon">🎯</span><span class="qa-label">Actions</span></div>
@@ -4158,6 +4195,212 @@ window.deleteTraining = async function(id) {
   renderAdminTraining(document.getElementById('appContent'));
 };
 
+
+// ═══════════════════════════════════════
+// TRENDS DASHBOARD — period summary for client reporting
+// ═══════════════════════════════════════
+let _trendDays = 30;
+let _trendSite = '';
+
+async function renderTrends(c) {
+  c.innerHTML = `
+    <div class="tr-toolbar">
+      <div>
+        <h2 style="margin:0;font-size:20px">📊 Safety Trends</h2>
+        <p style="margin:4px 0 0;font-size:13px;color:var(--text-light)">Activity, compliance and outstanding work over the chosen window. Use this to brief clients or spot drifts early.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-left:auto">
+        <div class="tr-range">
+          <button data-d="7" ${_trendDays===7?'class="active"':''}>7d</button>
+          <button data-d="30" ${_trendDays===30?'class="active"':''}>30d</button>
+          <button data-d="90" ${_trendDays===90?'class="active"':''}>90d</button>
+          <button data-d="365" ${_trendDays===365?'class="active"':''}>365d</button>
+        </div>
+        <select id="trendSite"><option value="">All sites</option></select>
+        <button class="btn btn-secondary tr-print-btn" onclick="window.print()" style="font-size:13px">🖨 Print / Save PDF</button>
+      </div>
+    </div>
+    <div id="trendBody"><div style="text-align:center;color:var(--text-light);padding:40px">Loading trends…</div></div>
+  `;
+  document.querySelectorAll('.tr-range button').forEach(b => b.addEventListener('click', () => {
+    _trendDays = parseInt(b.dataset.d, 10);
+    renderTrends(c);
+  }));
+  document.getElementById('trendSite').addEventListener('change', (e) => {
+    _trendSite = e.target.value;
+    renderTrends(c);
+  });
+  await loadTrendData();
+}
+
+function trendArrow(curr, prev) {
+  if (prev === 0 && curr === 0) return '<span class="tr-trend flat">— no change</span>';
+  if (prev === 0) return `<span class="tr-trend up">▲ new</span>`;
+  const pct = Math.round(((curr - prev) / prev) * 100);
+  if (pct === 0) return '<span class="tr-trend flat">— flat</span>';
+  if (pct > 0) return `<span class="tr-trend up">▲ ${pct}%</span>`;
+  return `<span class="tr-trend down">▼ ${Math.abs(pct)}%</span>`;
+}
+
+// Reverse trend coloring: lower-is-better metrics (near miss, unsafe) -> down=good
+function trendArrowReverse(curr, prev) {
+  if (prev === 0 && curr === 0) return '<span class="tr-trend flat">— no change</span>';
+  if (prev === 0) return `<span class="tr-trend down">▲ new</span>`;
+  const pct = Math.round(((curr - prev) / prev) * 100);
+  if (pct === 0) return '<span class="tr-trend flat">— flat</span>';
+  if (pct > 0) return `<span class="tr-trend down">▲ ${pct}%</span>`;
+  return `<span class="tr-trend up">▼ ${Math.abs(pct)}%</span>`;
+}
+
+async function loadTrendData() {
+  const body = document.getElementById('trendBody');
+  if (!body) return;
+  let url = `${API}/api/trends?days=${_trendDays}`;
+  if (_trendSite) url += `&site=${encodeURIComponent(_trendSite)}`;
+  let data;
+  try {
+    const res = await fetch(url, { headers: headers() });
+    data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed');
+  } catch(e) {
+    body.innerHTML = `<div class="card" style="padding:30px;text-align:center;color:#b91c1c">Couldn't load trends: ${esc(e.message)}</div>`;
+    return;
+  }
+
+  // Populate site filter dropdown if not done yet
+  const sel = document.getElementById('trendSite');
+  if (sel && sel.options.length <= 1 && data.sites && data.sites.length) {
+    data.sites.forEach(s => {
+      const o = document.createElement('option'); o.value = s; o.textContent = s;
+      if (s === _trendSite) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
+
+  const k = data.kpis;
+  const fmtRange = `${data.range.from} → ${data.range.to}`;
+  const prevRange = `${data.previous.from} → ${data.previous.to}`;
+
+  // KPI tiles
+  const kpiTiles = `
+    <div class="tr-grid">
+      <div class="tr-tile ${k.near_miss.total > k.near_miss.prev ? 'danger' : ''}">
+        <div class="tr-label">Near misses</div>
+        <div class="tr-value">${k.near_miss.total}</div>
+        <div class="tr-sub">${trendArrowReverse(k.near_miss.total, k.near_miss.prev)} vs prior ${data.range.days}d (${k.near_miss.prev})</div>
+        ${k.near_miss.high > 0 ? `<div class="tr-sub" style="color:#b91c1c;margin-top:4px">⚠ ${k.near_miss.high} high severity</div>` : ''}
+      </div>
+      <div class="tr-tile">
+        <div class="tr-label">Inspections completed</div>
+        <div class="tr-value">${k.inspections.total}</div>
+        <div class="tr-sub">${trendArrow(k.inspections.total, k.inspections.prev)} vs prior period (${k.inspections.prev})</div>
+        <div class="tr-sub" style="margin-top:4px">🪜 ${k.inspections.ladder.total} · 🏗️ ${k.inspections.tower.total} · 🔧 ${k.inspections.mewp.total}</div>
+      </div>
+      <div class="tr-tile ${k.inspections.unsafe > 0 ? 'danger' : 'success'}">
+        <div class="tr-label">Unsafe equipment</div>
+        <div class="tr-value">${k.inspections.unsafe}</div>
+        <div class="tr-sub">${k.inspections.unsafe === 0 ? 'No unsafe items recorded — clean run.' : 'Items recorded as not safe to use.'}</div>
+      </div>
+      <div class="tr-tile ${k.actions.overdue > 0 ? 'danger' : (k.actions.open > 0 ? 'warning' : 'success')}">
+        <div class="tr-label">Open actions</div>
+        <div class="tr-value">${k.actions.open}</div>
+        <div class="tr-sub">${k.actions.overdue > 0 ? `<span style="color:#b91c1c;font-weight:600">⚠ ${k.actions.overdue} overdue</span>` : 'On track.'}</div>
+        <div class="tr-sub" style="margin-top:4px">${k.actions.completed} completed in this period (was ${k.actions.prev_completed})</div>
+      </div>
+      <div class="tr-tile">
+        <div class="tr-label">Toolbox talks delivered</div>
+        <div class="tr-value">${k.toolbox.total}</div>
+        <div class="tr-sub">${trendArrow(k.toolbox.total, k.toolbox.prev)} vs prior period (${k.toolbox.prev})</div>
+      </div>
+      <div class="tr-tile ${k.training.expired > 0 ? 'danger' : (k.training.expiring_30d > 0 ? 'warning' : 'success')}">
+        <div class="tr-label">Training compliance</div>
+        <div class="tr-value">${k.training.active}</div>
+        <div class="tr-sub">In date</div>
+        ${k.training.expired > 0 ? `<div class="tr-sub" style="color:#b91c1c;margin-top:4px">${k.training.expired} expired</div>` : ''}
+        ${k.training.expiring_30d > 0 ? `<div class="tr-sub" style="color:#b45309;margin-top:4px">${k.training.expiring_30d} expiring in 30 days</div>` : ''}
+      </div>
+    </div>
+  `;
+
+  // Daily activity bar chart (stacked: near_miss + inspections + toolbox)
+  const days = data.daily;
+  const max = Math.max(1, ...days.map(d => d.near_miss + d.ladder + d.tower + d.mewp + d.toolbox));
+  const showLabelEvery = days.length > 60 ? 14 : (days.length > 30 ? 7 : 3);
+  const chartHeight = 160;
+  const chart = `
+    <div class="tr-card" style="overflow-x:auto">
+      <h3>Daily activity — ${fmtRange}${data.site ? ' · ' + esc(data.site) : ''}</h3>
+      <svg width="100%" height="${chartHeight + 30}" viewBox="0 0 ${Math.max(360, days.length * 14)} ${chartHeight + 30}" preserveAspectRatio="none" style="max-width:100%">
+        ${days.map((d, i) => {
+          const x = i * 14 + 2;
+          const segs = [
+            { val: d.near_miss, color: '#dc2626' },
+            { val: d.ladder + d.tower + d.mewp, color: '#0ea5e9' },
+            { val: d.toolbox, color: '#8b5cf6' },
+          ];
+          let yCursor = chartHeight;
+          const bars = segs.map(s => {
+            if (s.val === 0) return '';
+            const h = Math.max(1, (s.val / max) * (chartHeight - 4));
+            yCursor -= h;
+            return `<rect x="${x}" y="${yCursor}" width="10" height="${h}" fill="${s.color}" rx="1"></rect>`;
+          }).join('');
+          const label = (i % showLabelEvery === 0 || i === days.length - 1)
+            ? `<text x="${x + 5}" y="${chartHeight + 14}" font-size="9" fill="#94a3b8" text-anchor="middle">${(d.day || '').slice(5)}</text>`
+            : '';
+          return bars + label;
+        }).join('')}
+      </svg>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--text-light)">
+        <span><span style="display:inline-block;width:10px;height:10px;background:#dc2626;border-radius:2px;vertical-align:middle"></span> Near miss</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#0ea5e9;border-radius:2px;vertical-align:middle"></span> Inspections</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#8b5cf6;border-radius:2px;vertical-align:middle"></span> Toolbox talks</span>
+      </div>
+    </div>
+  `;
+
+  // Top locations
+  const topMax = Math.max(1, ...(data.top_locations || []).map(r => r.total));
+  const top = data.top_locations && data.top_locations.length > 0 ? `
+    <div class="tr-card">
+      <h3>Top locations</h3>
+      <table class="tr-locations">
+        <thead><tr><th>Location</th><th>Activity</th><th style="text-align:right">Near miss</th><th style="text-align:right">Inspections</th><th style="text-align:right">Talks</th></tr></thead>
+        <tbody>
+          ${data.top_locations.map(r => `
+            <tr>
+              <td><strong>${esc(r.loc)}</strong></td>
+              <td><div class="tr-bar"><div class="tr-bar-track"><div class="tr-bar-fill" style="width:${(r.total / topMax) * 100}%"></div></div><div class="tr-bar-num">${r.total}</div></div></td>
+              <td style="text-align:right">${r.near_miss}</td>
+              <td style="text-align:right">${r.inspections}</td>
+              <td style="text-align:right">${r.toolbox}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  ` : '';
+
+  // Toolbox topics
+  const topics = data.toolbox_topics && data.toolbox_topics.length > 0 ? `
+    <div class="tr-card">
+      <h3>Toolbox talks delivered — by topic</h3>
+      ${data.toolbox_topics.map(t => `<div style="display:flex;align-items:center;gap:10px;padding:6px 0"><div style="flex:1;font-size:13px">${esc(t.topic)}</div><div class="tr-bar" style="flex:1.6"><div class="tr-bar-track"><div class="tr-bar-fill" style="width:${(t.n / data.toolbox_topics[0].n) * 100}%"></div></div><div class="tr-bar-num">${t.n}</div></div></div>`).join('')}
+    </div>
+  ` : '';
+
+  body.innerHTML = `
+    <div style="margin-bottom:14px;padding:10px 14px;background:#f8fafc;border-radius:8px;font-size:13px;color:var(--text-light)">
+      Showing <strong>${data.range.days} days</strong>: ${fmtRange}. Compared to prior period: ${prevRange}.${data.site ? ` Filtered to <strong>${esc(data.site)}</strong>.` : ''}
+    </div>
+    ${kpiTiles}
+    ${chart}
+    ${top}
+    ${topics}
+  `;
+}
+
+window.renderTrends = renderTrends;
 
 // ═══════════════════════════════════════
 // ACTIONS — defects → tracked actions

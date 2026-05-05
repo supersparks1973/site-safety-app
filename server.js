@@ -1188,6 +1188,152 @@ async function startApp() {
     } catch(e) { res.status(500).json({ error: e.message }); }
   });
 
+  // ═══════ TRENDS DASHBOARD ═══════
+  app.get('/api/trends', authenticate, adminOnly, async (req, res) => {
+    try {
+      const days = Math.max(1, Math.min(365, parseInt(req.query.days, 10) || 30));
+      const site = (req.query.site || '').trim();
+      const siteFilter = site ? `%${site}%` : null;
+      const now = new Date();
+      const periodStart = new Date(now); periodStart.setDate(periodStart.getDate() - days);
+      const previousStart = new Date(periodStart); previousStart.setDate(previousStart.getDate() - days);
+
+      // Helper: count rows in a table within a window, optionally with extra WHERE clauses.
+      const countQ = async (table, fromIso, toIso, extra = '', extraParams = []) => {
+        const params = [fromIso, toIso, ...extraParams];
+        let sql = `SELECT COUNT(*)::int AS n FROM ${table} WHERE created_at >= $1 AND created_at < $2`;
+        if (siteFilter) {
+          params.push(siteFilter);
+          sql += ` AND COALESCE(${table === 'toolbox_talks' ? 'site_project' : 'location'}, '') ILIKE $${params.length}`;
+        }
+        if (extra) sql += ' ' + extra;
+        const r = await pool.query(sql, params);
+        return r.rows[0].n;
+      };
+
+      const startIso = periodStart.toISOString();
+      const endIso = now.toISOString();
+      const prevStartIso = previousStart.toISOString();
+      const prevEndIso = periodStart.toISOString();
+
+      // KPIs (current + previous window)
+      const [
+        nm, nmPrev, nmHigh,
+        ld, ldPrev, ldUnsafe,
+        tw, twPrev, twUnsafe,
+        mw, mwPrev, mwUnsafe,
+        tb, tbPrev,
+      ] = await Promise.all([
+        countQ('near_miss_reports', startIso, endIso),
+        countQ('near_miss_reports', prevStartIso, prevEndIso),
+        countQ('near_miss_reports', startIso, endIso, "AND potential_severity = 'High'"),
+        countQ('ladder_inspections', startIso, endIso),
+        countQ('ladder_inspections', prevStartIso, prevEndIso),
+        countQ('ladder_inspections', startIso, endIso, "AND safe_to_use = 'No'"),
+        countQ('tower_inspections', startIso, endIso),
+        countQ('tower_inspections', prevStartIso, prevEndIso),
+        countQ('tower_inspections', startIso, endIso, "AND safe_to_use = 'No'"),
+        countQ('mewp_inspections', startIso, endIso),
+        countQ('mewp_inspections', prevStartIso, prevEndIso),
+        countQ('mewp_inspections', startIso, endIso, "AND safe_to_use = 'No'"),
+        countQ('toolbox_talks', startIso, endIso),
+        countQ('toolbox_talks', prevStartIso, prevEndIso),
+      ]);
+
+      // Action stats — site filter doesn't apply directly to actions, so we ignore it here.
+      const aOpen = await pool.query(`SELECT COUNT(*)::int AS n FROM inspection_actions WHERE status IN ('open','in_progress')`);
+      const aOverdue = await pool.query(`SELECT COUNT(*)::int AS n FROM inspection_actions WHERE status IN ('open','in_progress') AND due_date < CURRENT_DATE`);
+      const aCompleted = await pool.query(`SELECT COUNT(*)::int AS n FROM inspection_actions WHERE status = 'completed' AND completed_at >= $1 AND completed_at < $2`, [startIso, endIso]);
+      const aCompletedPrev = await pool.query(`SELECT COUNT(*)::int AS n FROM inspection_actions WHERE status = 'completed' AND completed_at >= $1 AND completed_at < $2`, [prevStartIso, prevEndIso]);
+
+      // Daily activity buckets — for stacked bar chart.
+      const dailySql = `
+        WITH days AS (
+          SELECT generate_series($1::date, ($2::timestamp - interval '1 day')::date, '1 day'::interval)::date AS day
+        )
+        SELECT d.day::text AS day,
+               COALESCE(nm.c, 0)::int AS near_miss,
+               COALESCE(ld.c, 0)::int AS ladder,
+               COALESCE(tw.c, 0)::int AS tower,
+               COALESCE(mw.c, 0)::int AS mewp,
+               COALESCE(tb.c, 0)::int AS toolbox
+        FROM days d
+        LEFT JOIN (SELECT created_at::date AS day, COUNT(*)::int AS c FROM near_miss_reports WHERE created_at >= $1 AND created_at < $2 GROUP BY 1) nm ON nm.day = d.day
+        LEFT JOIN (SELECT created_at::date AS day, COUNT(*)::int AS c FROM ladder_inspections WHERE created_at >= $1 AND created_at < $2 GROUP BY 1) ld ON ld.day = d.day
+        LEFT JOIN (SELECT created_at::date AS day, COUNT(*)::int AS c FROM tower_inspections WHERE created_at >= $1 AND created_at < $2 GROUP BY 1) tw ON tw.day = d.day
+        LEFT JOIN (SELECT created_at::date AS day, COUNT(*)::int AS c FROM mewp_inspections WHERE created_at >= $1 AND created_at < $2 GROUP BY 1) mw ON mw.day = d.day
+        LEFT JOIN (SELECT created_at::date AS day, COUNT(*)::int AS c FROM toolbox_talks WHERE created_at >= $1 AND created_at < $2 GROUP BY 1) tb ON tb.day = d.day
+        ORDER BY d.day`;
+      const dailyR = await pool.query(dailySql, [startIso, endIso]);
+
+      // Top locations across near miss + 3 inspection tables (toolbox uses site_project)
+      const topR = await pool.query(`
+        WITH all_loc AS (
+          SELECT TRIM(location) AS loc, 'near_miss' AS src FROM near_miss_reports WHERE created_at >= $1 AND created_at < $2 AND location IS NOT NULL AND location <> ''
+          UNION ALL SELECT TRIM(location), 'ladder' FROM ladder_inspections WHERE created_at >= $1 AND created_at < $2 AND location IS NOT NULL AND location <> ''
+          UNION ALL SELECT TRIM(location), 'tower' FROM tower_inspections WHERE created_at >= $1 AND created_at < $2 AND location IS NOT NULL AND location <> ''
+          UNION ALL SELECT TRIM(location), 'mewp' FROM mewp_inspections WHERE created_at >= $1 AND created_at < $2 AND location IS NOT NULL AND location <> ''
+          UNION ALL SELECT TRIM(site_project), 'toolbox' FROM toolbox_talks WHERE created_at >= $1 AND created_at < $2 AND site_project IS NOT NULL AND site_project <> ''
+        )
+        SELECT loc,
+               COUNT(*)::int AS total,
+               SUM(CASE WHEN src='near_miss' THEN 1 ELSE 0 END)::int AS near_miss,
+               SUM(CASE WHEN src IN ('ladder','tower','mewp') THEN 1 ELSE 0 END)::int AS inspections,
+               SUM(CASE WHEN src='toolbox' THEN 1 ELSE 0 END)::int AS toolbox
+        FROM all_loc
+        GROUP BY loc
+        ORDER BY total DESC
+        LIMIT 10`, [startIso, endIso]);
+
+      // Distinct sites (for the filter dropdown) — top 25 by activity ever
+      const sitesR = await pool.query(`
+        WITH all_loc AS (
+          SELECT TRIM(location) AS loc FROM near_miss_reports WHERE location IS NOT NULL AND location <> ''
+          UNION ALL SELECT TRIM(location) FROM ladder_inspections WHERE location IS NOT NULL AND location <> ''
+          UNION ALL SELECT TRIM(location) FROM tower_inspections WHERE location IS NOT NULL AND location <> ''
+          UNION ALL SELECT TRIM(location) FROM mewp_inspections WHERE location IS NOT NULL AND location <> ''
+          UNION ALL SELECT TRIM(site_project) FROM toolbox_talks WHERE site_project IS NOT NULL AND site_project <> ''
+        )
+        SELECT loc, COUNT(*)::int AS n FROM all_loc GROUP BY loc ORDER BY n DESC LIMIT 25`);
+
+      // Toolbox talk topics — ranked
+      const topicsR = await pool.query(`SELECT topic, COUNT(*)::int AS n FROM toolbox_talks WHERE created_at >= $1 AND created_at < $2 ${siteFilter ? "AND COALESCE(site_project,'') ILIKE $3" : ''} GROUP BY topic ORDER BY n DESC LIMIT 8`, siteFilter ? [startIso, endIso, siteFilter] : [startIso, endIso]);
+
+      // Training compliance summary
+      let training = { active: 0, expired: 0, expiring_30d: 0 };
+      try {
+        const trR = await pool.query(`
+          SELECT
+            COUNT(*) FILTER (WHERE expiry_date IS NOT NULL AND expiry_date >= CURRENT_DATE)::int AS active,
+            COUNT(*) FILTER (WHERE expiry_date IS NOT NULL AND expiry_date < CURRENT_DATE)::int AS expired,
+            COUNT(*) FILTER (WHERE expiry_date IS NOT NULL AND expiry_date >= CURRENT_DATE AND expiry_date < CURRENT_DATE + INTERVAL '30 days')::int AS expiring_30d
+          FROM training_records`);
+        training = trR.rows[0];
+      } catch(e) { console.warn('Training summary unavailable:', e.message); }
+
+      res.json({
+        range: { from: periodStart.toISOString().slice(0,10), to: now.toISOString().slice(0,10), days },
+        previous: { from: previousStart.toISOString().slice(0,10), to: periodStart.toISOString().slice(0,10), days },
+        site: site || null,
+        kpis: {
+          near_miss: { total: nm, prev: nmPrev, high: nmHigh },
+          inspections: { total: ld + tw + mw, prev: ldPrev + twPrev + mwPrev, unsafe: ldUnsafe + twUnsafe + mwUnsafe,
+            ladder: { total: ld, prev: ldPrev, unsafe: ldUnsafe },
+            tower:  { total: tw, prev: twPrev, unsafe: twUnsafe },
+            mewp:   { total: mw, prev: mwPrev, unsafe: mwUnsafe }
+          },
+          actions: { open: aOpen.rows[0].n, overdue: aOverdue.rows[0].n, completed: aCompleted.rows[0].n, prev_completed: aCompletedPrev.rows[0].n },
+          toolbox: { total: tb, prev: tbPrev },
+          training,
+        },
+        daily: dailyR.rows,
+        top_locations: topR.rows,
+        toolbox_topics: topicsR.rows,
+        sites: sitesR.rows.map(r => r.loc),
+      });
+    } catch(e) { console.error('GET /api/trends', e); res.status(500).json({ error: e.message }); }
+  });
+
   // ═══════ ACTIONS ═══════
   app.get('/api/actions', authenticate, async (req, res) => {
     try {
