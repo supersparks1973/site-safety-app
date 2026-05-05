@@ -10,6 +10,7 @@ const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
         Header, Footer, AlignmentType, BorderStyle, WidthType, TabStopType,
         ShadingType, PageNumber, PageBreak, ImageRun } = require('docx');
 const PDFDocument = require('pdfkit');
+const compression = require('compression');
 
 
 const app = express();
@@ -184,6 +185,7 @@ async function startApp() {
     console.log('Default admin created: admin / admin123');
   }
 
+  app.use(compression()); // gzip JSON & HTML responses
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
   app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -193,7 +195,18 @@ async function startApp() {
     destination: (req, file, cb) => cb(null, path.join(__dirname, 'uploads')),
     filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
   });
-  const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+  const upload = multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB per file
+    fileFilter: (req, file, cb) => {
+      const allowedMime = /^image\/(jpe?g|png|gif|webp|heic|heif)$/i;
+      const allowedExt = /\.(jpe?g|png|gif|webp|heic|heif)$/i;
+      if (allowedMime.test(file.mimetype) && allowedExt.test(file.originalname)) {
+        return cb(null, true);
+      }
+      return cb(new Error('Only image files are allowed (JPEG, PNG, GIF, WebP, HEIC).'));
+    }
+  });
 
   function authenticate(req, res, next) {
     const token = req.headers.authorization?.split(' ')[1];
@@ -267,9 +280,15 @@ async function startApp() {
     res.json({ success: true });
   });
 
-  app.post('/api/upload', authenticate, upload.array('photos', 5), (req, res) => {
-    const files = req.files.map(f => `/uploads/${f.filename}`);
-    res.json({ files });
+  app.post('/api/upload', authenticate, (req, res) => {
+    upload.array('photos', 5)(req, res, (err) => {
+      if (err) {
+        // Multer rejection (size limit, fileFilter) — return a friendly 400.
+        return res.status(400).json({ error: err.message || 'Upload rejected' });
+      }
+      const files = (req.files || []).map(f => `/uploads/${f.filename}`);
+      res.json({ files });
+    });
   });
 
   app.post('/api/near-miss', authenticate, async (req, res) => {
