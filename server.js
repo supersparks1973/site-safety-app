@@ -11,6 +11,7 @@ const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
         ShadingType, PageNumber, PageBreak, ImageRun } = require('docx');
 const PDFDocument = require('pdfkit');
 const compression = require('compression');
+const QRCode = require('qrcode');
 
 
 const app = express();
@@ -165,6 +166,38 @@ async function startApp() {
   )`);
   try { await pool.query(`CREATE INDEX IF NOT EXISTS idx_actions_status_due ON inspection_actions (status, due_date)`); } catch(e) { console.warn('Migration: idx_actions_status_due:', e.message); }
 
+  await pool.query(`CREATE TABLE IF NOT EXISTS equipment_items (
+    id SERIAL PRIMARY KEY,
+    eq_type TEXT NOT NULL,
+    identifier TEXT NOT NULL,
+    description TEXT,
+    location TEXT,
+    schedule_days INTEGER NOT NULL DEFAULT 90,
+    last_inspected_at TIMESTAMP,
+    notes TEXT,
+    active BOOLEAN DEFAULT true,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+  try { await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_equipment_unique ON equipment_items (eq_type, LOWER(identifier))`); } catch(e) { console.warn('Migration: idx_equipment_unique:', e.message); }
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS audit_log (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    user_name TEXT,
+    user_role TEXT,
+    action TEXT NOT NULL,
+    record_type TEXT NOT NULL,
+    record_id INTEGER,
+    summary TEXT,
+    details JSONB,
+    ip_address TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+  try { await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_record ON audit_log (record_type, record_id)`); } catch(e) { console.warn('Migration: idx_audit_record:', e.message); }
+  try { await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log (created_at DESC)`); } catch(e) { console.warn('Migration: idx_audit_created:', e.message); }
+
   // Add signature column to existing tables if not present
   const migrateSig = async (table) => {
     try { await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS signature TEXT`); } catch(e) { console.warn(`Migration: signature col on ${table}:`, e.message); }
@@ -220,7 +253,36 @@ async function startApp() {
     next();
   }
 
-  // Helper: create an action from an inspection/near-miss defect.
+  // Helper: write an entry to the audit log. Best-effort — never throws.
+  async function logAudit(req, action, recordType, recordId, summary, details) {
+    try {
+      const u = (req && req.user) ? req.user : {};
+      const ip = (req && (req.ip || (req.connection && req.connection.remoteAddress))) || null;
+      await pool.query(
+        'INSERT INTO audit_log (user_id, user_name, user_role, action, record_type, record_id, summary, details, ip_address) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+        [u.id || null, u.full_name || null, u.role || null, action, recordType, recordId || null, summary || null, details ? JSON.stringify(details) : null, ip]
+      );
+    } catch(e) { console.warn('Audit log failed:', e.message); }
+  }
+
+  // Helper: when an inspection is submitted, mark the matching equipment item as freshly inspected.
+  async function touchEquipmentLastInspected(eqType, identifier) {
+    if (!identifier) return;
+    try {
+      await pool.query(
+        "UPDATE equipment_items SET last_inspected_at = NOW(), updated_at = NOW() WHERE eq_type = $1 AND LOWER(identifier) = LOWER($2)",
+        [eqType, String(identifier).trim()]
+      );
+    } catch(e) { console.warn('touchEquipmentLastInspected:', e.message); }
+  }
+
+  // Helper: figure out the public URL the portal is reachable at, for embedding in QR codes.
+  function publicBaseUrl(req) {
+    const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+    return `${proto}://${req.get('host')}`;
+  }
+
+    // Helper: create an action from an inspection/near-miss defect.
   // Returns the new action id, or null if nothing to create or insert failed.
   async function createActionFromDefect({ source_type, source_id, title, description, priority, due_days, created_by }) {
     if (!description || !String(description).trim()) description = 'See linked record for details.';
@@ -352,6 +414,8 @@ async function startApp() {
       const safetyFlag = d.safe_to_use === 'No' ? ' ⚠️ UNSAFE' : '';
       sendAdminEmail(`Ladder Inspection #${rows[0].id}${safetyFlag}`,
         `<h2>Ladder Inspection</h2><p><strong>Inspected by:</strong> ${req.user.full_name}</p><p><strong>Ladder:</strong> ${d.ladder_id} (${d.ladder_type})</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Safe to use:</strong> ${d.safe_to_use}</p>${d.defects_found ? `<p><strong>Defects:</strong> ${d.defects_found}</p>` : ''}`);
+      await touchEquipmentLastInspected('ladder', d.ladder_id);
+      logAudit(req, 'created', 'ladder-inspection', rows[0].id, `Ladder ${d.ladder_id || ''} — ${d.safe_to_use === 'No' ? 'UNSAFE' : 'safe'}`, null);
       if (d.safe_to_use === 'No' || (d.defects_found && d.defects_found.trim())) {
         const isUnsafe = d.safe_to_use === 'No';
         await createActionFromDefect({
@@ -387,6 +451,8 @@ async function startApp() {
       const safetyFlag = d.safe_to_use === 'No' ? ' ⚠️ UNSAFE' : '';
       sendAdminEmail(`Tower Inspection #${rows[0].id}${safetyFlag}`,
         `<h2>Mobile Tower Inspection</h2><p><strong>Inspected by:</strong> ${req.user.full_name}</p><p><strong>Tower:</strong> ${d.tower_id}</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Safe to use:</strong> ${d.safe_to_use}</p>${d.defects_found ? `<p><strong>Defects:</strong> ${d.defects_found}</p>` : ''}`);
+      await touchEquipmentLastInspected('tower', d.tower_id);
+      logAudit(req, 'created', 'tower-inspection', rows[0].id, `Tower ${d.tower_id || ''} — ${d.safe_to_use === 'No' ? 'UNSAFE' : 'safe'}`, null);
       if (d.safe_to_use === 'No' || (d.defects_found && d.defects_found.trim())) {
         const isUnsafe = d.safe_to_use === 'No';
         await createActionFromDefect({
@@ -422,6 +488,8 @@ async function startApp() {
       const safetyFlag = d.safe_to_use === 'No' ? ' ⚠️ UNSAFE' : '';
       sendAdminEmail(`MEWP Inspection #${rows[0].id}${safetyFlag}`,
         `<h2>MEWP Inspection</h2><p><strong>Inspected by:</strong> ${req.user.full_name}</p><p><strong>MEWP:</strong> ${d.mewp_id} (${d.mewp_type})</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Safe to use:</strong> ${d.safe_to_use}</p>${d.defects_found ? `<p><strong>Defects:</strong> ${d.defects_found}</p>` : ''}`);
+      await touchEquipmentLastInspected('mewp', d.mewp_id);
+      logAudit(req, 'created', 'mewp-inspection', rows[0].id, `MEWP ${d.mewp_id || ''} — ${d.safe_to_use === 'No' ? 'UNSAFE' : 'safe'}`, null);
       if (d.safe_to_use === 'No' || (d.defects_found && d.defects_found.trim())) {
         const isUnsafe = d.safe_to_use === 'No';
         await createActionFromDefect({
@@ -1334,6 +1402,186 @@ async function startApp() {
         sites: sitesR.rows.map(r => r.loc),
       });
     } catch(e) { console.error('GET /api/trends', e); res.status(500).json({ error: e.message }); }
+  });
+
+  // ═══════ EQUIPMENT REGISTER & INSPECTION REMINDERS ═══════
+  app.get('/api/equipment', authenticate, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`
+        SELECT *,
+          CASE WHEN last_inspected_at IS NULL THEN NULL
+            ELSE (last_inspected_at + (schedule_days || ' days')::interval) END AS next_due,
+          CASE
+            WHEN last_inspected_at IS NULL THEN 'never'
+            WHEN (last_inspected_at + (schedule_days || ' days')::interval) < NOW() THEN 'overdue'
+            WHEN (last_inspected_at + (schedule_days || ' days')::interval) < NOW() + INTERVAL '7 days' THEN 'due_soon'
+            ELSE 'ok'
+          END AS reminder_status
+        FROM equipment_items WHERE active = true
+        ORDER BY
+          CASE
+            WHEN last_inspected_at IS NULL THEN 0
+            WHEN (last_inspected_at + (schedule_days || ' days')::interval) < NOW() THEN 1
+            WHEN (last_inspected_at + (schedule_days || ' days')::interval) < NOW() + INTERVAL '7 days' THEN 2
+            ELSE 3
+          END,
+          eq_type, identifier`);
+      res.json(rows);
+    } catch(e) { console.error('GET /api/equipment', e); res.status(500).json({ error: e.message }); }
+  });
+
+  app.get('/api/equipment/counts', authenticate, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE last_inspected_at IS NULL)::int AS never_inspected,
+          COUNT(*) FILTER (WHERE last_inspected_at IS NOT NULL AND (last_inspected_at + (schedule_days || ' days')::interval) < NOW())::int AS overdue,
+          COUNT(*) FILTER (WHERE last_inspected_at IS NOT NULL AND (last_inspected_at + (schedule_days || ' days')::interval) BETWEEN NOW() AND NOW() + INTERVAL '7 days')::int AS due_soon,
+          COUNT(*)::int AS total
+        FROM equipment_items WHERE active = true`);
+      res.json(rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post('/api/equipment', authenticate, adminOnly, async (req, res) => {
+    try {
+      const d = req.body;
+      if (!d.eq_type || !d.identifier || !d.identifier.trim()) return res.status(400).json({ error: 'Type and identifier are required' });
+      const { rows } = await pool.query(
+        'INSERT INTO equipment_items (eq_type, identifier, description, location, schedule_days, notes, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+        [d.eq_type, d.identifier.trim(), d.description || '', d.location || '', d.schedule_days || 90, d.notes || '', req.user.id]
+      );
+      logAudit(req, 'created', 'equipment', rows[0].id, `Equipment added: ${d.eq_type} ${d.identifier}`, null);
+      res.json(rows[0]);
+    } catch(e) {
+      if (e.code === '23505') return res.status(409).json({ error: 'An item with that type + identifier already exists' });
+      console.error('POST /api/equipment', e); res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.patch('/api/equipment/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      const d = req.body;
+      const fields = []; const params = [];
+      const set = (col, val) => { params.push(val); fields.push(`${col} = $${params.length}`); };
+      if (d.eq_type !== undefined) set('eq_type', d.eq_type);
+      if (d.identifier !== undefined) set('identifier', d.identifier);
+      if (d.description !== undefined) set('description', d.description);
+      if (d.location !== undefined) set('location', d.location);
+      if (d.schedule_days !== undefined) set('schedule_days', parseInt(d.schedule_days, 10) || 90);
+      if (d.notes !== undefined) set('notes', d.notes);
+      if (d.active !== undefined) set('active', d.active);
+      fields.push(`updated_at = NOW()`);
+      params.push(req.params.id);
+      await pool.query(`UPDATE equipment_items SET ${fields.join(', ')} WHERE id = $${params.length}`, params);
+      logAudit(req, 'updated', 'equipment', req.params.id, 'Equipment updated', null);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete('/api/equipment/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      await pool.query('DELETE FROM equipment_items WHERE id = $1', [req.params.id]);
+      logAudit(req, 'deleted', 'equipment', req.params.id, 'Equipment deleted', null);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // QR code for one equipment item — returns SVG
+  app.get('/api/equipment/:id/qr.svg', authenticate, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT * FROM equipment_items WHERE id = $1', [req.params.id]);
+      if (rows.length === 0) return res.status(404).send('Not found');
+      const item = rows[0];
+      const url = `${publicBaseUrl(req)}/?inspect=${encodeURIComponent(item.eq_type)}&id=${encodeURIComponent(item.identifier)}`;
+      const svg = await QRCode.toString(url, { type: 'svg', errorCorrectionLevel: 'M', margin: 1, width: 256 });
+      res.setHeader('Content-Type', 'image/svg+xml');
+      res.send(svg);
+    } catch(e) { console.error('GET qr.svg', e); res.status(500).send(e.message); }
+  });
+
+  // Printable sticker sheet (HTML) for selected or all equipment
+  app.get('/api/equipment/qr-sheet', authenticate, adminOnly, async (req, res) => {
+    try {
+      const idsParam = (req.query.ids || '').trim();
+      const params = [];
+      let sql = "SELECT * FROM equipment_items WHERE active = true";
+      if (idsParam) {
+        const ids = idsParam.split(',').map(s => parseInt(s, 10)).filter(n => !isNaN(n));
+        if (ids.length === 0) return res.status(400).send('No valid ids');
+        sql += ' AND id = ANY($1)';
+        params.push(ids);
+      }
+      sql += ' ORDER BY eq_type, identifier';
+      const { rows: items } = await pool.query(sql, params);
+      if (items.length === 0) return res.status(404).send('No equipment to print');
+
+      const base = publicBaseUrl(req);
+      const stickers = await Promise.all(items.map(async (it) => {
+        const url = `${base}/?inspect=${encodeURIComponent(it.eq_type)}&id=${encodeURIComponent(it.identifier)}`;
+        const svg = await QRCode.toString(url, { type: 'svg', errorCorrectionLevel: 'M', margin: 1, width: 200 });
+        const icon = it.eq_type === 'ladder' ? '\u{1FA9C}' : it.eq_type === 'tower' ? '\u{1F3D7}\u{FE0F}' : (it.eq_type === 'mewp' ? '\u{1F527}' : '\u{1F6E0}\u{FE0F}');
+        const eqLabel = it.eq_type.charAt(0).toUpperCase() + it.eq_type.slice(1);
+        return { svg, icon, eqLabel, identifier: it.identifier, location: it.location || '' };
+      }));
+
+      const html = `<!doctype html>
+<html><head><meta charset="utf-8"><title>QR Sticker Sheet</title>
+<style>
+  @page { size: A4; margin: 12mm; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 12mm; color: #1f2937; }
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8mm; padding-bottom: 4mm; border-bottom: 2px solid #8B1A1A; }
+  .header h1 { margin: 0; font-size: 18px; color: #8B1A1A; }
+  .header .meta { font-size: 11px; color: #64748b; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8mm; }
+  .sticker { border: 1.5px dashed #94a3b8; border-radius: 8px; padding: 6mm 4mm; text-align: center; page-break-inside: avoid; }
+  .sticker svg { width: 38mm; height: 38mm; display: block; margin: 0 auto 3mm; }
+  .sticker .id { font-size: 18px; font-weight: 800; color: #1f2937; margin-bottom: 2mm; }
+  .sticker .lbl { font-size: 11px; color: #64748b; margin-bottom: 4mm; text-transform: uppercase; letter-spacing: .5px; }
+  .sticker .scan { font-size: 10px; color: #8B1A1A; font-weight: 600; }
+  .toolbar { margin-bottom: 6mm; padding: 4mm; background: #f1f5f9; border-radius: 6px; font-size: 12px; }
+  @media print { .toolbar { display: none; } body { padding: 0; } }
+</style>
+</head><body>
+  <div class="toolbar">
+    <strong>${items.length} sticker${items.length === 1 ? '' : 's'}</strong> ready to print. Use Cmd/Ctrl+P, choose "Save as PDF" or send to your label printer. Each QR code links to the inspection form for its specific item.
+    <button onclick="window.print()" style="float:right;background:#8B1A1A;color:#fff;border:0;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600">🖨 Print now</button>
+  </div>
+  <div class="header">
+    <h1>ManProjects Ltd — Equipment QR Stickers</h1>
+    <div class="meta">${new Date().toLocaleDateString('en-GB')}</div>
+  </div>
+  <div class="grid">
+    ${stickers.map(s => `
+      <div class="sticker">
+        ${s.svg}
+        <div class="id">${s.icon} ${s.identifier.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</div>
+        <div class="lbl">${s.eqLabel}${s.location ? ' &middot; ' + s.location.replace(/&/g, '&amp;').replace(/</g, '&lt;') : ''}</div>
+        <div class="scan">📲 Scan to inspect</div>
+      </div>
+    `).join('')}
+  </div>
+</body></html>`;
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+    } catch(e) { console.error('GET qr-sheet', e); res.status(500).send(e.message); }
+  });
+
+  // ═══════ AUDIT LOG ═══════
+  app.get('/api/audit-log', authenticate, adminOnly, async (req, res) => {
+    try {
+      const { record_type, record_id, action, user_id, days } = req.query;
+      const params = [];
+      let sql = 'SELECT * FROM audit_log WHERE 1=1';
+      if (record_type) { params.push(record_type); sql += ` AND record_type = $${params.length}`; }
+      if (record_id) { params.push(record_id); sql += ` AND record_id = $${params.length}`; }
+      if (action) { params.push(action); sql += ` AND action = $${params.length}`; }
+      if (user_id) { params.push(user_id); sql += ` AND user_id = $${params.length}`; }
+      if (days) { params.push(parseInt(days, 10)); sql += ` AND created_at > NOW() - ($${params.length} || ' days')::interval`; }
+      sql += ' ORDER BY created_at DESC LIMIT 500';
+      const { rows } = await pool.query(sql, params);
+      res.json(rows);
+    } catch(e) { console.error('GET /api/audit-log', e); res.status(500).json({ error: e.message }); }
   });
 
   // ═══════ ACTIONS ═══════

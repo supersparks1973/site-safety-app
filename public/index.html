@@ -817,6 +817,29 @@ function showApp() {
   refreshInstallButton();
 }
 
+// QR deep-link: ?inspect=ladder&id=LDR-007 — captured at load and applied after auth.
+(function captureDeepLink() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const inspect = params.get('inspect');
+    const id = params.get('id');
+    if (inspect && id && ['ladder', 'tower', 'mewp'].includes(inspect)) {
+      window._deepLinkInspect = { type: inspect, id: id };
+      history.replaceState(null, '', window.location.pathname);
+    }
+  } catch(e) {}
+})();
+
+function applyDeepLinkIfAny() {
+  const dl = window._deepLinkInspect;
+  if (!dl) return false;
+  state.deeplinkEqId = dl.id;
+  window._deepLinkInspect = null;
+  navigate(dl.type);
+  setTimeout(() => { state.deeplinkEqId = null; }, 200);
+  return true;
+}
+
 // Check stored token on load — verify it's still valid
 if (state.token && state.user) {
   fetch(`${API}/api/auth/me`, { headers: headers() })
@@ -1040,7 +1063,7 @@ function renderLadderForm(c) {
       <div class="form-section">
         <h3>📋 Ladder Details</h3>
         <div class="form-group"><label>Date</label><input type="date" name="date" value="${today()}" required></div>
-        <div class="form-group"><label>Ladder ID / Number</label><input type="text" name="ladder_id" placeholder="e.g. LAD-001" required></div>
+        <div class="form-group"><label>Ladder ID / Number</label><input type="text" name="ladder_id" value="${esc(state.deeplinkEqId || '')}" placeholder="e.g. LAD-001" required></div>
         <div class="form-group"><label>Ladder Type</label>
           <select name="ladder_type" required>
             <option value="">-- Select --</option>
@@ -1100,7 +1123,7 @@ function renderTowerForm(c) {
       <div class="form-section">
         <h3>📋 Tower Details</h3>
         <div class="form-group"><label>Date</label><input type="date" name="date" value="${today()}" required></div>
-        <div class="form-group"><label>Tower ID / Number</label><input type="text" name="tower_id" placeholder="e.g. TOW-001" required></div>
+        <div class="form-group"><label>Tower ID / Number</label><input type="text" name="tower_id" value="${esc(state.deeplinkEqId || '')}" placeholder="e.g. TOW-001" required></div>
         <div class="form-group"><label>Location</label><input type="text" name="location" placeholder="Where is the tower erected?" required></div>
         <div class="form-group"><label>Max Platform Height (m)</label><input type="text" name="max_platform_height" placeholder="e.g. 6.2"></div>
       </div>
@@ -1157,7 +1180,7 @@ function renderMEWPForm(c) {
       <div class="form-section">
         <h3>📋 MEWP Details</h3>
         <div class="form-group"><label>Date</label><input type="date" name="date" value="${today()}" required></div>
-        <div class="form-group"><label>MEWP ID / Number</label><input type="text" name="mewp_id" placeholder="e.g. MEWP-001" required></div>
+        <div class="form-group"><label>MEWP ID / Number</label><input type="text" name="mewp_id" value="${esc(state.deeplinkEqId || '')}" placeholder="e.g. MEWP-001" required></div>
         <div class="form-group"><label>MEWP Type</label>
           <select name="mewp_type" required>
             <option value="">-- Select --</option>
@@ -4435,7 +4458,7 @@ async function renderSchedule(c) {
         <h2 style="margin-bottom:4px">📅 Inspection Schedule</h2>
         <p style="color:var(--text-light);font-size:14px">Track each piece of equipment and how often it needs inspecting. The system marks an item as inspected automatically when its ID matches an inspection record.</p>
       </div>
-      <div class="hide-readonly"><button class="btn btn-primary" onclick="openEqModal()">➕ Add Equipment</button></div>
+      <div class="hide-readonly" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-secondary" onclick="openQRSheet()">🖨 Print sticker sheet</button><button class="btn btn-primary" onclick="openEqModal()">➕ Add Equipment</button></div>
     </div>
     <div id="scheduleList"><div style="text-align:center;color:var(--text-light);padding:30px">Loading…</div></div>
   `;
@@ -4469,9 +4492,9 @@ async function loadSchedule() {
       } else {
         dueRel = `<span style="color:#94a3b8">No inspections recorded yet</span>`;
       }
-      return `<div class="card" style="display:flex;gap:14px;align-items:center;cursor:pointer;border-left:4px solid ${colors[status]}" onclick="openEqModal(${it.id})">
-        <div style="font-size:32px;flex-shrink:0">${EQ_ICONS[it.eq_type] || '🛠️'}</div>
-        <div style="flex:1;min-width:0">
+      return `<div class="card" style="display:flex;gap:14px;align-items:center;border-left:4px solid ${colors[status]}">
+        <div style="font-size:32px;flex-shrink:0;cursor:pointer" onclick="openEqModal(${it.id})">${EQ_ICONS[it.eq_type] || '🛠️'}</div>
+        <div style="flex:1;min-width:0;cursor:pointer" onclick="openEqModal(${it.id})">
           <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">
             <strong style="font-size:15px">${esc(it.identifier)}</strong>
             <span style="color:var(--text-light);font-size:13px">${EQ_LABELS[it.eq_type] || it.eq_type}${it.location ? ' · ' + esc(it.location) : ''}</span>
@@ -4480,6 +4503,7 @@ async function loadSchedule() {
           <div style="font-size:12px;color:var(--text-light);margin-top:4px">Last inspected: ${last} · Schedule every ${it.schedule_days} days · Next: ${next}</div>
           <div style="font-size:13px;margin-top:4px">${dueRel}</div>
         </div>
+        <button class="btn btn-secondary" style="font-size:12px;padding:6px 10px;flex-shrink:0" onclick="openQRPreview(${it.id}, '${esc(it.identifier)}', '${esc(it.eq_type)}')" title="QR sticker">📲 QR</button>
       </div>`;
     }).join('');
   } catch(e) {
@@ -4567,6 +4591,81 @@ async function deleteEq(id) {
   } catch(e) { alert('Failed to delete: ' + e.message); }
 }
 
+async function openQRPreview(id, identifier, eqType) {
+  const m = document.createElement('div');
+  m.id = 'qrPreviewModal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px';
+  m.innerHTML = `
+    <div style="background:#fff;border-radius:14px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);text-align:center">
+      <div style="padding:18px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between">
+        <h3 style="margin:0;font-size:16px">QR sticker — ${esc(identifier)}</h3>
+        <button onclick="document.getElementById('qrPreviewModal').remove()" style="background:transparent;border:0;font-size:24px;cursor:pointer;color:#64748b;line-height:1">×</button>
+      </div>
+      <div style="padding:20px">
+        <div id="qrPreviewArea" style="background:#fff;border:1px dashed #cbd5e1;border-radius:10px;padding:18px;min-height:160px"><div style="text-align:center;color:var(--text-light);padding:30px">Loading…</div></div>
+        <p style="margin:12px 0 0;font-size:13px;color:var(--text-light)">Scan with a phone camera. Goes straight to the ${esc(eqType)} inspection form, with <strong>${esc(identifier)}</strong> pre-filled.</p>
+      </div>
+      <div style="padding:14px 20px;border-top:1px solid #e5e7eb;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-secondary" style="font-size:13px" onclick="downloadQR(${id}, '${esc(identifier)}')">⬇ Download SVG</button>
+        <button class="btn btn-primary" style="font-size:13px" onclick="openOneStickerSheet(${id})">🖨 Print sticker</button>
+      </div>
+    </div>
+  `;
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+  document.body.appendChild(m);
+  try {
+    const res = await fetch(`${API}/api/equipment/${id}/qr.svg`, { headers: headers() });
+    if (!res.ok) throw new Error('QR generation failed');
+    const svg = await res.text();
+    const area = document.getElementById('qrPreviewArea');
+    if (area) area.innerHTML = svg;
+  } catch(e) {
+    const area = document.getElementById('qrPreviewArea');
+    if (area) area.innerHTML = `<div style="color:#b91c1c">Couldn't generate QR: ${esc(e.message)}</div>`;
+  }
+}
+
+async function downloadQR(id, identifier) {
+  try {
+    const res = await fetch(`${API}/api/equipment/${id}/qr.svg`, { headers: headers() });
+    const svg = await res.text();
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `QR-${identifier.replace(/[^a-zA-Z0-9_-]/g, '_')}.svg`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  } catch(e) { alert('Download failed: ' + e.message); }
+}
+
+async function openOneStickerSheet(id) {
+  try {
+    const res = await fetch(`${API}/api/equipment/qr-sheet?ids=${id}`, { headers: headers() });
+    if (!res.ok) { alert('Could not generate sticker: ' + res.statusText); return; }
+    const html = await res.text();
+    const blob = new Blob([html], { type: 'text/html' });
+    window.open(URL.createObjectURL(blob), '_blank');
+  } catch(e) { alert('Failed: ' + e.message); }
+}
+
+async function openQRSheet() {
+  try {
+    const res = await fetch(`${API}/api/equipment/qr-sheet`, { headers: headers() });
+    if (!res.ok) {
+      const err = await res.text();
+      alert('Could not generate sticker sheet: ' + (err || res.statusText));
+      return;
+    }
+    const html = await res.text();
+    const blob = new Blob([html], { type: 'text/html' });
+    window.open(URL.createObjectURL(blob), '_blank');
+  } catch(e) { alert('Failed to open sticker sheet: ' + e.message); }
+}
+
+window.openQRPreview = openQRPreview;
+window.openQRSheet = openQRSheet;
+window.openOneStickerSheet = openOneStickerSheet;
+window.downloadQR = downloadQR;
 window.openEqModal = openEqModal; window.saveEq = saveEq; window.deleteEq = deleteEq;
 window.refreshScheduleBadge = refreshScheduleBadge;
 setTimeout(refreshScheduleBadge, 1500);
