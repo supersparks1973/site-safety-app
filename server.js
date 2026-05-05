@@ -162,20 +162,20 @@ async function startApp() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
-  try { await pool.query(`CREATE INDEX IF NOT EXISTS idx_actions_status_due ON inspection_actions (status, due_date)`); } catch(e) {}
+  try { await pool.query(`CREATE INDEX IF NOT EXISTS idx_actions_status_due ON inspection_actions (status, due_date)`); } catch(e) { console.warn('Migration: idx_actions_status_due:', e.message); }
 
   // Add signature column to existing tables if not present
   const migrateSig = async (table) => {
-    try { await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS signature TEXT`); } catch(e) {}
+    try { await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS signature TEXT`); } catch(e) { console.warn(`Migration: signature col on ${table}:`, e.message); }
   };
   await Promise.all(['near_miss_reports','ladder_inspections','tower_inspections','mewp_inspections'].map(migrateSig));
 
   // Allow completion_date to be NULL for existing training_records table
-  try { await pool.query(`ALTER TABLE training_records ALTER COLUMN completion_date DROP NOT NULL`); } catch(e) {}
+  try { await pool.query(`ALTER TABLE training_records ALTER COLUMN completion_date DROP NOT NULL`); } catch(e) { console.warn('Migration: training_records.completion_date NULLABLE:', e.message); }
 
   // Add external_name to training_records and make user_id nullable
-  try { await pool.query('ALTER TABLE training_records ADD COLUMN IF NOT EXISTS external_name TEXT'); } catch(e) {}
-  try { await pool.query('ALTER TABLE training_records ALTER COLUMN user_id DROP NOT NULL'); } catch(e) {}
+  try { await pool.query('ALTER TABLE training_records ADD COLUMN IF NOT EXISTS external_name TEXT'); } catch(e) { console.warn('Migration: training_records.external_name:', e.message); }
+  try { await pool.query('ALTER TABLE training_records ALTER COLUMN user_id DROP NOT NULL'); } catch(e) { console.warn('Migration: training_records.user_id NULLABLE:', e.message); }
 
   const { rows: admins } = await pool.query("SELECT id FROM users WHERE role = 'admin'");
   if (admins.length === 0) {
@@ -911,7 +911,7 @@ async function startApp() {
     if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
     const p = rows[0];
     let checklist = {};
-    try { checklist = JSON.parse(p.checklist || '{}'); } catch {}
+    try { checklist = JSON.parse(p.checklist || '{}'); } catch(e) { console.warn(`rescue plan #${p.id} checklist JSON.parse failed:`, e.message); }
 
     const maroon = "8B1A1A";
     const grey = "4A4A4A";
