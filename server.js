@@ -144,6 +144,26 @@ async function startApp() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  await pool.query(`CREATE TABLE IF NOT EXISTS inspection_actions (
+    id SERIAL PRIMARY KEY,
+    source_type TEXT NOT NULL,
+    source_id INTEGER,
+    title TEXT NOT NULL,
+    description TEXT,
+    priority TEXT DEFAULT 'medium',
+    status TEXT DEFAULT 'open',
+    due_date DATE,
+    assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    completed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    completed_at TIMESTAMP,
+    completion_notes TEXT,
+    completion_photos TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+  try { await pool.query(`CREATE INDEX IF NOT EXISTS idx_actions_status_due ON inspection_actions (status, due_date)`); } catch(e) {}
+
   // Add signature column to existing tables if not present
   const migrateSig = async (table) => {
     try { await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS signature TEXT`); } catch(e) {}
@@ -185,6 +205,22 @@ async function startApp() {
       return res.status(403).json({ error: 'Read-only access — view only' });
     }
     next();
+  }
+
+  // Helper: create an action from an inspection/near-miss defect.
+  // Returns the new action id, or null if nothing to create or insert failed.
+  async function createActionFromDefect({ source_type, source_id, title, description, priority, due_days, created_by }) {
+    if (!description || !String(description).trim()) description = 'See linked record for details.';
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + (due_days != null ? due_days : 7));
+    const dueIso = dueDate.toISOString().slice(0, 10);
+    try {
+      const { rows } = await pool.query(
+        'INSERT INTO inspection_actions (source_type, source_id, title, description, priority, status, due_date, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
+        [source_type, source_id || null, title, description, priority || 'medium', 'open', dueIso, created_by || null]
+      );
+      return rows[0].id;
+    } catch(e) { console.error('createActionFromDefect failed:', e.message); return null; }
   }
 
   function adminOnly(req, res, next) {
@@ -244,6 +280,18 @@ async function startApp() {
         [req.user.id, d.date, d.time, d.location, d.description, d.potential_severity, d.immediate_actions || '', d.weather_conditions || '', d.witnesses || '', d.photos || '', d.signature || '']);
       sendAdminEmail(`New Near Miss Report #${rows[0].id}`,
         `<h2>Near Miss Report</h2><p><strong>Reported by:</strong> ${req.user.full_name}</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Severity:</strong> ${d.potential_severity}</p><p><strong>Description:</strong> ${d.description}</p>`);
+      // Auto-create an action for High severity near-misses
+      if (d.potential_severity === 'High') {
+        await createActionFromDefect({
+          source_type: 'near-miss',
+          source_id: rows[0].id,
+          title: `Investigate near-miss at ${d.location || 'site'}`,
+          description: (d.description || '') + (d.immediate_actions ? '\n\nImmediate actions taken: ' + d.immediate_actions : ''),
+          priority: 'high',
+          due_days: 5,
+          created_by: req.user.id
+        });
+      }
       res.json({ id: rows[0].id, message: 'Near miss report submitted' });
     } catch(e) { console.error('POST /api/near-miss', e); res.status(500).json({ error: e.message }); }
   });
@@ -282,6 +330,18 @@ async function startApp() {
       const safetyFlag = d.safe_to_use === 'No' ? ' ⚠️ UNSAFE' : '';
       sendAdminEmail(`Ladder Inspection #${rows[0].id}${safetyFlag}`,
         `<h2>Ladder Inspection</h2><p><strong>Inspected by:</strong> ${req.user.full_name}</p><p><strong>Ladder:</strong> ${d.ladder_id} (${d.ladder_type})</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Safe to use:</strong> ${d.safe_to_use}</p>${d.defects_found ? `<p><strong>Defects:</strong> ${d.defects_found}</p>` : ''}`);
+      if (d.safe_to_use === 'No' || (d.defects_found && d.defects_found.trim())) {
+        const isUnsafe = d.safe_to_use === 'No';
+        await createActionFromDefect({
+          source_type: 'ladder-inspection',
+          source_id: rows[0].id,
+          title: `${isUnsafe ? 'UNSAFE — withdraw/repair' : 'Address defects on'} ladder ${d.ladder_id || ''}`.trim(),
+          description: (d.defects_found || 'See inspection record') + (d.actions_taken ? '\n\nActions taken: ' + d.actions_taken : ''),
+          priority: isUnsafe ? 'high' : 'medium',
+          due_days: isUnsafe ? 1 : 7,
+          created_by: req.user.id
+        });
+      }
       res.json({ id: rows[0].id, message: 'Ladder inspection submitted' });
     } catch(e) { console.error('POST /api/ladder-inspection', e); res.status(500).json({ error: e.message }); }
   });
@@ -305,6 +365,18 @@ async function startApp() {
       const safetyFlag = d.safe_to_use === 'No' ? ' ⚠️ UNSAFE' : '';
       sendAdminEmail(`Tower Inspection #${rows[0].id}${safetyFlag}`,
         `<h2>Mobile Tower Inspection</h2><p><strong>Inspected by:</strong> ${req.user.full_name}</p><p><strong>Tower:</strong> ${d.tower_id}</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Safe to use:</strong> ${d.safe_to_use}</p>${d.defects_found ? `<p><strong>Defects:</strong> ${d.defects_found}</p>` : ''}`);
+      if (d.safe_to_use === 'No' || (d.defects_found && d.defects_found.trim())) {
+        const isUnsafe = d.safe_to_use === 'No';
+        await createActionFromDefect({
+          source_type: 'tower-inspection',
+          source_id: rows[0].id,
+          title: `${isUnsafe ? 'UNSAFE — withdraw/repair' : 'Address defects on'} tower ${d.tower_id || ''}`.trim(),
+          description: (d.defects_found || 'See inspection record') + (d.actions_taken ? '\n\nActions taken: ' + d.actions_taken : ''),
+          priority: isUnsafe ? 'high' : 'medium',
+          due_days: isUnsafe ? 1 : 7,
+          created_by: req.user.id
+        });
+      }
       res.json({ id: rows[0].id, message: 'Tower inspection submitted' });
     } catch(e) { console.error('POST /api/tower-inspection', e); res.status(500).json({ error: e.message }); }
   });
@@ -328,6 +400,18 @@ async function startApp() {
       const safetyFlag = d.safe_to_use === 'No' ? ' ⚠️ UNSAFE' : '';
       sendAdminEmail(`MEWP Inspection #${rows[0].id}${safetyFlag}`,
         `<h2>MEWP Inspection</h2><p><strong>Inspected by:</strong> ${req.user.full_name}</p><p><strong>MEWP:</strong> ${d.mewp_id} (${d.mewp_type})</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Safe to use:</strong> ${d.safe_to_use}</p>${d.defects_found ? `<p><strong>Defects:</strong> ${d.defects_found}</p>` : ''}`);
+      if (d.safe_to_use === 'No' || (d.defects_found && d.defects_found.trim())) {
+        const isUnsafe = d.safe_to_use === 'No';
+        await createActionFromDefect({
+          source_type: 'mewp-inspection',
+          source_id: rows[0].id,
+          title: `${isUnsafe ? 'UNSAFE — withdraw/repair' : 'Address defects on'} MEWP ${d.mewp_id || ''}`.trim(),
+          description: (d.defects_found || 'See inspection record') + (d.actions_taken ? '\n\nActions taken: ' + d.actions_taken : ''),
+          priority: isUnsafe ? 'high' : 'medium',
+          due_days: isUnsafe ? 1 : 7,
+          created_by: req.user.id
+        });
+      }
       res.json({ id: rows[0].id, message: 'MEWP inspection submitted' });
     } catch(e) { console.error('POST /api/mewp-inspection', e); res.status(500).json({ error: e.message }); }
   });
@@ -1055,6 +1139,107 @@ async function startApp() {
         [day14.toISOString().split('T')[0], day30.toISOString().split('T')[0]]);
 
       res.json({ expired, within14, within30 });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ═══════ ACTIONS ═══════
+  app.get('/api/actions', authenticate, async (req, res) => {
+    try {
+      const { status, overdue, mine } = req.query;
+      let sql = `SELECT a.*, c.full_name as created_by_name, x.full_name as completed_by_name, asg.full_name as assigned_to_name
+                 FROM inspection_actions a
+                 LEFT JOIN users c ON a.created_by = c.id
+                 LEFT JOIN users x ON a.completed_by = x.id
+                 LEFT JOIN users asg ON a.assigned_to = asg.id
+                 WHERE 1=1`;
+      const params = [];
+      if (status) { params.push(status); sql += ` AND a.status = $${params.length}`; }
+      if (overdue === 'true') { sql += ` AND a.status IN ('open','in_progress') AND a.due_date < CURRENT_DATE`; }
+      if (mine === 'true') { params.push(req.user.id); sql += ` AND (a.assigned_to = $${params.length} OR a.created_by = $${params.length})`; }
+      sql += ` ORDER BY CASE a.status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'completed' THEN 2 ELSE 3 END,
+               a.due_date ASC NULLS LAST,
+               CASE a.priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
+               a.created_at DESC`;
+      const { rows } = await pool.query(sql, params);
+      res.json(rows);
+    } catch(e) { console.error('GET /api/actions', e); res.status(500).json({ error: e.message }); }
+  });
+
+  app.get('/api/actions/counts', authenticate, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE status = 'open') AS open,
+          COUNT(*) FILTER (WHERE status = 'in_progress') AS in_progress,
+          COUNT(*) FILTER (WHERE status IN ('open','in_progress') AND due_date < CURRENT_DATE) AS overdue,
+          COUNT(*) FILTER (WHERE status = 'completed') AS completed
+        FROM inspection_actions`);
+      res.json(rows[0]);
+    } catch(e) { console.error('GET /api/actions/counts', e); res.status(500).json({ error: e.message }); }
+  });
+
+  app.get('/api/actions/:id', authenticate, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`SELECT a.*, c.full_name as created_by_name, x.full_name as completed_by_name, asg.full_name as assigned_to_name
+                 FROM inspection_actions a
+                 LEFT JOIN users c ON a.created_by = c.id
+                 LEFT JOIN users x ON a.completed_by = x.id
+                 LEFT JOIN users asg ON a.assigned_to = asg.id
+                 WHERE a.id = $1`, [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+      res.json(rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.patch('/api/actions/:id', authenticate, async (req, res) => {
+    try {
+      const d = req.body;
+      const fields = [];
+      const params = [];
+      const set = (col, val) => { params.push(val); fields.push(`${col} = $${params.length}`); };
+      if (d.status !== undefined) set('status', d.status);
+      if (d.completion_notes !== undefined) set('completion_notes', d.completion_notes);
+      if (d.completion_photos !== undefined) set('completion_photos', d.completion_photos);
+      if (d.due_date !== undefined) set('due_date', d.due_date || null);
+      if (d.priority !== undefined) set('priority', d.priority);
+      if (d.assigned_to !== undefined) set('assigned_to', d.assigned_to || null);
+      if (d.title !== undefined) set('title', d.title);
+      if (d.description !== undefined) set('description', d.description);
+      if (d.status === 'completed') {
+        set('completed_by', req.user.id);
+        fields.push(`completed_at = NOW()`);
+      } else if (d.status === 'open' || d.status === 'in_progress') {
+        fields.push(`completed_by = NULL, completed_at = NULL`);
+      }
+      fields.push(`updated_at = NOW()`);
+      if (fields.length === 1) return res.json({ success: true, noop: true });
+      params.push(req.params.id);
+      await pool.query(`UPDATE inspection_actions SET ${fields.join(', ')} WHERE id = $${params.length}`, params);
+      res.json({ success: true });
+    } catch(e) { console.error('PATCH /api/actions/:id', e); res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete('/api/actions/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      await pool.query('DELETE FROM inspection_actions WHERE id = $1', [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post('/api/actions', authenticate, adminOnly, async (req, res) => {
+    try {
+      const d = req.body;
+      if (!d.title || !d.title.trim()) return res.status(400).json({ error: 'Title required' });
+      const id = await createActionFromDefect({
+        source_type: 'manual', source_id: null,
+        title: d.title.trim(),
+        description: d.description || '',
+        priority: d.priority || 'medium',
+        due_days: d.due_days != null ? d.due_days : 7,
+        created_by: req.user.id
+      });
+      if (d.assigned_to) await pool.query('UPDATE inspection_actions SET assigned_to = $1 WHERE id = $2', [d.assigned_to, id]);
+      res.json({ id });
     } catch(e) { res.status(500).json({ error: e.message }); }
   });
 
