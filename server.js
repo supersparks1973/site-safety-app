@@ -316,6 +316,7 @@ async function startApp() {
 
   app.delete('/api/near-miss/:id', authenticate, adminOnly, async (req, res) => {
     try {
+      await pool.query("DELETE FROM inspection_actions WHERE source_type = 'near-miss' AND source_id = $1", [req.params.id]);
       await pool.query('DELETE FROM near_miss_reports WHERE id = $1', [req.params.id]);
       res.json({ success: true });
     } catch(e) { console.error('DELETE /api/near-miss/:id', e); res.status(500).json({ error: e.message }); }
@@ -424,6 +425,32 @@ async function startApp() {
       const { rows } = await pool.query('SELECT m.*, u.full_name as inspected_by FROM mewp_inspections m JOIN users u ON m.user_id = u.id WHERE m.user_id = $1 ORDER BY m.created_at DESC', [req.user.id]);
       res.json(rows);
     }
+  });
+
+  // Admin delete endpoints for equipment inspections
+  app.delete('/api/ladder-inspection/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      // Also remove any linked tracked actions so the dashboard isn't left with orphans
+      await pool.query("DELETE FROM inspection_actions WHERE source_type = 'ladder-inspection' AND source_id = $1", [req.params.id]);
+      await pool.query('DELETE FROM ladder_inspections WHERE id = $1', [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { console.error('DELETE /api/ladder-inspection', e); res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete('/api/tower-inspection/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      await pool.query("DELETE FROM inspection_actions WHERE source_type = 'tower-inspection' AND source_id = $1", [req.params.id]);
+      await pool.query('DELETE FROM tower_inspections WHERE id = $1', [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { console.error('DELETE /api/tower-inspection', e); res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete('/api/mewp-inspection/:id', authenticate, adminOnly, async (req, res) => {
+    try {
+      await pool.query("DELETE FROM inspection_actions WHERE source_type = 'mewp-inspection' AND source_id = $1", [req.params.id]);
+      await pool.query('DELETE FROM mewp_inspections WHERE id = $1', [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { console.error('DELETE /api/mewp-inspection', e); res.status(500).json({ error: e.message }); }
   });
 
   // ═══════ REPORT / INSPECTION WORD DOC DOWNLOADS ═══════

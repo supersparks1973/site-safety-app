@@ -1634,11 +1634,31 @@ window.showInspectionDetail = function(type, r) {
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
           <button class="btn btn-outline btn-sm" onclick="exportPDF('${type}', ${JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;')})">📄 PDF</button>
           <button class="btn btn-outline btn-sm" onclick="downloadDocx('${type}', ${r.id}, '${type}_Inspection_${(r.date||'').replace(/'/g, '')}')">📝 Word Doc</button>
+          ${(state.user.role === 'admin' || state.user.role === 'project_manager') ? `<button class="btn btn-sm" style="background:#dc2626;color:#fff;border:0" onclick="deleteInspection('${type}', ${r.id}, this)">🗑 Delete</button>` : ''}
           <button class="btn btn-outline btn-sm" onclick="this.closest('.modal-overlay').remove()">Close</button>
         </div>
       </div>
     </div>
   `);
+};
+
+// ═══════════════════════════════════════
+// DELETE INSPECTION (admin)
+// ═══════════════════════════════════════
+window.deleteInspection = async function(type, id, btn) {
+  const labels = { ladder: 'ladder', tower: 'tower', mewp: 'MEWP' };
+  const label = labels[type] || 'inspection';
+  if (!confirm(`Delete this ${label} inspection?\n\nThis also removes any linked tracked action. This cannot be undone.`)) return;
+  try {
+    const res = await fetch(`${API}/api/${type}-inspection/${id}`, { method: 'DELETE', headers: headers() });
+    if (!res.ok) throw new Error('Delete failed');
+    showToast('Inspection deleted');
+    // Close the modal if open, then refresh the current tab
+    const modal = btn && btn.closest ? btn.closest('.modal-overlay') : null;
+    if (modal) modal.remove();
+    if (typeof loadInspections === 'function') loadInspections(type);
+    if (typeof refreshActionsBadge === 'function') refreshActionsBadge();
+  } catch(e) { alert('Failed to delete: ' + e.message); }
 };
 
 // ═══════════════════════════════════════
