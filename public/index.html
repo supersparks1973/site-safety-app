@@ -4007,6 +4007,79 @@ window.deleteTraining = async function(id) {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
+
+// Show offline banner immediately (before login), not just after.
+if (typeof updateOnlineStatus === 'function') updateOnlineStatus();
+
+// PWA install prompt handling
+let _deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  showInstallBanner();
+});
+
+function showInstallBanner() {
+  if (localStorage.getItem('installBannerDismissed') === '1') return;
+  if (window.matchMedia('(display-mode: standalone)').matches) return; // already installed
+  if (document.getElementById('installBanner')) return;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isInStandaloneIOS = window.navigator && window.navigator.standalone === true;
+  if (isInStandaloneIOS) return;
+
+  // For non-iOS, only show if we have a deferred prompt event
+  if (!isIOS && !_deferredInstallPrompt) return;
+
+  const banner = document.createElement('div');
+  banner.id = 'installBanner';
+  banner.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;background:#1e293b;color:#fff;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 10px 30px rgba(0,0,0,.3);font-size:14px;max-width:520px;margin:0 auto';
+  banner.innerHTML = isIOS
+    ? `<div style="font-size:24px;flex-shrink:0">➕</div>
+       <div style="flex:1;line-height:1.4">
+         <div style="font-weight:600;margin-bottom:2px">Install Site Safety</div>
+         <div style="font-size:12px;opacity:.85">Tap <strong>Share</strong> then <strong>Add to Home Screen</strong> for quicker access on site.</div>
+       </div>
+       <button id="installBannerClose" style="background:transparent;border:0;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;line-height:1">×</button>`
+    : `<div style="font-size:24px;flex-shrink:0">➕</div>
+       <div style="flex:1;line-height:1.4">
+         <div style="font-weight:600;margin-bottom:2px">Install Site Safety</div>
+         <div style="font-size:12px;opacity:.85">Add to your home screen for quicker access on site.</div>
+       </div>
+       <button id="installBannerInstall" style="background:#8B1A1A;border:0;color:#fff;font-weight:600;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px">Install</button>
+       <button id="installBannerClose" style="background:transparent;border:0;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;line-height:1">×</button>`;
+  document.body.appendChild(banner);
+
+  const closeBtn = document.getElementById('installBannerClose');
+  if (closeBtn) closeBtn.addEventListener('click', () => {
+    localStorage.setItem('installBannerDismissed', '1');
+    banner.remove();
+  });
+  const installBtn = document.getElementById('installBannerInstall');
+  if (installBtn) installBtn.addEventListener('click', async () => {
+    if (!_deferredInstallPrompt) return;
+    _deferredInstallPrompt.prompt();
+    const choice = await _deferredInstallPrompt.userChoice;
+    _deferredInstallPrompt = null;
+    if (choice && choice.outcome === 'accepted') {
+      banner.remove();
+    } else {
+      // User dismissed — don't nag again this session
+      localStorage.setItem('installBannerDismissed', '1');
+      banner.remove();
+    }
+  });
+}
+
+// Show iOS install banner shortly after load if applicable (no event to wait for)
+window.addEventListener('load', () => {
+  setTimeout(showInstallBanner, 1500);
+});
+
+// If the app gets installed, hide the banner and remember
+window.addEventListener('appinstalled', () => {
+  localStorage.setItem('installBannerDismissed', '1');
+  const b = document.getElementById('installBanner'); if (b) b.remove();
+});
 </script>
 </body>
 </html>
