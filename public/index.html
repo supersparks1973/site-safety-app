@@ -350,6 +350,7 @@ body.read-only-mode .hide-readonly{display:none!important}
           <div class="sidebar-user-role" id="sidebarRole">operative</div>
         </div>
       </div>
+      <button id="sidebarInstallBtn" onclick="reopenInstallBanner()" style="background:transparent;color:#94a3b8;border:1px solid #475569;margin-bottom:8px;font-size:13px;display:none">📲 Install app</button>
       <button onclick="logout()">Sign Out</button>
     </div>
   </aside>
@@ -644,6 +645,7 @@ function showApp() {
   });
   updateSyncIndicator();
   updateOnlineStatus();
+  refreshInstallButton();
 }
 
 // Check stored token on load — verify it's still valid
@@ -4019,16 +4021,38 @@ window.addEventListener('beforeinstallprompt', (e) => {
   showInstallBanner();
 });
 
-function showInstallBanner() {
-  if (localStorage.getItem('installBannerDismissed') === '1') return;
+function reopenInstallBanner() {
+  // Clear dismissal and re-show the banner. If no install prompt event was captured
+  // (e.g. because of browser engagement heuristics), we still show the iOS-style
+  // "how to install" instructions panel as a fallback.
+  localStorage.removeItem('installBannerDismissed');
+  const existing = document.getElementById('installBanner');
+  if (existing) existing.remove();
+  // Force show — bypass the !isIOS && !_deferredInstallPrompt guard by faking a no-op prompt
+  // when nothing was captured. We add a 'force' arg.
+  showInstallBanner(true);
+}
+
+// Decide whether the sidebar 'Install app' button should be visible.
+function refreshInstallButton() {
+  const btn = document.getElementById('sidebarInstallBtn');
+  if (!btn) return;
+  if (window.matchMedia('(display-mode: standalone)').matches) { btn.style.display = 'none'; return; }
+  if (window.navigator && window.navigator.standalone === true) { btn.style.display = 'none'; return; }
+  btn.style.display = 'inline-block';
+}
+
+function showInstallBanner(force) {
+  if (!force && localStorage.getItem('installBannerDismissed') === '1') return;
   if (window.matchMedia('(display-mode: standalone)').matches) return; // already installed
   if (document.getElementById('installBanner')) return;
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   const isInStandaloneIOS = window.navigator && window.navigator.standalone === true;
   if (isInStandaloneIOS) return;
 
-  // For non-iOS, only show if we have a deferred prompt event
-  if (!isIOS && !_deferredInstallPrompt) return;
+  // For non-iOS without a deferred prompt: only show when forced (manual click).
+  // The auto-prompt path stays the same as before.
+  if (!isIOS && !_deferredInstallPrompt && !force) return;
 
   const banner = document.createElement('div');
   banner.id = 'installBanner';
@@ -4040,13 +4064,20 @@ function showInstallBanner() {
          <div style="font-size:12px;opacity:.85">Tap <strong>Share</strong> then <strong>Add to Home Screen</strong> for quicker access on site.</div>
        </div>
        <button id="installBannerClose" style="background:transparent;border:0;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;line-height:1">×</button>`
-    : `<div style="font-size:24px;flex-shrink:0">➕</div>
-       <div style="flex:1;line-height:1.4">
-         <div style="font-weight:600;margin-bottom:2px">Install Site Safety</div>
-         <div style="font-size:12px;opacity:.85">Add to your home screen for quicker access on site.</div>
-       </div>
-       <button id="installBannerInstall" style="background:#8B1A1A;border:0;color:#fff;font-weight:600;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px">Install</button>
-       <button id="installBannerClose" style="background:transparent;border:0;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;line-height:1">×</button>`;
+    : (_deferredInstallPrompt
+       ? `<div style="font-size:24px;flex-shrink:0">➕</div>
+          <div style="flex:1;line-height:1.4">
+            <div style="font-weight:600;margin-bottom:2px">Install Site Safety</div>
+            <div style="font-size:12px;opacity:.85">Add to your home screen for quicker access on site.</div>
+          </div>
+          <button id="installBannerInstall" style="background:#8B1A1A;border:0;color:#fff;font-weight:600;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px">Install</button>
+          <button id="installBannerClose" style="background:transparent;border:0;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;line-height:1">×</button>`
+       : `<div style="font-size:24px;flex-shrink:0">➕</div>
+          <div style="flex:1;line-height:1.4">
+            <div style="font-weight:600;margin-bottom:2px">Install Site Safety</div>
+            <div style="font-size:12px;opacity:.85">In your browser menu, look for <strong>Install Site Safety</strong> or <strong>Add to Home Screen</strong>.</div>
+          </div>
+          <button id="installBannerClose" style="background:transparent;border:0;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;line-height:1">×</button>`);
   document.body.appendChild(banner);
 
   const closeBtn = document.getElementById('installBannerClose');
@@ -4079,6 +4110,7 @@ window.addEventListener('load', () => {
 window.addEventListener('appinstalled', () => {
   localStorage.setItem('installBannerDismissed', '1');
   const b = document.getElementById('installBanner'); if (b) b.remove();
+  refreshInstallButton();
 });
 </script>
 </body>
