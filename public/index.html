@@ -792,6 +792,16 @@ function showApp() {
       });
       navigate('dashboard');
     } else {
+      if (state.user.role === 'project_manager') {
+        // Project Managers cannot access Users or Audit Log
+        const pmBlocked = ['users', 'audit-log'];
+        document.querySelectorAll('#sidebarAdminNav .sidebar-nav a[data-page]').forEach(a => {
+          if (pmBlocked.includes(a.dataset.page)) a.classList.add('disabled-link');
+        });
+        document.querySelectorAll('#adminNav button[data-page]').forEach(btn => {
+          if (pmBlocked.includes(btn.dataset.page)) btn.classList.add('disabled-link');
+        });
+      }
       navigate('dashboard');
     }
   } else {
@@ -909,6 +919,11 @@ function renderPage(page) {
     'p2p-test': renderP2PTestEditor,
   };
   if (pages[page]) {
+    // Project Managers cannot view Users or Audit Log
+    if (state.user && state.user.role === 'project_manager' && (page === 'users' || page === 'audit-log')) {
+      c.innerHTML = '<div class="card" style="text-align:center;padding:40px 20px"><div style="font-size:48px;margin-bottom:16px">🔒</div><h3>Access Restricted</h3><p style="color:var(--text-light);margin-top:8px">This section is only available to Admin users.</p></div>';
+      return;
+    }
     if (state.readOnly) {
       const allowedPages = ['dashboard', 'trends', 'reports', 'closed', 'inspections', 'actions', 'schedule', 'training', 'toolbox-talks'];
       if (!allowedPages.includes(page)) {

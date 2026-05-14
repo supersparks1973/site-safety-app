@@ -308,6 +308,13 @@ async function startApp() {
     next();
   }
 
+  // Stricter check for sensitive admin pages (User management, Audit log).
+  // Only role === 'admin' may access — project_manager and external_view are blocked.
+  function strictAdminOnly(req, res, next) {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+    next();
+  }
+
   app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
     const { rows } = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
@@ -323,12 +330,12 @@ async function startApp() {
     res.json(rows[0]);
   });
 
-  app.get('/api/users', authenticate, adminOnly, async (req, res) => {
+  app.get('/api/users', authenticate, strictAdminOnly, async (req, res) => {
     const { rows } = await pool.query('SELECT id, username, full_name, role, created_at FROM users ORDER BY created_at DESC');
     res.json(rows);
   });
 
-  app.post('/api/users', authenticate, adminOnly, async (req, res) => {
+  app.post('/api/users', authenticate, strictAdminOnly, async (req, res) => {
     const { username, password, full_name, role } = req.body;
     try {
       const hash = bcrypt.hashSync(password, 10);
@@ -338,7 +345,7 @@ async function startApp() {
     } catch (err) { res.status(400).json({ error: 'Username already exists' }); }
   });
 
-  app.delete('/api/users/:id', authenticate, adminOnly, async (req, res) => {
+  app.delete('/api/users/:id', authenticate, strictAdminOnly, async (req, res) => {
     await pool.query("DELETE FROM users WHERE id = $1 AND role NOT IN ('admin', 'project_manager')", [req.params.id]);
     logAudit(req, 'deleted', 'user', req.params.id, 'User deleted', null);
       res.json({ success: true });
@@ -1568,7 +1575,7 @@ async function startApp() {
   });
 
   // ═══════ AUDIT LOG ═══════
-  app.get('/api/audit-log', authenticate, adminOnly, async (req, res) => {
+  app.get('/api/audit-log', authenticate, strictAdminOnly, async (req, res) => {
     try {
       const { record_type, record_id, action, user_id, days } = req.query;
       const params = [];
