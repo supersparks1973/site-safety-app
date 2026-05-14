@@ -3969,7 +3969,8 @@ async function renderMyTraining(c) {
   c.innerHTML = '<h2 style="margin-bottom:16px;display:flex;align-items:center;gap:8px">🎓 My Training</h2><p>Loading...</p>';
   try {
     const records = await fetch(`${API}/api/training`, { headers: headers() }).then(r => r.json());
-    const myRecords = records.filter(r => r.user_id != null && Number(r.user_id) === Number(state.user.id));
+    // Server already filters by role for operatives (matches user_id OR external_name).
+    const myRecords = records;
     c.innerHTML = `
       <h2 style="margin-bottom:16px">🎓 My Training</h2>
       ${myRecords.length === 0 ? '<p style="color:var(--text-light)">No training records yet. Your admin will add your qualifications.</p>' :
