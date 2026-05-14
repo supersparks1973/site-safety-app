@@ -764,7 +764,7 @@ function showApp() {
   document.getElementById('userBadge').textContent = state.user.role;
 
   // Sidebar user info
-  const name = state.user.name || state.user.username || 'User';
+  const name = state.user.full_name || state.user.username || 'User';
   document.getElementById('sidebarName').textContent = name;
   const roleLabels = { admin: 'Admin', project_manager: 'Project Manager', external_view: 'Client', operative: 'Operative' };
   document.getElementById('sidebarRole').textContent = roleLabels[state.user.role] || state.user.role;
