@@ -470,7 +470,7 @@ function headers() {
 
 // Read-only banner for external_view users
 function readOnlyBanner() {
-  return state.readOnly ? '<div class="read-only-banner">🔒 <strong>View Only</strong> — You have read-only access for audit purposes. Data cannot be modified.</div>' : '';
+  return state.readOnly ? '<div class="read-only-banner">🔒 <strong>View Only</strong> — Client access is read-only. Data cannot be modified.</div>' : '';
 }
 
 // HTML escape helper
@@ -766,7 +766,7 @@ function showApp() {
   // Sidebar user info
   const name = state.user.name || state.user.username || 'User';
   document.getElementById('sidebarName').textContent = name;
-  const roleLabels = { admin: 'Admin', project_manager: 'Project Manager', external_view: 'External View', operative: 'Operative' };
+  const roleLabels = { admin: 'Admin', project_manager: 'Project Manager', external_view: 'Client', operative: 'Operative' };
   document.getElementById('sidebarRole').textContent = roleLabels[state.user.role] || state.user.role;
   document.getElementById('sidebarAvatar').textContent = name.charAt(0).toUpperCase();
 
@@ -934,7 +934,7 @@ function renderPage(page) {
     if (state.readOnly) {
       const allowedPages = ['dashboard', 'trends', 'reports', 'closed', 'inspections', 'actions', 'schedule', 'training', 'toolbox-talks'];
       if (!allowedPages.includes(page)) {
-        c.innerHTML = readOnlyBanner() + '<div class="card" style="text-align:center;padding:40px 20px"><div style="font-size:48px;margin-bottom:16px">🔒</div><h3>Access Restricted</h3><p style="color:var(--text-light);margin-top:8px">This section is not available with External View access.</p></div>';
+        c.innerHTML = readOnlyBanner() + '<div class="card" style="text-align:center;padding:40px 20px"><div style="font-size:48px;margin-bottom:16px">🔒</div><h3>Access Restricted</h3><p style="color:var(--text-light);margin-top:8px">This section is not available with Client access.</p></div>';
         return;
       }
       // Wrap content in a container with banner above
@@ -1790,7 +1790,7 @@ async function renderAdminUsers(c) {
         <div class="form-group"><label>Username</label><input type="text" id="newUsername" placeholder="e.g. jsmith" autocapitalize="none"></div>
         <div class="form-group"><label>Password</label><input type="password" id="newPassword" placeholder="Min 6 characters"></div>
         <div class="form-group"><label>Role</label>
-          <select id="newRole"><option value="operative">Operative</option><option value="project_manager">Project Manager</option><option value="external_view">External View (Audit)</option><option value="admin">Admin</option></select>
+          <select id="newRole"><option value="operative">Operative</option><option value="project_manager">Project Manager</option><option value="external_view">Client</option><option value="admin">Admin</option></select>
         </div>
         <button class="btn btn-primary btn-sm" onclick="addUser()">Add User</button>
       </div>
@@ -1799,7 +1799,7 @@ async function renderAdminUsers(c) {
         <div class="card">
           <div class="card-header">
             <h3>${u.full_name}</h3>
-            <span class="badge" style="background:${u.role==='admin'?'#fee2e2':u.role==='project_manager'?'#dbeafe':u.role==='external_view'?'#fef3c7':'#e2e8f0'};color:${u.role==='admin'?'#991b1b':u.role==='project_manager'?'#1e40af':u.role==='external_view'?'#92400e':'#475569'}">${{'project_manager':'Project Manager','external_view':'External View','admin':'Admin','operative':'Operative'}[u.role]||u.role}</span>
+            <span class="badge" style="background:${u.role==='admin'?'#fee2e2':u.role==='project_manager'?'#dbeafe':u.role==='external_view'?'#fef3c7':'#e2e8f0'};color:${u.role==='admin'?'#991b1b':u.role==='project_manager'?'#1e40af':u.role==='external_view'?'#92400e':'#475569'}">${{'project_manager':'Project Manager','external_view':'Client','admin':'Admin','operative':'Operative'}[u.role]||u.role}</span>
           </div>
           <div class="card-body">
             <p><strong>Username:</strong> ${u.username}</p>
