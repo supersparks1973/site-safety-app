@@ -330,7 +330,7 @@ async function startApp() {
     res.json(rows[0]);
   });
 
-  app.get('/api/users', authenticate, strictAdminOnly, async (req, res) => {
+  app.get('/api/users', authenticate, adminOnly, async (req, res) => {
     const { rows } = await pool.query('SELECT id, username, full_name, role, created_at FROM users ORDER BY created_at DESC');
     res.json(rows);
   });
