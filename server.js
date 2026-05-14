@@ -1141,8 +1141,15 @@ async function startApp() {
   });
 
   app.get('/api/training', authenticate, async (req, res) => {
-    const { rows } = await pool.query(`SELECT t.*, COALESCE(u.full_name, t.external_name, 'Unknown') as operative_name FROM training_records t LEFT JOIN users u ON t.user_id = u.id ORDER BY t.expiry_date ASC NULLS LAST`);
-    res.json(rows);
+    // Admin / PM / Client see every record (Training Matrix).
+    // Operatives only see records linked to their own user_id (My Training).
+    if (['admin', 'project_manager', 'external_view'].includes(req.user.role)) {
+      const { rows } = await pool.query(`SELECT t.*, COALESCE(u.full_name, t.external_name, 'Unknown') as operative_name FROM training_records t LEFT JOIN users u ON t.user_id = u.id ORDER BY t.expiry_date ASC NULLS LAST`);
+      res.json(rows);
+    } else {
+      const { rows } = await pool.query(`SELECT t.*, COALESCE(u.full_name, t.external_name, 'Unknown') as operative_name FROM training_records t LEFT JOIN users u ON t.user_id = u.id WHERE t.user_id = $1 ORDER BY t.expiry_date ASC NULLS LAST`, [req.user.id]);
+      res.json(rows);
+    }
   });
 
   app.delete('/api/training/:id', authenticate, adminOnly, async (req, res) => {
