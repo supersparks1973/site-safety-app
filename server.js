@@ -1147,16 +1147,19 @@ async function startApp() {
       const { rows } = await pool.query(`SELECT t.*, COALESCE(u.full_name, t.external_name, 'Unknown') as operative_name FROM training_records t LEFT JOIN users u ON t.user_id = u.id ORDER BY t.expiry_date ASC NULLS LAST`);
       res.json(rows);
     } else {
-      // Operatives: own user_id OR orphan records where external_name matches their name
-      // (covers historic records added via the admin's 'Type name below' option).
+      // Operatives: own user_id OR orphan records whose external_name matches the
+      // operative's full_name in the DB (subquery — don't rely on JWT freshness).
       const { rows } = await pool.query(
         `SELECT t.*, COALESCE(u.full_name, t.external_name, 'Unknown') as operative_name
            FROM training_records t
            LEFT JOIN users u ON t.user_id = u.id
           WHERE t.user_id = $1
-             OR (t.user_id IS NULL AND LOWER(TRIM(t.external_name)) = LOWER(TRIM($2)))
+             OR (
+               t.user_id IS NULL
+               AND LOWER(TRIM(t.external_name)) = (SELECT LOWER(TRIM(full_name)) FROM users WHERE id = $1)
+             )
           ORDER BY t.expiry_date ASC NULLS LAST`,
-        [req.user.id, req.user.full_name || '']
+        [req.user.id]
       );
       res.json(rows);
     }
