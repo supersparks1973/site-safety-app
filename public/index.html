@@ -779,6 +779,11 @@ function showApp() {
     document.getElementById('sidebarAdminNav').classList.remove('hidden');
     document.getElementById('sidebarOpNav').classList.add('hidden');
 
+    // Reset any role-specific visibility tweaks from a prior login in this tab
+    document.querySelectorAll('#sidebarAdminNav .sidebar-section').forEach(s => { s.style.display = ''; });
+    document.querySelectorAll('#sidebarAdminNav .sidebar-nav a[data-page]').forEach(a => { a.style.display = ''; a.classList.remove('disabled-link'); });
+    document.querySelectorAll('#adminNav button[data-page]').forEach(btn => { btn.style.display = ''; btn.classList.remove('disabled-link'); });
+
     if (state.readOnly) {
       // External View: only allow specific pages
       const allowedPages = ['dashboard', 'trends', 'reports', 'closed', 'inspections', 'actions', 'schedule', 'training', 'toolbox-talks'];
