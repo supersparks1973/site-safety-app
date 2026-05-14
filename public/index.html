@@ -793,13 +793,15 @@ function showApp() {
       navigate('dashboard');
     } else {
       if (state.user.role === 'project_manager') {
-        // Project Managers cannot access Users or Audit Log
-        const pmBlocked = ['users', 'audit-log'];
-        document.querySelectorAll('#sidebarAdminNav .sidebar-nav a[data-page]').forEach(a => {
-          if (pmBlocked.includes(a.dataset.page)) a.classList.add('disabled-link');
-        });
-        document.querySelectorAll('#adminNav button[data-page]').forEach(btn => {
-          if (pmBlocked.includes(btn.dataset.page)) btn.classList.add('disabled-link');
+        // Project Managers: hide the entire Admin section (Users + Audit Log)
+        const usersLink = document.querySelector('#sidebarAdminNav .sidebar-nav a[data-page="users"]');
+        if (usersLink) {
+          const section = usersLink.closest('.sidebar-section');
+          if (section) section.style.display = 'none';
+        }
+        // Also hide Users button in mobile bottom nav
+        document.querySelectorAll('#adminNav button[data-page="users"]').forEach(btn => {
+          btn.style.display = 'none';
         });
       }
       navigate('dashboard');
