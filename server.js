@@ -1170,6 +1170,67 @@ async function startApp() {
     res.json({ success: true });
   });
 
+  // Update an existing training record (admin only).
+  app.put('/api/training/:id', authenticate, adminOnly, async (req, res) => {
+    const d = req.body;
+    const userId = d.user_id && d.user_id !== 'null' && d.user_id !== '' ? d.user_id : null;
+    if (!d.category || !d.course_name) {
+      return res.status(400).json({ error: 'category and course_name are required' });
+    }
+    try {
+      const { rowCount } = await pool.query(
+        `UPDATE training_records
+         SET user_id = $1, external_name = $2, category = $3, course_name = $4,
+             provider = $5, card_number = $6, completion_date = $7, expiry_date = $8
+         WHERE id = $9`,
+        [userId, d.external_name || null, d.category, d.course_name,
+         d.provider || '', d.card_number || '', d.completion_date || null,
+         d.expiry_date || null, req.params.id]
+      );
+      if (rowCount === 0) return res.status(404).json({ error: 'Record not found' });
+      res.json({ success: true, message: 'Training record updated' });
+    } catch(e) {
+      console.error('PUT /api/training/:id', e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Rename a course across every training record (admin only).
+  // Body: { old_name, new_name }
+  app.put('/api/training/course/rename', authenticate, adminOnly, async (req, res) => {
+    const oldName = (req.body.old_name || '').trim();
+    const newName = (req.body.new_name || '').trim();
+    if (!oldName || !newName) return res.status(400).json({ error: 'old_name and new_name are required' });
+    if (oldName === newName) return res.json({ success: true, updated: 0 });
+    try {
+      const { rowCount } = await pool.query(
+        'UPDATE training_records SET course_name = $1 WHERE course_name = $2',
+        [newName, oldName]
+      );
+      res.json({ success: true, updated: rowCount });
+    } catch(e) {
+      console.error('PUT /api/training/course/rename', e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Delete every training record for a given course (admin only).
+  // The course name is URL-encoded in the path.
+  app.delete('/api/training/course/:name', authenticate, adminOnly, async (req, res) => {
+    const courseName = decodeURIComponent(req.params.name || '');
+    if (!courseName) return res.status(400).json({ error: 'course name required' });
+    try {
+      const { rowCount } = await pool.query(
+        'DELETE FROM training_records WHERE course_name = $1',
+        [courseName]
+      );
+      res.json({ success: true, deleted: rowCount });
+    } catch(e) {
+      console.error('DELETE /api/training/course/:name', e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // ═══════ EMAIL DIGEST ═══════
   async function sendDigest(period) {
     if (!transporter || !ADMIN_EMAIL) return;

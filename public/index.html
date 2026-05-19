@@ -4059,6 +4059,10 @@ async function renderAdminTraining(c) {
         <button onclick="showTrainingView('expiring',this)" style="color:var(--warning)">⚠️ Expiring</button>
       </div>
 
+      <div class="hide-readonly" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" style="width:auto" onclick="openManageCourses()">⚙️ Manage Courses</button>
+      </div>
+
       <div id="trainingList"></div>
     `;
     window._trainingRecords = records;
@@ -4138,7 +4142,10 @@ window.showTrainingView = function(view, btn) {
           <p>${r.completion_date ? `<strong>Completed:</strong> ${r.completion_date}` : ''}${r.completion_date && r.expiry_date ? ' &nbsp;|&nbsp; ' : ''}${r.expiry_date ? `<strong>Expires:</strong> ${r.expiry_date}` : ''}${!r.completion_date && !r.expiry_date ? '<em style="color:var(--text-light)">No dates recorded</em>' : ''}</p>
           ${r.card_number ? `<p><strong>Card/Cert:</strong> ${r.card_number}</p>` : ''}
         </div>
-        <button class="btn btn-outline btn-sm hide-readonly" style="margin-top:8px;color:var(--danger);border-color:var(--danger);width:auto" onclick="deleteTraining(${r.id})">Remove</button>
+        <div class="hide-readonly" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" style="width:auto" onclick="editTrainingRecord(${r.id})">✏️ Edit</button>
+          <button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger);width:auto" onclick="deleteTraining(${r.id})">Remove</button>
+        </div>
       </div>`;
   }).join('');
 };
@@ -4274,6 +4281,201 @@ window.deleteTraining = async function(id) {
   await fetch(`${API}/api/training/${id}`, { method: 'DELETE', headers: headers() });
   showToast('Record removed');
   renderAdminTraining(document.getElementById('appContent'));
+};
+
+// ── Edit a single training record (admin) ────────────────────────────────
+window.editTrainingRecord = function(id) {
+  const records = window._trainingRecords || [];
+  const users = window._trainingUsers || [];
+  const r = records.find(x => x.id === id);
+  if (!r) { showToast('Record not found', 'error'); return; }
+
+  const operatives = users.filter(u => u.role === 'operative');
+  const isLinked = r.user_id != null;
+  // Existing modal-overlay pattern is used elsewhere — see rescue plan modal.
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal-overlay" id="editTrainingModal" onclick="if(event.target===this)this.remove()">
+      <div class="modal" style="max-width:520px">
+        <h3 style="margin-bottom:16px">✏️ Edit Training Record</h3>
+        <div class="form-group"><label>Operative</label>
+          <select id="editTrainUser">
+            <option value="external" ${!isLinked ? 'selected' : ''}>— Type name below (not on system) —</option>
+            ${operatives.map(u => `<option value="${u.id}" ${String(u.id) === String(r.user_id) ? 'selected' : ''}>${esc(u.full_name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label>Operative Name (if not on system)</label>
+          <input type="text" id="editTrainExternalName" value="${esc(r.external_name || '')}" placeholder="e.g. John Smith (subcontractor)">
+        </div>
+        <div class="form-group"><label>Category</label>
+          <select id="editTrainCategory">
+            ${['Competency Card','Safety Training','Equipment Training','First Aid','Working at Height','Confined Space','Electrical','Mechanical','Other']
+              .map(opt => `<option ${r.category === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label>Course / Qualification Name</label>
+          <input type="text" id="editTrainCourse" value="${esc(r.course_name || '')}">
+        </div>
+        <div class="form-group"><label>Training Provider</label>
+          <input type="text" id="editTrainProvider" value="${esc(r.provider || '')}">
+        </div>
+        <div class="form-group"><label>Card / Certificate Number</label>
+          <input type="text" id="editTrainCardNo" value="${esc(r.card_number || '')}">
+        </div>
+        <div class="form-group"><label>Completion Date</label>
+          <input type="date" id="editTrainComplete" value="${esc(r.completion_date || '')}">
+        </div>
+        <div class="form-group"><label>Expiry Date</label>
+          <input type="date" id="editTrainExpiry" value="${esc(r.expiry_date || '')}">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+          <button class="btn btn-primary btn-sm" style="width:auto" onclick="saveEditedTraining(${r.id})">💾 Save Changes</button>
+          <button class="btn btn-outline btn-sm" style="width:auto" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `);
+};
+
+window.saveEditedTraining = async function(id) {
+  const userSelect = document.getElementById('editTrainUser').value;
+  const externalName = document.getElementById('editTrainExternalName').value.trim();
+  const category = document.getElementById('editTrainCategory').value;
+  const course_name = document.getElementById('editTrainCourse').value.trim();
+  const provider = document.getElementById('editTrainProvider').value.trim();
+  const card_number = document.getElementById('editTrainCardNo').value.trim();
+  const completion_date = document.getElementById('editTrainComplete').value;
+  const expiry_date = document.getElementById('editTrainExpiry').value;
+
+  if (!course_name) { showToast('Please enter a course name', 'error'); return; }
+
+  const isExternal = userSelect === 'external';
+  if (isExternal && !externalName) { showToast('Please enter the operative name', 'error'); return; }
+
+  const body = { category, course_name, provider, card_number, completion_date, expiry_date };
+  if (isExternal) {
+    body.user_id = null;
+    body.external_name = externalName;
+  } else {
+    body.user_id = userSelect;
+    body.external_name = null;
+  }
+
+  try {
+    const res = await fetch(`${API}/api/training/${id}`, {
+      method: 'PUT', headers: headers(),
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j.error || 'Save failed');
+    }
+    const modal = document.getElementById('editTrainingModal');
+    if (modal) modal.remove();
+    showToast('Training record updated');
+    renderAdminTraining(document.getElementById('appContent'));
+  } catch(e) {
+    showToast('Failed to save: ' + e.message, 'error');
+  }
+};
+
+// ── Manage Courses (admin): rename or delete an entire course ────────────
+window.openManageCourses = function() {
+  const records = window._trainingRecords || [];
+  if (records.length === 0) {
+    showToast('No courses to manage yet', 'error');
+    return;
+  }
+  // Build {courseName: count} map so the admin can see how many records each delete will affect.
+  const counts = {};
+  records.forEach(r => {
+    const name = r.course_name || '';
+    if (!name) return;
+    counts[name] = (counts[name] || 0) + 1;
+  });
+  const courseNames = Object.keys(counts).sort();
+
+  const rows = courseNames.map(name => `
+    <tr>
+      <td style="padding:8px;border-bottom:1px solid var(--border)">${esc(name)}</td>
+      <td style="padding:8px;border-bottom:1px solid var(--border);text-align:center;color:var(--text-light)">${counts[name]}</td>
+      <td style="padding:8px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap">
+        <button class="btn btn-outline btn-sm" style="width:auto;margin-right:4px" onclick="renameCourse(${JSON.stringify(name).replace(/"/g, '&quot;')})">✏️ Rename</button>
+        <button class="btn btn-outline btn-sm" style="width:auto;color:var(--danger);border-color:var(--danger)" onclick="deleteCourse(${JSON.stringify(name).replace(/"/g, '&quot;')})">🗑 Delete</button>
+      </td>
+    </tr>
+  `).join('');
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal-overlay" id="manageCoursesModal" onclick="if(event.target===this)this.remove()">
+      <div class="modal" style="max-width:640px">
+        <h3 style="margin-bottom:8px">⚙️ Manage Courses</h3>
+        <p style="color:var(--text-light);font-size:13px;margin-bottom:12px">Rename a course to fix typos across every record. Delete a course to remove all records for that qualification — this can't be undone.</p>
+        <div style="max-height:50vh;overflow:auto;border:1px solid var(--border);border-radius:8px">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead>
+              <tr style="background:var(--bg);position:sticky;top:0">
+                <th style="padding:8px;text-align:left;border-bottom:1px solid var(--border)">Course Name</th>
+                <th style="padding:8px;text-align:center;border-bottom:1px solid var(--border);width:80px">Records</th>
+                <th style="padding:8px;text-align:right;border-bottom:1px solid var(--border);width:200px">Actions</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+          <button class="btn btn-outline btn-sm" style="width:auto" onclick="this.closest('.modal-overlay').remove()">Close</button>
+        </div>
+      </div>
+    </div>
+  `);
+};
+
+window.renameCourse = async function(oldName) {
+  const newName = prompt(`Rename course "${oldName}" to:`, oldName);
+  if (newName === null) return;
+  const trimmed = newName.trim();
+  if (!trimmed) { showToast('Course name cannot be empty', 'error'); return; }
+  if (trimmed === oldName) return;
+  try {
+    const res = await fetch(`${API}/api/training/course/rename`, {
+      method: 'PUT', headers: headers(),
+      body: JSON.stringify({ old_name: oldName, new_name: trimmed })
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j.error || 'Rename failed');
+    }
+    const j = await res.json();
+    const modal = document.getElementById('manageCoursesModal');
+    if (modal) modal.remove();
+    showToast(`Renamed (${j.updated} record${j.updated === 1 ? '' : 's'} updated)`);
+    renderAdminTraining(document.getElementById('appContent'));
+  } catch(e) {
+    showToast('Rename failed: ' + e.message, 'error');
+  }
+};
+
+window.deleteCourse = async function(name) {
+  const records = window._trainingRecords || [];
+  const count = records.filter(r => r.course_name === name).length;
+  const msg = `Delete the course "${name}"? This will permanently remove ${count} record${count === 1 ? '' : 's'} across all operatives. This cannot be undone.`;
+  if (!confirm(msg)) return;
+  try {
+    const res = await fetch(`${API}/api/training/course/${encodeURIComponent(name)}`, {
+      method: 'DELETE', headers: headers()
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j.error || 'Delete failed');
+    }
+    const j = await res.json();
+    const modal = document.getElementById('manageCoursesModal');
+    if (modal) modal.remove();
+    showToast(`Deleted course (${j.deleted} record${j.deleted === 1 ? '' : 's'} removed)`);
+    renderAdminTraining(document.getElementById('appContent'));
+  } catch(e) {
+    showToast('Delete failed: ' + e.message, 'error');
+  }
 };
 
 
