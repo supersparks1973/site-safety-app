@@ -11,6 +11,7 @@ const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
         ShadingType, PageNumber, PageBreak, ImageRun } = require('docx');
 const PDFDocument = require('pdfkit');
 const compression = require('compression');
+const webpush = require('web-push');
 const QRCode = require('qrcode');
 
 
@@ -197,6 +198,46 @@ async function startApp() {
   )`);
   try { await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_record ON audit_log (record_type, record_id)`); } catch(e) { console.warn('Migration: idx_audit_record:', e.message); }
   try { await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log (created_at DESC)`); } catch(e) { console.warn('Migration: idx_audit_created:', e.message); }
+
+  // Generic key/value table for app-level secrets (currently: VAPID keys).
+  await pool.query(`CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // Per-device push subscriptions (Web Push API).
+  await pool.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_used TIMESTAMP
+  )`);
+  try { await pool.query(`CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions (user_id)`); } catch(e) { console.warn('Migration: idx_push_subs_user:', e.message); }
+
+  // Bootstrap VAPID keys — generate once and persist. Rotating invalidates
+  // every existing subscription, so we never rotate automatically.
+  let vapidPublicKey = null;
+  let vapidPrivateKey = null;
+  {
+    const { rows } = await pool.query("SELECT key, value FROM app_settings WHERE key IN ('vapid_public_key', 'vapid_private_key')");
+    const found = Object.fromEntries(rows.map(r => [r.key, r.value]));
+    if (found.vapid_public_key && found.vapid_private_key) {
+      vapidPublicKey  = found.vapid_public_key;
+      vapidPrivateKey = found.vapid_private_key;
+    } else {
+      const k = webpush.generateVAPIDKeys();
+      await pool.query("INSERT INTO app_settings (key, value) VALUES ('vapid_public_key', $1), ('vapid_private_key', $2) ON CONFLICT (key) DO NOTHING", [k.publicKey, k.privateKey]);
+      vapidPublicKey  = k.publicKey;
+      vapidPrivateKey = k.privateKey;
+      console.log('Generated and stored new VAPID keys.');
+    }
+    webpush.setVapidDetails('mailto:ian@manprojects.co.uk', vapidPublicKey, vapidPrivateKey);
+  }
 
   // Add signature column to existing tables if not present
   const migrateSig = async (table) => {
@@ -1294,6 +1335,89 @@ async function startApp() {
       lastWeeklyDigest = weekKey;
       sendDigest('weekly').catch(err => console.error('Weekly digest error:', err.message));
     }
+    // Daily push round-up at 8am
+    if (hour >= 8 && lastDailyPush !== todayKey) {
+      lastDailyPush = todayKey;
+      sendDailyPushSummary().catch(err => console.error('Daily push error:', err.message));
+    }
+  }
+
+  let lastDailyPush = null;
+
+  async function sendDailyPushSummary() {
+    const today = new Date().toISOString().split('T')[0];
+    const in14 = new Date(); in14.setDate(in14.getDate() + 14);
+    const in14Str = in14.toISOString().split('T')[0];
+    const sevenAgo = new Date(); sevenAgo.setDate(sevenAgo.getDate() - 7);
+    const sevenAgoStr = sevenAgo.toISOString().split('T')[0];
+
+    const { rows: admins } = await pool.query("SELECT id FROM users WHERE role IN ('admin','project_manager')");
+    const adminIds = admins.map(r => r.id);
+
+    // 1) Overdue inspections (>7d since last inspection per equipment ID).
+    const overdue = await pool.query(`
+      WITH last_inspect AS (
+        SELECT ladder_id AS eq_id, '🪜 Ladder' AS label, MAX(date) AS last_date
+          FROM ladder_inspections GROUP BY ladder_id
+        UNION ALL
+        SELECT tower_id, '🏗️ Tower', MAX(date) FROM tower_inspections GROUP BY tower_id
+        UNION ALL
+        SELECT mewp_id, '🔧 MEWP', MAX(date) FROM mewp_inspections GROUP BY mewp_id
+      )
+      SELECT eq_id, label, last_date FROM last_inspect WHERE last_date < $1
+    `, [sevenAgoStr]);
+
+    if (overdue.rows.length > 0 && adminIds.length > 0) {
+      const summary = overdue.rows.slice(0, 5).map(r => `${r.label} ${r.eq_id}`).join(', ');
+      const extra = overdue.rows.length > 5 ? ` +${overdue.rows.length - 5} more` : '';
+      await sendPushToUsers(adminIds, {
+        title: `⚠️ ${overdue.rows.length} inspection${overdue.rows.length === 1 ? '' : 's'} overdue`,
+        body:  summary + extra,
+        url:   '/',
+        tag:   'overdue-inspections'
+      }).catch(e => console.warn('push overdue-inspections failed:', e.message));
+    }
+
+    // 2) Training expiring in next 14 days — notify operative + admins.
+    const trainingSoon = await pool.query(`
+      SELECT t.id, t.course_name, t.expiry_date, t.user_id,
+             COALESCE(u.full_name, t.external_name, 'Unknown') AS who
+        FROM training_records t LEFT JOIN users u ON t.user_id = u.id
+       WHERE t.expiry_date IS NOT NULL
+         AND t.expiry_date >= $1 AND t.expiry_date <= $2
+    `, [today, in14Str]);
+    for (const r of trainingSoon.rows) {
+      const days = Math.ceil((new Date(r.expiry_date) - new Date(today)) / (1000*60*60*24));
+      const recipients = new Set(adminIds);
+      if (r.user_id) recipients.add(r.user_id);
+      await sendPushToUsers([...recipients], {
+        title: `🎓 ${r.course_name} expiring`,
+        body:  `${r.who} — expires in ${days} day${days === 1 ? '' : 's'} (${r.expiry_date})`,
+        url:   '/',
+        tag:   `training-${r.id}`
+      }).catch(e => console.warn('push training-soon failed:', e.message));
+    }
+
+    // 3) Actions due today or overdue — notify assignee + admins.
+    const actionsDue = await pool.query(`
+      SELECT id, title, due_date, assigned_to
+        FROM inspection_actions
+       WHERE status IN ('open','in_progress')
+         AND due_date IS NOT NULL
+         AND due_date <= $1
+    `, [today]);
+    for (const r of actionsDue.rows) {
+      const overdueDays = Math.ceil((new Date(today) - new Date(r.due_date)) / (1000*60*60*24));
+      const verb = overdueDays > 0 ? `overdue by ${overdueDays} day${overdueDays === 1 ? '' : 's'}` : 'due today';
+      const recipients = new Set(adminIds);
+      if (r.assigned_to) recipients.add(r.assigned_to);
+      await sendPushToUsers([...recipients], {
+        title: `🎯 Action ${verb}`,
+        body:  r.title,
+        url:   '/',
+        tag:   `action-${r.id}`
+      }).catch(e => console.warn('push action-due failed:', e.message));
+    }
   }
   // Check schedule every 30 minutes
   setInterval(checkDigestSchedule, 30 * 60 * 1000);
@@ -1635,6 +1759,84 @@ async function startApp() {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.send(html);
     } catch(e) { console.error('GET qr-sheet', e); res.status(500).send(e.message); }
+  });
+
+  // ═══════ PUSH NOTIFICATIONS ═══════
+
+  app.get('/api/push/public-key', authenticate, (req, res) => {
+    res.json({ key: vapidPublicKey });
+  });
+
+  app.post('/api/push/subscribe', authenticate, async (req, res) => {
+    try {
+      const { endpoint, keys } = req.body || {};
+      if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
+        return res.status(400).json({ error: 'Invalid subscription payload' });
+      }
+      const ua = (req.headers['user-agent'] || '').substring(0, 250);
+      await pool.query(
+        `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent, last_used)
+         VALUES ($1, $2, $3, $4, $5, NOW())
+         ON CONFLICT (endpoint) DO UPDATE
+           SET user_id = EXCLUDED.user_id,
+               p256dh  = EXCLUDED.p256dh,
+               auth    = EXCLUDED.auth,
+               user_agent = EXCLUDED.user_agent,
+               last_used = NOW()`,
+        [req.user.id, endpoint, keys.p256dh, keys.auth, ua]
+      );
+      res.json({ ok: true });
+    } catch(e) { console.error('POST /api/push/subscribe', e); res.status(500).json({ error: e.message }); }
+  });
+
+  app.post('/api/push/unsubscribe', authenticate, async (req, res) => {
+    try {
+      const { endpoint } = req.body || {};
+      if (!endpoint) return res.status(400).json({ error: 'endpoint required' });
+      await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1 AND user_id = $2', [endpoint, req.user.id]);
+      res.json({ ok: true });
+    } catch(e) { console.error('POST /api/push/unsubscribe', e); res.status(500).json({ error: e.message }); }
+  });
+
+  // Send a push payload { title, body, url?, tag? } to every subscription
+  // belonging to any of the given user_ids. 404/410 subs are auto-pruned.
+  async function sendPushToUsers(userIds, payload) {
+    if (!Array.isArray(userIds) || userIds.length === 0) return 0;
+    const { rows } = await pool.query(
+      'SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ANY($1::int[])',
+      [userIds]
+    );
+    const json = JSON.stringify(payload);
+    let sent = 0;
+    await Promise.all(rows.map(async (s) => {
+      try {
+        await webpush.sendNotification(
+          { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+          json
+        );
+        sent++;
+        pool.query('UPDATE push_subscriptions SET last_used = NOW() WHERE id = $1', [s.id]).catch(() => {});
+      } catch(err) {
+        if (err && (err.statusCode === 404 || err.statusCode === 410)) {
+          await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [s.id]).catch(() => {});
+        } else {
+          console.warn('Push send failed:', err && err.statusCode, err && err.body && String(err.body).substring(0, 200));
+        }
+      }
+    }));
+    return sent;
+  }
+
+  // Test push — sends to the requesting user's own devices.
+  app.post('/api/push/test', authenticate, async (req, res) => {
+    try {
+      const sent = await sendPushToUsers([req.user.id], {
+        title: '🔔 ManProjects test',
+        body:  'Push notifications are working on this device.',
+        url:   '/'
+      });
+      res.json({ ok: true, delivered_to_devices: sent });
+    } catch(e) { console.error('POST /api/push/test', e); res.status(500).json({ error: e.message }); }
   });
 
   // ═══════ AUDIT LOG ═══════

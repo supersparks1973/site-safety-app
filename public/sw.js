@@ -1,4 +1,4 @@
-const CACHE_NAME = 'site-safety-v8';
+const CACHE_NAME = 'site-safety-v9';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -43,4 +43,38 @@ self.addEventListener('fetch', (event) => {
       })
       .catch(() => caches.match(event.request).then((r) => r || caches.match('/')))
   );
+});
+
+// ═══════ Push notifications ═══════
+self.addEventListener('push', (event) => {
+  let data = {};
+  if (event.data) {
+    try { data = event.data.json(); }
+    catch { data = { title: 'ManProjects', body: event.data.text() }; }
+  }
+  const title = data.title || 'ManProjects';
+  const options = {
+    body: data.body || '',
+    icon: '/logo.png',
+    badge: '/logo.png',
+    data: { url: data.url || '/' },
+    tag: data.tag || undefined,
+    renotify: !!data.tag,
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil((async () => {
+    const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of list) {
+      if ('focus' in c) {
+        c.postMessage({ type: 'navigate', url });
+        return c.focus();
+      }
+    }
+    if (self.clients.openWindow) return self.clients.openWindow(url);
+  })());
 });

@@ -408,6 +408,8 @@ body.read-only-mode .hide-readonly{display:none!important}
           <div class="sidebar-user-role" id="sidebarRole">operative</div>
         </div>
       </div>
+      <button id="sidebarNotifBtn" onclick="toggleNotifications()" style="background:transparent;color:#94a3b8;border:1px solid #475569;margin-bottom:8px;font-size:13px">🔔 Notifications: off</button>
+      <button id="sidebarTestNotifBtn" onclick="sendTestNotification()" style="display:none;background:transparent;color:#94a3b8;border:1px solid #475569;margin-bottom:8px;font-size:13px">🔔 Send test</button>
       <button id="sidebarInstallBtn" onclick="reopenInstallBanner()" style="background:transparent;color:#94a3b8;border:1px solid #475569;margin-bottom:8px;font-size:13px">📲 Install app</button>
       <button onclick="logout()">Sign Out</button>
     </div>
@@ -835,6 +837,106 @@ function showApp() {
   refreshInstallButton();
   // QR-code deep-link: if /index.html?inspect=X&id=Y captured a target, jump there now.
   applyDeepLinkIfAny();
+  refreshNotifButton();
+}
+
+// ═══════════════════════════════════════
+// PUSH NOTIFICATIONS
+// ═══════════════════════════════════════
+async function refreshNotifButton() {
+  const btn = document.getElementById('sidebarNotifBtn');
+  const testBtn = document.getElementById('sidebarTestNotifBtn');
+  if (!btn) return;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    btn.textContent = '🔔 Notifications: not supported';
+    btn.disabled = true;
+    btn.style.opacity = 0.5;
+    return;
+  }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    const enabled = !!sub && Notification.permission === 'granted';
+    btn.textContent = enabled ? '🔔 Notifications: on' : '🔔 Notifications: off';
+    if (testBtn) testBtn.style.display = (enabled && state.user && state.user.role === 'admin') ? '' : 'none';
+  } catch(e) { console.warn('refreshNotifButton:', e); }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+window.toggleNotifications = async function() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    showToast('Notifications not supported on this device', 'error');
+    return;
+  }
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (sub) {
+    try {
+      const endpoint = sub.endpoint;
+      await sub.unsubscribe();
+      await fetch(`${API}/api/push/unsubscribe`, {
+        method: 'POST',
+        headers: { ...headers(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint })
+      }).catch(() => {});
+      showToast('Notifications disabled');
+    } catch(e) { showToast('Failed to disable: ' + (e.message || 'unknown'), 'error'); }
+  } else {
+    if (Notification.permission === 'denied') {
+      showToast('Notifications blocked in browser settings. Allow them and try again.', 'error');
+      return;
+    }
+    try {
+      if (Notification.permission !== 'granted') {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') { showToast('Permission was not granted', 'error'); return; }
+      }
+      const keyRes = await fetch(`${API}/api/push/public-key`, { headers: headers() }).then(r => r.json());
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyRes.key)
+      });
+      const json = sub.toJSON();
+      const res = await fetch(`${API}/api/push/subscribe`, {
+        method: 'POST',
+        headers: { ...headers(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys })
+      });
+      if (!res.ok) throw new Error('Server rejected subscription');
+      showToast('Notifications enabled');
+    } catch(e) {
+      console.error(e);
+      showToast('Failed to enable: ' + (e.message || 'unknown'), 'error');
+    }
+  }
+  refreshNotifButton();
+};
+
+window.sendTestNotification = async function() {
+  try {
+    const res = await fetch(`${API}/api/push/test`, { method: 'POST', headers: headers() });
+    const body = await res.json().catch(() => ({}));
+    if (res.ok) showToast(`Test sent to ${body.delivered_to_devices || 0} device(s)`);
+    else throw new Error(body.error || 'failed');
+  } catch(e) { showToast('Test failed: ' + (e.message || 'unknown'), 'error'); }
+};
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    const m = e.data || {};
+    if (m.type === 'navigate' && m.url) {
+      try { history.pushState(null, '', m.url); } catch {}
+      if (m.url.includes('?inspect=')) location.reload();
+    }
+  });
 }
 
 // QR deep-link: ?inspect=ladder&id=LDR-007 — captured at load and applied after auth.
