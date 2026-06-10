@@ -1661,139 +1661,189 @@ window.deleteReport = async function(id) {
 // ═══════════════════════════════════════
 // ADMIN: INSPECTIONS
 // ═══════════════════════════════════════
+// All inspections, flat — for the table view.
+window._inspAll = [];
+window._inspFilters = { q: '', type: 'all', status: 'all', from: '', to: '', sort: 'date_desc' };
+
 async function renderAdminInspections(c) {
   c.innerHTML = `
-    <h2 style="margin-bottom:16px">📋 Inspections</h2>
-    <input type="search" id="inspSearch" placeholder="🔎 Filter by operative, ID or location…" oninput="filterInspectionTree(this.value)" style="width:100%;max-width:480px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:16px;font-size:14px">
+    <h2 style="margin-bottom:12px">📋 Inspections</h2>
+
+    <!-- Filter bar -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <input type="search" id="inspSearch" placeholder="🔎 Operative, equipment ID or location…" oninput="setInspFilter('q', this.value)" style="flex:1;min-width:220px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px">
+
+      <div id="inspTypeChips" class="insp-chip-group" style="display:flex;gap:4px"></div>
+      <div id="inspStatusChips" class="insp-chip-group" style="display:flex;gap:4px"></div>
+
+      <div style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text-light)">
+        <span>From</span><input type="date" id="inspFrom" onchange="setInspFilter('from', this.value)" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+        <span>To</span><input type="date" id="inspTo" onchange="setInspFilter('to', this.value)" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+      </div>
+
+      <button class="btn btn-outline btn-sm" onclick="resetInspFilters()" style="padding:6px 12px;font-size:12px">Reset</button>
+    </div>
+
+    <div id="inspSummary" style="font-size:12px;color:var(--text-light);margin-bottom:8px"></div>
     <div id="inspectionList">Loading…</div>
   `;
-  loadInspectionsGrouped();
+  renderInspectionChips();
+  loadInspections();
 }
 
-// Holds the most recently loaded list so the search filter can re-render quickly.
-window._inspByOperative = null;
+function renderInspectionChips() {
+  const chip = (group, val, label, current) => {
+    const active = current === val;
+    return `<button onclick="setInspFilter('${group}', '${val}')" style="padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid ${active ? 'var(--primary)' : 'var(--border)'};background:${active ? 'var(--primary)' : '#fff'};color:${active ? '#fff' : 'var(--text)'};cursor:pointer">${label}</button>`;
+  };
+  const t = window._inspFilters.type;
+  document.getElementById('inspTypeChips').innerHTML = [
+    chip('type', 'all',    'All types',  t),
+    chip('type', 'ladder', '🪜 Ladder',  t),
+    chip('type', 'tower',  '🏗️ Tower',  t),
+    chip('type', 'mewp',   '🔧 MEWP',    t),
+  ].join('');
+  const s = window._inspFilters.status;
+  document.getElementById('inspStatusChips').innerHTML = [
+    chip('status', 'all',    'All',         s),
+    chip('status', 'safe',   '✓ Safe',      s),
+    chip('status', 'unsafe', '⚠ UNSAFE',    s),
+  ].join('');
+}
 
-async function loadInspectionsGrouped() {
+window.setInspFilter = function(key, value) {
+  window._inspFilters[key] = value;
+  renderInspectionChips();
+  applyInspectionFilters();
+};
+
+window.resetInspFilters = function() {
+  window._inspFilters = { q: '', type: 'all', status: 'all', from: '', to: '', sort: 'date_desc' };
+  document.getElementById('inspSearch').value = '';
+  document.getElementById('inspFrom').value = '';
+  document.getElementById('inspTo').value = '';
+  renderInspectionChips();
+  applyInspectionFilters();
+};
+
+// Called by deleteInspection() to refresh after a delete.
+window.loadInspections = async function() {
   const list = document.getElementById('inspectionList');
+  if (!list) return;
   try {
     const [ladder, tower, mewp] = await Promise.all([
       fetch(`${API}/api/ladder-inspection`, { headers: headers() }).then(r => r.json()),
-      fetch(`${API}/api/tower-inspection`, { headers: headers() }).then(r => r.json()),
+      fetch(`${API}/api/tower-inspection`,  { headers: headers() }).then(r => r.json()),
       fetch(`${API}/api/mewp-inspection`,   { headers: headers() }).then(r => r.json()),
     ]);
-    const all = [
+    window._inspAll = [
       ...ladder.map(r => ({ ...r, _type: 'ladder' })),
       ...tower.map(r  => ({ ...r, _type: 'tower'  })),
       ...mewp.map(r   => ({ ...r, _type: 'mewp'   })),
     ];
-    if (all.length === 0) {
-      list.innerHTML = '<p style="color:var(--text-light)">No inspections yet.</p>';
-      return;
-    }
-    // Group: operative → type → YYYY-MM
-    const byOp = {};
-    all.forEach(r => {
-      const op = (r.inspected_by || 'Unknown').trim();
-      const month = (r.date || '').substring(0, 7) || 'Undated';
-      byOp[op] = byOp[op] || {};
-      byOp[op][r._type] = byOp[op][r._type] || {};
-      byOp[op][r._type][month] = byOp[op][r._type][month] || [];
-      byOp[op][r._type][month].push(r);
-    });
-    window._inspByOperative = byOp;
-    renderInspectionTree(byOp);
-  } catch(e) { console.error(e); list.innerHTML = '<p>Failed to load inspections</p>'; }
-}
+    applyInspectionFilters();
+  } catch(e) {
+    console.error(e);
+    list.innerHTML = '<p>Failed to load inspections</p>';
+  }
+};
 
-function renderInspectionTree(byOp) {
+function applyInspectionFilters() {
   const list = document.getElementById('inspectionList');
+  const summary = document.getElementById('inspSummary');
+  if (!list) return;
+  const f = window._inspFilters;
+  const all = window._inspAll || [];
+  const term = (f.q || '').trim().toLowerCase();
+
+  let rows = all.filter(r => {
+    if (f.type !== 'all' && r._type !== f.type) return false;
+    if (f.status === 'safe'   && r.safe_to_use !== 'Yes') return false;
+    if (f.status === 'unsafe' && r.safe_to_use === 'Yes') return false;
+    if (f.from && (r.date || '') < f.from) return false;
+    if (f.to   && (r.date || '') > f.to)   return false;
+    if (term) {
+      const blob = [(r.inspected_by||''), (r.location||''), (r.ladder_id||''), (r.tower_id||''), (r.mewp_id||''), (r.defects_found||'')].join(' ').toLowerCase();
+      if (!blob.includes(term)) return false;
+    }
+    return true;
+  });
+
+  // Sort by date desc by default. Header clicks can re-sort.
+  const [sortKey, sortDir] = (f.sort || 'date_desc').split('_');
+  rows.sort((a, b) => {
+    const av = (a[sortKey === 'equipment' ? 'mewp_id' : sortKey] || a.ladder_id || a.tower_id || a.mewp_id || '');
+    const bv = (b[sortKey === 'equipment' ? 'mewp_id' : sortKey] || b.ladder_id || b.tower_id || b.mewp_id || '');
+    const av2 = sortKey === 'equipment' ? (a.ladder_id || a.tower_id || a.mewp_id || '') : (a[sortKey] || '');
+    const bv2 = sortKey === 'equipment' ? (b.ladder_id || b.tower_id || b.mewp_id || '') : (b[sortKey] || '');
+    const cmp = String(av2).localeCompare(String(bv2), undefined, { numeric: true });
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  summary.textContent = `Showing ${rows.length} of ${all.length} ${all.length === 1 ? 'inspection' : 'inspections'}`;
+
+  if (rows.length === 0) {
+    list.innerHTML = '<div class="card" style="text-align:center;padding:30px;color:var(--text-light)">No inspections match the current filters.</div>';
+    return;
+  }
+
   const typeMeta = {
     ladder: { icon: '🪜', label: 'Ladder' },
     tower:  { icon: '🏗️', label: 'Tower'  },
     mewp:   { icon: '🔧', label: 'MEWP'   },
   };
-  const typeOrder = ['ladder', 'tower', 'mewp'];
-  const monthLabel = (ym) => {
-    if (ym === 'Undated') return 'Undated';
-    const [y, m] = ym.split('-');
-    const names = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    return `${names[parseInt(m,10)-1] || m} ${y}`;
-  };
-  const cardHtml = (r) => {
-    const safe = r.safe_to_use === 'Yes';
-    const id_field = r.ladder_id || r.tower_id || r.mewp_id;
-    const payload = JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-    return `
-      <div class="card" style="margin:8px 0" onclick="showInspectionDetail('${r._type}', ${payload})">
-        <div class="card-header">
-          <h3>${esc(id_field || '')} — ${esc(r.location || '')}</h3>
-          <span class="badge ${safe ? 'badge-safe' : 'badge-unsafe'}">${safe ? 'Safe' : 'UNSAFE'}</span>
-        </div>
-        <div class="card-body">
-          <p><strong>Date:</strong> ${esc(r.date || '—')}</p>
-          ${r.defects_found ? `<p style="color:var(--danger)"><strong>Defects:</strong> ${esc(String(r.defects_found).substring(0,100))}</p>` : ''}
-        </div>
-      </div>`;
-  };
-  const ops = Object.keys(byOp).sort((a,b) => a.localeCompare(b));
-  list.innerHTML = ops.map(op => {
-    const types = byOp[op];
-    const opCount = Object.values(types).reduce((s, monthsObj) => s + Object.values(monthsObj).reduce((a,b)=>a+b.length,0), 0);
-    return `
-      <details class="insp-folder" data-op="${esc(op.toLowerCase())}" style="background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden">
-        <summary style="padding:14px 16px;cursor:pointer;font-weight:700;font-size:15px;display:flex;justify-content:space-between;align-items:center;background:#F8FAFC">
-          <span>👤 ${esc(op)}</span>
-          <span style="font-size:12px;color:var(--text-light);font-weight:600">${opCount} ${opCount === 1 ? 'inspection' : 'inspections'}</span>
-        </summary>
-        <div style="padding:8px 14px 14px">
-          ${typeOrder.filter(t => types[t]).map(t => {
-            const months = types[t];
-            const typeCount = Object.values(months).reduce((a,b)=>a+b.length,0);
-            const monthKeys = Object.keys(months).sort((a,b) => b.localeCompare(a));
+  const sortIndicator = (k) => sortKey === k ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
+  const th = (k, label, align='left') => `<th onclick="sortInspections('${k}')" style="padding:10px 12px;text-align:${align};font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-light);font-weight:700;cursor:pointer;user-select:none;background:#f8fafc;border-bottom:1px solid var(--border);position:sticky;top:0">${label}${sortIndicator(k)}</th>`;
+
+  list.innerHTML = `
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:auto;box-shadow:var(--shadow)">
+      <table style="width:100%;border-collapse:collapse;min-width:760px">
+        <thead>
+          <tr>
+            ${th('_type', 'Type')}
+            ${th('equipment', 'Equipment')}
+            ${th('location', 'Location')}
+            ${th('inspected_by', 'Operative')}
+            ${th('date', 'Date')}
+            ${th('safe_to_use', 'Status', 'center')}
+            <th style="padding:10px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-light);font-weight:700;background:#f8fafc;border-bottom:1px solid var(--border)">Defects</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => {
+            const safe = r.safe_to_use === 'Yes';
+            const equipId = r.ladder_id || r.tower_id || r.mewp_id || '—';
+            const m = typeMeta[r._type] || { icon: '', label: r._type };
+            const payload = JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const defectPreview = r.defects_found ? esc(String(r.defects_found).substring(0, 60)) + (String(r.defects_found).length > 60 ? '…' : '') : '<span style="color:var(--text-light)">—</span>';
             return `
-              <details class="insp-folder-type" data-type="${t}" style="margin:6px 0;border-left:3px solid var(--primary);padding-left:10px">
-                <summary style="padding:8px 4px;cursor:pointer;font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:center">
-                  <span>${typeMeta[t].icon} ${typeMeta[t].label}</span>
-                  <span style="font-size:11px;color:var(--text-light);font-weight:600">${typeCount}</span>
-                </summary>
-                <div style="padding:4px 0 4px 8px">
-                  ${monthKeys.map(ym => `
-                    <details class="insp-folder-month" style="margin:4px 0">
-                      <summary style="padding:6px 4px;cursor:pointer;font-size:13px;color:var(--text);display:flex;justify-content:space-between;align-items:center">
-                        <span>📅 ${monthLabel(ym)}</span>
-                        <span style="font-size:11px;color:var(--text-light)">${months[ym].length}</span>
-                      </summary>
-                      <div style="padding:4px 0 4px 4px">
-                        ${months[ym].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(cardHtml).join('')}
-                      </div>
-                    </details>
-                  `).join('')}
-                </div>
-              </details>`;
+              <tr onclick="showInspectionDetail('${r._type}', ${payload})" style="cursor:pointer;border-bottom:1px solid #f1f5f9;background:${safe ? '#fff' : '#fef2f2'}" onmouseover="this.style.background='${safe ? '#f8fafc' : '#fee2e2'}'" onmouseout="this.style.background='${safe ? '#fff' : '#fef2f2'}'">
+                <td style="padding:10px 12px;font-size:13px;white-space:nowrap"><span style="margin-right:4px">${m.icon}</span>${m.label}</td>
+                <td style="padding:10px 12px;font-size:13px;font-weight:600">${esc(equipId)}</td>
+                <td style="padding:10px 12px;font-size:13px;color:var(--text-light)">${esc(r.location || '—')}</td>
+                <td style="padding:10px 12px;font-size:13px">${esc(r.inspected_by || '—')}</td>
+                <td style="padding:10px 12px;font-size:13px;color:var(--text-light);white-space:nowrap">${esc(r.date || '—')}</td>
+                <td style="padding:10px 12px;text-align:center;white-space:nowrap"><span class="badge ${safe ? 'badge-safe' : 'badge-unsafe'}" style="font-size:11px">${safe ? '✓ Safe' : '⚠ UNSAFE'}</span></td>
+                <td style="padding:10px 12px;font-size:12px;color:#991b1b;max-width:260px">${defectPreview}</td>
+              </tr>`;
           }).join('')}
-        </div>
-      </details>`;
-  }).join('');
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
-window.filterInspectionTree = function(q) {
-  const term = (q || '').trim().toLowerCase();
-  document.querySelectorAll('.insp-folder').forEach(opEl => {
-    const opName = opEl.dataset.op || '';
-    let anyVisible = false;
-    opEl.querySelectorAll('.card').forEach(card => {
-      const text = card.textContent.toLowerCase();
-      const match = !term || opName.includes(term) || text.includes(term);
-      card.style.display = match ? '' : 'none';
-      if (match) anyVisible = true;
-    });
-    opEl.style.display = anyVisible ? '' : 'none';
-    if (term && anyVisible) opEl.setAttribute('open', '');
-  });
+window.sortInspections = function(key) {
+  const f = window._inspFilters;
+  const [curKey, curDir] = (f.sort || 'date_desc').split('_');
+  if (curKey === key) {
+    f.sort = `${key}_${curDir === 'asc' ? 'desc' : 'asc'}`;
+  } else {
+    // sensible default direction per column
+    f.sort = (key === 'date') ? 'date_desc' : `${key}_asc`;
+  }
+  applyInspectionFilters();
 };
-
-// Back-compat shim: deletes used to call loadInspections(type) to refresh.
-window.loadInspections = function() { loadInspectionsGrouped(); };
 
 window.showInspectionDetail = function(type, r) {
   if (typeof r === 'string') r = JSON.parse(r);
