@@ -1564,13 +1564,13 @@ async function renderAdminReports(c) {
       reports.map(r => `
         <div class="card" onclick="showReportDetail(${r.id})" style="cursor:pointer">
           <div class="card-header">
-            <h3>#${r.id} — ${r.location}</h3>
-            <span class="badge badge-${r.status}">${r.status}</span>
+            <h3>#${r.id} — ${esc(r.location || '')}</h3>
+            <span class="badge badge-${esc(r.status || '')}">${esc(r.status || '')}</span>
           </div>
           <div class="card-body">
-            <p><strong>Reported by:</strong> ${r.reported_by} &nbsp;|&nbsp; <strong>Date:</strong> ${r.date} ${r.time}</p>
-            <p><strong>Severity:</strong> <span style="color:${r.potential_severity==='Critical'?'var(--danger)':r.potential_severity==='High'?'var(--warning)':'inherit'}">${r.potential_severity}</span></p>
-            <p>${r.description.substring(0, 120)}${r.description.length > 120 ? '...' : ''}</p>
+            <p><strong>Reported by:</strong> ${esc(r.reported_by || '—')} &nbsp;|&nbsp; <strong>Date:</strong> ${esc(r.date || '')} ${esc(r.time || '')}</p>
+            <p><strong>Severity:</strong> <span style="color:${r.potential_severity==='Critical'?'var(--danger)':r.potential_severity==='High'?'var(--warning)':'inherit'}">${esc(r.potential_severity || '')}</span></p>
+            <p>${esc(String(r.description || '').substring(0, 120))}${(r.description || '').length > 120 ? '...' : ''}</p>
           </div>
         </div>
       `).join(''));
@@ -1590,14 +1590,14 @@ async function renderClosedReports(c) {
       reports.map(r => `
         <div class="card" onclick="showReportDetail(${r.id})" style="cursor:pointer">
           <div class="card-header">
-            <h3>#${r.id} — ${r.location}</h3>
+            <h3>#${r.id} — ${esc(r.location || '')}</h3>
             <span class="badge badge-closed">closed</span>
           </div>
           <div class="card-body">
-            <p><strong>Reported by:</strong> ${r.reported_by} &nbsp;|&nbsp; <strong>Date:</strong> ${r.date} ${r.time}</p>
-            <p><strong>Severity:</strong> <span style="color:${r.potential_severity==='Critical'?'var(--danger)':r.potential_severity==='High'?'var(--warning)':'inherit'}">${r.potential_severity}</span></p>
-            <p>${r.description.substring(0, 120)}${r.description.length > 120 ? '...' : ''}</p>
-            ${r.admin_notes ? `<p style="margin-top:6px;padding:8px;background:#f0fdf4;border-radius:6px;font-size:13px"><strong>Admin Notes:</strong> ${r.admin_notes}</p>` : ''}
+            <p><strong>Reported by:</strong> ${esc(r.reported_by || '—')} &nbsp;|&nbsp; <strong>Date:</strong> ${esc(r.date || '')} ${esc(r.time || '')}</p>
+            <p><strong>Severity:</strong> <span style="color:${r.potential_severity==='Critical'?'var(--danger)':r.potential_severity==='High'?'var(--warning)':'inherit'}">${esc(r.potential_severity || '')}</span></p>
+            <p>${esc(String(r.description || '').substring(0, 120))}${(r.description || '').length > 120 ? '...' : ''}</p>
+            ${r.admin_notes ? `<p style="margin-top:6px;padding:8px;background:#f0fdf4;border-radius:6px;font-size:13px"><strong>Admin Notes:</strong> ${esc(r.admin_notes)}</p>` : ''}
           </div>
         </div>
       `).join(''));
@@ -1605,38 +1605,43 @@ async function renderClosedReports(c) {
 }
 
 window.showReportDetail = async function(id) {
-  const reports = await fetch(`${API}/api/near-miss`, { headers: headers() }).then(r => r.json());
+  const reports = await fetch(`${API}/api/near-miss`, { headers: headers() }).then(r => r.json()).catch(() => []);
   const r = reports.find(x => x.id === id);
   if (!r) return;
+  window._currentReport = r; // stash for exportPDF lookup
   const photos = r.photos ? r.photos.split(',').filter(Boolean) : [];
   document.body.insertAdjacentHTML('beforeend', `
     <div class="modal-overlay" onclick="if(event.target===this)this.remove()">
       <div class="modal">
         <h3>⚠️ Near Miss #${r.id}</h3>
-        <p><strong>Reported by:</strong> ${r.reported_by}</p>
-        <p><strong>Date/Time:</strong> ${r.date} ${r.time}</p>
-        <p><strong>Location:</strong> ${r.location}</p>
-        <p><strong>Severity:</strong> ${r.potential_severity}</p>
-        <p><strong>Description:</strong> ${r.description}</p>
-        ${r.immediate_actions ? `<p><strong>Immediate Actions:</strong> ${r.immediate_actions}</p>` : ''}
-        ${r.weather_conditions ? `<p><strong>Weather:</strong> ${r.weather_conditions}</p>` : ''}
-        ${r.witnesses ? `<p><strong>Witnesses:</strong> ${r.witnesses}</p>` : ''}
-        ${photos.length > 0 ? `<div class="modal-photos">${photos.map(p => `<img src="${p}" alt="Photo">`).join('')}</div>` : ''}
+        <p><strong>Reported by:</strong> ${esc(r.reported_by || '—')}</p>
+        <p><strong>Date/Time:</strong> ${esc(r.date || '')} ${esc(r.time || '')}</p>
+        <p><strong>Location:</strong> ${esc(r.location || '')}</p>
+        <p><strong>Severity:</strong> ${esc(r.potential_severity || '')}</p>
+        <p><strong>Description:</strong> ${esc(r.description || '')}</p>
+        ${r.immediate_actions ? `<p><strong>Immediate Actions:</strong> ${esc(r.immediate_actions)}</p>` : ''}
+        ${r.weather_conditions ? `<p><strong>Weather:</strong> ${esc(r.weather_conditions)}</p>` : ''}
+        ${r.witnesses ? `<p><strong>Witnesses:</strong> ${esc(r.witnesses)}</p>` : ''}
+        ${photos.length > 0 ? `<div class="modal-photos">${photos.map(p => `<img src="${esc(p)}" alt="Photo">`).join('')}</div>` : ''}
         <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
         <div class="form-group"><label>Status</label>
           <select id="modalStatus"><option ${r.status==='open'?'selected':''}>open</option><option ${r.status==='reviewed'?'selected':''}>reviewed</option><option ${r.status==='closed'?'selected':''}>closed</option></select>
         </div>
-        <div class="form-group"><label>Admin Notes</label><textarea id="modalNotes" rows="3">${r.admin_notes || ''}</textarea></div>
+        <div class="form-group"><label>Admin Notes</label><textarea id="modalNotes" rows="3">${esc(r.admin_notes || '')}</textarea></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-primary btn-sm" onclick="updateReport(${r.id})">Save</button>
-          <button class="btn btn-outline btn-sm" onclick="exportPDF('near-miss', ${JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;')})">📄 PDF</button>
-          <button class="btn btn-outline btn-sm" onclick="downloadDocx('near-miss', ${r.id}, 'Near_Miss_${r.date}')">📝 Word Doc</button>
+          <button class="btn btn-outline btn-sm" onclick="exportReportPdf(${r.id})">📄 PDF</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadDocx('near-miss', ${r.id}, 'Near_Miss_${esc(r.date || '')}')">📝 Word Doc</button>
           ${r.status === 'closed' ? `<button class="btn btn-danger btn-sm" onclick="deleteReport(${r.id})">🗑️ Delete</button>` : ''}
           <button class="btn btn-outline btn-sm" onclick="this.closest('.modal-overlay').remove()">Close</button>
         </div>
       </div>
     </div>
   `);
+};
+
+window.exportReportPdf = function(id) {
+  if (window._currentReport && window._currentReport.id === id) exportPDF('near-miss', window._currentReport);
 };
 
 window.updateReport = async function(id) {
@@ -1666,6 +1671,7 @@ window.deleteReport = async function(id) {
 // ═══════════════════════════════════════
 // All inspections, flat — for the table view.
 window._inspAll = [];
+window._inspById = new Map(); // key: `${type}:${id}` → record
 window._inspFilters = { q: '', type: 'all', status: 'all', from: '', to: '', sort: 'date_desc' };
 
 async function renderAdminInspections(c) {
@@ -1744,6 +1750,8 @@ window.loadInspections = async function() {
       ...tower.map(r  => ({ ...r, _type: 'tower'  })),
       ...mewp.map(r   => ({ ...r, _type: 'mewp'   })),
     ];
+    window._inspById.clear();
+    window._inspAll.forEach(r => window._inspById.set(`${r._type}:${r.id}`, r));
     applyInspectionFilters();
   } catch(e) {
     console.error(e);
@@ -1817,10 +1825,9 @@ function applyInspectionFilters() {
             const safe = r.safe_to_use === 'Yes';
             const equipId = r.ladder_id || r.tower_id || r.mewp_id || '—';
             const m = typeMeta[r._type] || { icon: '', label: r._type };
-            const payload = JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;');
             const defectPreview = r.defects_found ? esc(String(r.defects_found).substring(0, 60)) + (String(r.defects_found).length > 60 ? '…' : '') : '<span style="color:var(--text-light)">—</span>';
             return `
-              <tr onclick="showInspectionDetail('${r._type}', ${payload})" style="cursor:pointer;border-bottom:1px solid #f1f5f9;background:${safe ? '#fff' : '#fef2f2'}" onmouseover="this.style.background='${safe ? '#f8fafc' : '#fee2e2'}'" onmouseout="this.style.background='${safe ? '#fff' : '#fef2f2'}'">
+              <tr onclick="showInspectionDetail('${r._type}', ${r.id})" style="cursor:pointer;border-bottom:1px solid #f1f5f9;background:${safe ? '#fff' : '#fef2f2'}" onmouseover="this.style.background='${safe ? '#f8fafc' : '#fee2e2'}'" onmouseout="this.style.background='${safe ? '#fff' : '#fef2f2'}'">
                 <td style="padding:10px 12px;font-size:13px;white-space:nowrap"><span style="margin-right:4px">${m.icon}</span>${m.label}</td>
                 <td style="padding:10px 12px;font-size:13px;font-weight:600">${esc(equipId)}</td>
                 <td style="padding:10px 12px;font-size:13px;color:var(--text-light)">${esc(r.location || '—')}</td>
@@ -1836,6 +1843,11 @@ function applyInspectionFilters() {
   `;
 }
 
+window.exportInspectionPdf = function(type, id) {
+  const r = window._inspById && window._inspById.get(`${type}:${id}`);
+  if (r) exportPDF(type, r);
+};
+
 window.sortInspections = function(key) {
   const f = window._inspFilters;
   const [curKey, curDir] = (f.sort || 'date_desc').split('_');
@@ -1848,8 +1860,17 @@ window.sortInspections = function(key) {
   applyInspectionFilters();
 };
 
-window.showInspectionDetail = function(type, r) {
-  if (typeof r === 'string') r = JSON.parse(r);
+window.showInspectionDetail = function(type, idOrRecord) {
+  // Accept either (type, id) — preferred — or legacy (type, recordObject/json).
+  let r;
+  if (typeof idOrRecord === 'number' || (typeof idOrRecord === 'string' && /^\d+$/.test(idOrRecord))) {
+    r = window._inspById && window._inspById.get(`${type}:${idOrRecord}`);
+  } else if (typeof idOrRecord === 'string') {
+    try { r = JSON.parse(idOrRecord); } catch { r = null; }
+  } else {
+    r = idOrRecord;
+  }
+  if (!r) return;
   const photos = r.photos ? r.photos.split(',').filter(Boolean) : [];
   const typeMeta = {
     ladder: { icon: '🪜', label: 'Ladder' },
@@ -1900,8 +1921,6 @@ window.showInspectionDetail = function(type, r) {
       ${r.actions_taken ? `<div style="background:#f0fdf4;border-left:3px solid #16a34a;padding:10px 12px;border-radius:4px"><strong style="color:#166534;font-size:12px">ACTIONS TAKEN</strong><div style="margin-top:4px;font-size:14px">${esc(r.actions_taken)}</div></div>` : ''}
     </div>` : '';
 
-  const payload = JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-
   document.body.insertAdjacentHTML('beforeend', `
     <div class="modal-overlay" onclick="if(event.target===this)this.remove()">
       <div class="modal" style="max-width:640px;padding:0;overflow:hidden">
@@ -1946,7 +1965,7 @@ window.showInspectionDetail = function(type, r) {
 
         <!-- Footer / actions -->
         <div style="padding:14px 22px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-          <button class="btn btn-outline btn-sm" onclick="exportPDF('${type}', ${payload})">📄 PDF</button>
+          <button class="btn btn-outline btn-sm" onclick="exportInspectionPdf('${type}', ${r.id})">📄 PDF</button>
           <button class="btn btn-outline btn-sm" onclick="downloadDocx('${type}', ${r.id}, '${type}_Inspection_${(r.date||'').replace(/'/g, '')}')">📝 Word</button>
           ${(state.user.role === 'admin' || state.user.role === 'project_manager') ? `<button class="btn btn-sm" style="background:#dc2626;color:#fff;border:0" onclick="deleteInspection('${type}', ${r.id}, this)">🗑 Delete</button>` : ''}
           <button class="btn btn-outline btn-sm" onclick="this.closest('.modal-overlay').remove()">Close</button>
@@ -2026,11 +2045,11 @@ async function renderAdminUsers(c) {
       ${users.map(u => `
         <div class="card">
           <div class="card-header">
-            <h3>${u.full_name}</h3>
-            <span class="badge" style="background:${u.role==='admin'?'#fee2e2':u.role==='project_manager'?'#dbeafe':u.role==='external_view'?'#fef3c7':'#e2e8f0'};color:${u.role==='admin'?'#991b1b':u.role==='project_manager'?'#1e40af':u.role==='external_view'?'#92400e':'#475569'}">${{'project_manager':'Project Manager','external_view':'Client','admin':'Admin','operative':'Operative'}[u.role]||u.role}</span>
+            <h3>${esc(u.full_name || '')}</h3>
+            <span class="badge" style="background:${u.role==='admin'?'#fee2e2':u.role==='project_manager'?'#dbeafe':u.role==='external_view'?'#fef3c7':'#e2e8f0'};color:${u.role==='admin'?'#991b1b':u.role==='project_manager'?'#1e40af':u.role==='external_view'?'#92400e':'#475569'}">${{'project_manager':'Project Manager','external_view':'Client','admin':'Admin','operative':'Operative'}[u.role]||esc(u.role)}</span>
           </div>
           <div class="card-body">
-            <p><strong>Username:</strong> ${u.username}</p>
+            <p><strong>Username:</strong> ${esc(u.username || '')}</p>
             <p><strong>Created:</strong> ${new Date(u.created_at).toLocaleDateString()}</p>
           </div>
           ${u.role === 'operative' || u.role === 'external_view' ? `<button class="btn btn-outline btn-sm" style="margin-top:8px;color:var(--danger);border-color:var(--danger)" onclick="deleteUser(${u.id})">Remove</button>` : ''}
@@ -2077,10 +2096,10 @@ async function renderProjects(c) {
       <button class="btn btn-primary btn-sm hide-readonly" onclick="showProjectForm()">+ New Project</button>
     </div>
     <div class="tab-bar" id="projectTabs">
-      <button class="active" onclick="filterProjects('all')">All</button>
-      <button onclick="filterProjects('active')">Active</button>
-      <button onclick="filterProjects('completed')">Completed</button>
-      <button onclick="filterProjects('on-hold')">On Hold</button>
+      <button class="active" onclick="filterProjects('all', event)">All</button>
+      <button onclick="filterProjects('active', event)">Active</button>
+      <button onclick="filterProjects('completed', event)">Completed</button>
+      <button onclick="filterProjects('on-hold', event)">On Hold</button>
     </div>
     <div id="projectContent">Loading...</div>
   `;
@@ -2090,10 +2109,10 @@ async function renderProjects(c) {
   } catch { document.getElementById('projectContent').innerHTML = '<p>Failed to load projects</p>'; }
 }
 
-window.filterProjects = function(status) {
+window.filterProjects = function(status, ev) {
   // Update tabs
   document.querySelectorAll('#projectTabs button').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  if (ev && ev.target) ev.target.classList.add('active');
   const filtered = status === 'all' ? projectsCache : projectsCache.filter(p => p.status === status);
   const el = document.getElementById('projectContent');
 
@@ -2117,15 +2136,15 @@ window.filterProjects = function(status) {
            onmouseenter="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,.1)'"
            onmouseleave="this.style.transform='';this.style.boxShadow=''">
         <div class="card-header">
-          <h3 style="font-size:16px">${p.name}</h3>
-          <span class="badge" style="${statusStyle}">${p.status}</span>
+          <h3 style="font-size:16px">${esc(p.name || '')}</h3>
+          <span class="badge" style="${statusStyle}">${esc(p.status || '')}</span>
         </div>
         <div class="card-body">
-          <p><strong>Client:</strong> ${p.client_name}</p>
-          ${p.site_address ? `<p><strong>Site:</strong> ${p.site_address}</p>` : ''}
+          <p><strong>Client:</strong> ${esc(p.client_name || '')}</p>
+          ${p.site_address ? `<p><strong>Site:</strong> ${esc(p.site_address)}</p>` : ''}
           <div style="display:flex;gap:16px;margin-top:4px;font-size:13px;color:var(--text-light)">
-            ${p.start_date ? `<span>Start: ${p.start_date}</span>` : ''}
-            ${p.end_date ? `<span>End: ${p.end_date}</span>` : ''}
+            ${p.start_date ? `<span>Start: ${esc(p.start_date)}</span>` : ''}
+            ${p.end_date ? `<span>End: ${esc(p.end_date)}</span>` : ''}
           </div>
         </div>
       </div>`;
