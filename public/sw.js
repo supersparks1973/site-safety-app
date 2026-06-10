@@ -1,4 +1,4 @@
-const CACHE_NAME = 'site-safety-v5';
+const CACHE_NAME = 'site-safety-v6';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

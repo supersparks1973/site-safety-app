@@ -440,7 +440,7 @@ async function startApp() {
   });
 
   app.get('/api/ladder-inspection', authenticate, async (req, res) => {
-    if (req.user.role === 'admin') {
+    if (['admin', 'project_manager', 'external_view'].includes(req.user.role)) {
       const { rows } = await pool.query('SELECT l.*, u.full_name as inspected_by FROM ladder_inspections l JOIN users u ON l.user_id = u.id ORDER BY l.created_at DESC');
       res.json(rows);
     } else {
@@ -477,7 +477,7 @@ async function startApp() {
   });
 
   app.get('/api/tower-inspection', authenticate, async (req, res) => {
-    if (req.user.role === 'admin') {
+    if (['admin', 'project_manager', 'external_view'].includes(req.user.role)) {
       const { rows } = await pool.query('SELECT t.*, u.full_name as inspected_by FROM tower_inspections t JOIN users u ON t.user_id = u.id ORDER BY t.created_at DESC');
       res.json(rows);
     } else {
@@ -514,7 +514,7 @@ async function startApp() {
   });
 
   app.get('/api/mewp-inspection', authenticate, async (req, res) => {
-    if (req.user.role === 'admin') {
+    if (['admin', 'project_manager', 'external_view'].includes(req.user.role)) {
       const { rows } = await pool.query('SELECT m.*, u.full_name as inspected_by FROM mewp_inspections m JOIN users u ON m.user_id = u.id ORDER BY m.created_at DESC');
       res.json(rows);
     } else {
@@ -993,7 +993,7 @@ async function startApp() {
   });
 
   app.get('/api/rescue-plan', authenticate, async (req, res) => {
-    if (req.user.role === 'admin') {
+    if (['admin', 'project_manager', 'external_view'].includes(req.user.role)) {
       const { rows } = await pool.query('SELECT r.*, u.full_name as submitted_by FROM rescue_plans r JOIN users u ON r.user_id = u.id ORDER BY r.created_at DESC');
       res.json(rows);
     } else {

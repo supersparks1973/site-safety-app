@@ -761,7 +761,8 @@ document.getElementById('logoutBtn').addEventListener('click', logout);
 function showApp() {
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('appScreen').classList.remove('hidden');
-  document.getElementById('userBadge').textContent = state.user.role;
+  const roleLabelsBadge = { admin: 'Admin', project_manager: 'Project Manager', external_view: 'Client', operative: 'Operative' };
+  document.getElementById('userBadge').textContent = roleLabelsBadge[state.user.role] || state.user.role;
 
   // Sidebar user info
   const name = state.user.full_name || state.user.username || 'User';
@@ -832,6 +833,8 @@ function showApp() {
   updateSyncIndicator();
   updateOnlineStatus();
   refreshInstallButton();
+  // QR-code deep-link: if /index.html?inspect=X&id=Y captured a target, jump there now.
+  applyDeepLinkIfAny();
 }
 
 // QR deep-link: ?inspect=ladder&id=LDR-007 — captured at load and applied after auth.
