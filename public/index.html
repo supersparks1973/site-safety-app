@@ -1664,43 +1664,136 @@ window.deleteReport = async function(id) {
 async function renderAdminInspections(c) {
   c.innerHTML = `
     <h2 style="margin-bottom:16px">📋 Inspections</h2>
-    <div class="tab-bar">
-      <button class="active" onclick="loadInspections('ladder',this)">🪜 Ladders</button>
-      <button onclick="loadInspections('tower',this)">🏗️ Towers</button>
-      <button onclick="loadInspections('mewp',this)">🔧 MEWPs</button>
-    </div>
-    <div id="inspectionList">Loading...</div>
+    <input type="search" id="inspSearch" placeholder="🔎 Filter by operative, ID or location…" oninput="filterInspectionTree(this.value)" style="width:100%;max-width:480px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:16px;font-size:14px">
+    <div id="inspectionList">Loading…</div>
   `;
-  loadInspections('ladder');
+  loadInspectionsGrouped();
 }
 
-window.loadInspections = async function(type, btn) {
-  if (btn) {
-    btn.closest('.tab-bar').querySelectorAll('button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-  }
+// Holds the most recently loaded list so the search filter can re-render quickly.
+window._inspByOperative = null;
+
+async function loadInspectionsGrouped() {
   const list = document.getElementById('inspectionList');
   try {
-    const data = await fetch(`${API}/api/${type}-inspection`, { headers: headers() }).then(r => r.json());
-    if (data.length === 0) { list.innerHTML = '<p style="color:var(--text-light)">No inspections yet.</p>'; return; }
-    list.innerHTML = data.map(r => {
-      const by = r.inspected_by;
-      const safe = r.safe_to_use === 'Yes';
-      const id_field = r.ladder_id || r.tower_id || r.mewp_id;
-      return `
-        <div class="card" onclick="showInspectionDetail('${type}', ${JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;')})">
-          <div class="card-header">
-            <h3>${id_field} — ${r.location}</h3>
-            <span class="badge ${safe ? 'badge-safe' : 'badge-unsafe'}">${safe ? 'Safe' : 'UNSAFE'}</span>
-          </div>
-          <div class="card-body">
-            <p><strong>Inspected by:</strong> ${by} &nbsp;|&nbsp; <strong>Date:</strong> ${r.date}</p>
-            ${r.defects_found ? `<p style="color:var(--danger)"><strong>Defects:</strong> ${r.defects_found.substring(0, 100)}</p>` : ''}
-          </div>
-        </div>`;
-    }).join('');
-  } catch { list.innerHTML = '<p>Failed to load</p>'; }
+    const [ladder, tower, mewp] = await Promise.all([
+      fetch(`${API}/api/ladder-inspection`, { headers: headers() }).then(r => r.json()),
+      fetch(`${API}/api/tower-inspection`, { headers: headers() }).then(r => r.json()),
+      fetch(`${API}/api/mewp-inspection`,   { headers: headers() }).then(r => r.json()),
+    ]);
+    const all = [
+      ...ladder.map(r => ({ ...r, _type: 'ladder' })),
+      ...tower.map(r  => ({ ...r, _type: 'tower'  })),
+      ...mewp.map(r   => ({ ...r, _type: 'mewp'   })),
+    ];
+    if (all.length === 0) {
+      list.innerHTML = '<p style="color:var(--text-light)">No inspections yet.</p>';
+      return;
+    }
+    // Group: operative → type → YYYY-MM
+    const byOp = {};
+    all.forEach(r => {
+      const op = (r.inspected_by || 'Unknown').trim();
+      const month = (r.date || '').substring(0, 7) || 'Undated';
+      byOp[op] = byOp[op] || {};
+      byOp[op][r._type] = byOp[op][r._type] || {};
+      byOp[op][r._type][month] = byOp[op][r._type][month] || [];
+      byOp[op][r._type][month].push(r);
+    });
+    window._inspByOperative = byOp;
+    renderInspectionTree(byOp);
+  } catch(e) { console.error(e); list.innerHTML = '<p>Failed to load inspections</p>'; }
+}
+
+function renderInspectionTree(byOp) {
+  const list = document.getElementById('inspectionList');
+  const typeMeta = {
+    ladder: { icon: '🪜', label: 'Ladder' },
+    tower:  { icon: '🏗️', label: 'Tower'  },
+    mewp:   { icon: '🔧', label: 'MEWP'   },
+  };
+  const typeOrder = ['ladder', 'tower', 'mewp'];
+  const monthLabel = (ym) => {
+    if (ym === 'Undated') return 'Undated';
+    const [y, m] = ym.split('-');
+    const names = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return `${names[parseInt(m,10)-1] || m} ${y}`;
+  };
+  const cardHtml = (r) => {
+    const safe = r.safe_to_use === 'Yes';
+    const id_field = r.ladder_id || r.tower_id || r.mewp_id;
+    const payload = JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    return `
+      <div class="card" style="margin:8px 0" onclick="showInspectionDetail('${r._type}', ${payload})">
+        <div class="card-header">
+          <h3>${esc(id_field || '')} — ${esc(r.location || '')}</h3>
+          <span class="badge ${safe ? 'badge-safe' : 'badge-unsafe'}">${safe ? 'Safe' : 'UNSAFE'}</span>
+        </div>
+        <div class="card-body">
+          <p><strong>Date:</strong> ${esc(r.date || '—')}</p>
+          ${r.defects_found ? `<p style="color:var(--danger)"><strong>Defects:</strong> ${esc(String(r.defects_found).substring(0,100))}</p>` : ''}
+        </div>
+      </div>`;
+  };
+  const ops = Object.keys(byOp).sort((a,b) => a.localeCompare(b));
+  list.innerHTML = ops.map(op => {
+    const types = byOp[op];
+    const opCount = Object.values(types).reduce((s, monthsObj) => s + Object.values(monthsObj).reduce((a,b)=>a+b.length,0), 0);
+    return `
+      <details class="insp-folder" data-op="${esc(op.toLowerCase())}" style="background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden">
+        <summary style="padding:14px 16px;cursor:pointer;font-weight:700;font-size:15px;display:flex;justify-content:space-between;align-items:center;background:#F8FAFC">
+          <span>👤 ${esc(op)}</span>
+          <span style="font-size:12px;color:var(--text-light);font-weight:600">${opCount} ${opCount === 1 ? 'inspection' : 'inspections'}</span>
+        </summary>
+        <div style="padding:8px 14px 14px">
+          ${typeOrder.filter(t => types[t]).map(t => {
+            const months = types[t];
+            const typeCount = Object.values(months).reduce((a,b)=>a+b.length,0);
+            const monthKeys = Object.keys(months).sort((a,b) => b.localeCompare(a));
+            return `
+              <details class="insp-folder-type" data-type="${t}" style="margin:6px 0;border-left:3px solid var(--primary);padding-left:10px">
+                <summary style="padding:8px 4px;cursor:pointer;font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:center">
+                  <span>${typeMeta[t].icon} ${typeMeta[t].label}</span>
+                  <span style="font-size:11px;color:var(--text-light);font-weight:600">${typeCount}</span>
+                </summary>
+                <div style="padding:4px 0 4px 8px">
+                  ${monthKeys.map(ym => `
+                    <details class="insp-folder-month" style="margin:4px 0">
+                      <summary style="padding:6px 4px;cursor:pointer;font-size:13px;color:var(--text);display:flex;justify-content:space-between;align-items:center">
+                        <span>📅 ${monthLabel(ym)}</span>
+                        <span style="font-size:11px;color:var(--text-light)">${months[ym].length}</span>
+                      </summary>
+                      <div style="padding:4px 0 4px 4px">
+                        ${months[ym].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(cardHtml).join('')}
+                      </div>
+                    </details>
+                  `).join('')}
+                </div>
+              </details>`;
+          }).join('')}
+        </div>
+      </details>`;
+  }).join('');
+}
+
+window.filterInspectionTree = function(q) {
+  const term = (q || '').trim().toLowerCase();
+  document.querySelectorAll('.insp-folder').forEach(opEl => {
+    const opName = opEl.dataset.op || '';
+    let anyVisible = false;
+    opEl.querySelectorAll('.card').forEach(card => {
+      const text = card.textContent.toLowerCase();
+      const match = !term || opName.includes(term) || text.includes(term);
+      card.style.display = match ? '' : 'none';
+      if (match) anyVisible = true;
+    });
+    opEl.style.display = anyVisible ? '' : 'none';
+    if (term && anyVisible) opEl.setAttribute('open', '');
+  });
 };
+
+// Back-compat shim: deletes used to call loadInspections(type) to refresh.
+window.loadInspections = function() { loadInspectionsGrouped(); };
 
 window.showInspectionDetail = function(type, r) {
   if (typeof r === 'string') r = JSON.parse(r);
