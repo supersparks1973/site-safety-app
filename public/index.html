@@ -1798,19 +1798,103 @@ window.loadInspections = function() { loadInspectionsGrouped(); };
 window.showInspectionDetail = function(type, r) {
   if (typeof r === 'string') r = JSON.parse(r);
   const photos = r.photos ? r.photos.split(',').filter(Boolean) : [];
-  const fields = Object.entries(r).filter(([k]) => !['id','user_id','photos','created_at','inspected_by'].includes(k))
-    .map(([k, v]) => `<p><strong>${k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</strong> ${v || '—'}</p>`).join('');
+  const typeMeta = {
+    ladder: { icon: '🪜', label: 'Ladder' },
+    tower:  { icon: '🏗️', label: 'Tower'  },
+    mewp:   { icon: '🔧', label: 'MEWP'   },
+  };
+  const meta = typeMeta[type] || { icon: '📋', label: type };
+  const safe = r.safe_to_use === 'Yes';
+  const equipId = r.ladder_id || r.tower_id || r.mewp_id || '';
+
+  // Fields shown elsewhere or internal-only — don't repeat in the checks grid.
+  const HIDE = new Set([
+    'id','user_id','photos','created_at','inspected_by','signature','_type','type',
+    'safe_to_use','defects_found','actions_taken','date','location',
+    'ladder_id','tower_id','mewp_id'
+  ]);
+
+  // Prettify field labels — Title Case with common acronyms preserved.
+  const ACRONYMS = { 'mewp':'MEWP', 'id':'ID', 'ppe':'PPE', 'rcd':'RCD', 'loler':'LOLER' };
+  const labelize = (k) => k.split('_').map(w =>
+    ACRONYMS[w.toLowerCase()] || (w.charAt(0).toUpperCase() + w.slice(1))
+  ).join(' ');
+
+  const renderValue = (v) => {
+    if (v === null || v === undefined || v === '') return '<span style="color:var(--text-light)">—</span>';
+    const s = String(v);
+    if (s === 'Yes') return '<span style="color:#16a34a;font-weight:600">✓ Yes</span>';
+    if (s === 'No')  return '<span style="color:#dc2626;font-weight:600">✗ No</span>';
+    if (s === 'N/A') return '<span style="color:var(--text-light)">N/A</span>';
+    if (s === 'Good') return '<span style="color:#16a34a;font-weight:600">Good</span>';
+    if (s === 'Fair') return '<span style="color:#f59e0b;font-weight:600">Fair</span>';
+    if (s === 'Poor' || s === 'Damaged') return '<span style="color:#dc2626;font-weight:600">' + s + '</span>';
+    return esc(s);
+  };
+
+  const checks = Object.entries(r)
+    .filter(([k]) => !HIDE.has(k))
+    .map(([k, v]) => `
+      <div style="padding:8px 0;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;gap:12px">
+        <span style="color:var(--text-light);font-size:13px">${labelize(k)}</span>
+        <span style="font-size:13px;text-align:right">${renderValue(v)}</span>
+      </div>`).join('');
+
+  const notes = (r.defects_found || r.actions_taken) ? `
+    <div style="margin-top:18px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-light);font-weight:700;margin-bottom:6px">Notes</div>
+      ${r.defects_found ? `<div style="background:#fef2f2;border-left:3px solid #dc2626;padding:10px 12px;border-radius:4px;margin-bottom:6px"><strong style="color:#991b1b;font-size:12px">DEFECTS FOUND</strong><div style="margin-top:4px;font-size:14px">${esc(r.defects_found)}</div></div>` : ''}
+      ${r.actions_taken ? `<div style="background:#f0fdf4;border-left:3px solid #16a34a;padding:10px 12px;border-radius:4px"><strong style="color:#166534;font-size:12px">ACTIONS TAKEN</strong><div style="margin-top:4px;font-size:14px">${esc(r.actions_taken)}</div></div>` : ''}
+    </div>` : '';
+
+  const payload = JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
   document.body.insertAdjacentHTML('beforeend', `
     <div class="modal-overlay" onclick="if(event.target===this)this.remove()">
-      <div class="modal">
-        <h3>${type === 'ladder' ? '🪜' : type === 'tower' ? '🏗️' : '🔧'} ${type.charAt(0).toUpperCase() + type.slice(1)} Inspection</h3>
-        <p><strong>Inspected by:</strong> ${r.inspected_by}</p>
-        ${fields}
-        ${photos.length > 0 ? `<div class="modal-photos">${photos.map(p => `<img src="${p}" alt="Photo">`).join('')}</div>` : ''}
-        ${r.signature ? `<div style="margin-top:12px"><strong>Signature:</strong><br><img src="${r.signature}" style="max-width:200px;max-height:80px;border:1px solid var(--border);border-radius:4px;margin-top:4px"></div>` : ''}
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
-          <button class="btn btn-outline btn-sm" onclick="exportPDF('${type}', ${JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;')})">📄 PDF</button>
-          <button class="btn btn-outline btn-sm" onclick="downloadDocx('${type}', ${r.id}, '${type}_Inspection_${(r.date||'').replace(/'/g, '')}')">📝 Word Doc</button>
+      <div class="modal" style="max-width:640px;padding:0;overflow:hidden">
+        <!-- Header -->
+        <div style="padding:18px 22px;background:linear-gradient(135deg,#1e293b,#334155);color:#fff">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+            <div>
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.8px;opacity:0.7;font-weight:600">${meta.icon} ${meta.label} Inspection</div>
+              <h3 style="margin:4px 0 0;color:#fff;font-size:22px">${esc(equipId) || '—'}</h3>
+              <div style="font-size:13px;opacity:0.85;margin-top:2px">${esc(r.location || '')}</div>
+            </div>
+            <span class="badge ${safe ? 'badge-safe' : 'badge-unsafe'}" style="font-size:13px;padding:6px 12px">${safe ? '✓ SAFE' : '⚠ UNSAFE'}</span>
+          </div>
+        </div>
+
+        <!-- Body -->
+        <div style="padding:18px 22px;max-height:60vh;overflow-y:auto">
+          <!-- Meta strip -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding-bottom:14px;border-bottom:1px solid #e2e8f0;margin-bottom:14px">
+            <div><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-light);font-weight:600">Inspected by</div><div style="font-size:14px;font-weight:600;margin-top:2px">${esc(r.inspected_by || '—')}</div></div>
+            <div><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-light);font-weight:600">Date</div><div style="font-size:14px;font-weight:600;margin-top:2px">${esc(r.date || '—')}</div></div>
+          </div>
+
+          <!-- Checks -->
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-light);font-weight:700;margin-bottom:6px">Checks</div>
+          <div>${checks || '<div style="color:var(--text-light);font-size:13px">No checks recorded.</div>'}</div>
+
+          ${notes}
+
+          ${photos.length > 0 ? `
+            <div style="margin-top:18px">
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-light);font-weight:700;margin-bottom:8px">Photos</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">${photos.map(p => `<img src="${p}" alt="Photo" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">`).join('')}</div>
+            </div>` : ''}
+
+          ${r.signature ? `
+            <div style="margin-top:18px">
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-light);font-weight:700;margin-bottom:8px">Signature</div>
+              <img src="${r.signature}" style="max-width:220px;max-height:90px;border:1px solid var(--border);border-radius:6px;background:#fff">
+            </div>` : ''}
+        </div>
+
+        <!-- Footer / actions -->
+        <div style="padding:14px 22px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          <button class="btn btn-outline btn-sm" onclick="exportPDF('${type}', ${payload})">📄 PDF</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadDocx('${type}', ${r.id}, '${type}_Inspection_${(r.date||'').replace(/'/g, '')}')">📝 Word</button>
           ${(state.user.role === 'admin' || state.user.role === 'project_manager') ? `<button class="btn btn-sm" style="background:#dc2626;color:#fff;border:0" onclick="deleteInspection('${type}', ${r.id}, this)">🗑 Delete</button>` : ''}
           <button class="btn btn-outline btn-sm" onclick="this.closest('.modal-overlay').remove()">Close</button>
         </div>
