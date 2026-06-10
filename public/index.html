@@ -1340,7 +1340,6 @@ async function renderDashboard(c) {
       </div>
 
       <div id="trainingAlerts" style="margin-bottom:16px"></div>
-      <div id="remindersSection" style="margin-bottom:16px"></div>
 
       <div class="dash-section">
         <div class="dash-section-title">🚀 Quick Actions</div>
@@ -1425,7 +1424,6 @@ async function renderDashboard(c) {
       </div>
     `;
     loadTrainingAlerts();
-    loadReminders();
   } catch(e) { console.error(e); c.innerHTML = '<p>Failed to load dashboard</p>'; }
 }
 
