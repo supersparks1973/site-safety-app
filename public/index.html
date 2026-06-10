@@ -966,7 +966,7 @@ function renderHome(c) {
     <div class="dash-banner" style="margin-bottom:20px">
       <img src="/logo.png" alt="ManProjects Ltd">
       <div class="banner-text">
-        <h2>${greeting}, ${state.user.full_name.split(' ')[0]}</h2>
+        <h2>${greeting}, ${esc((state.user.full_name || state.user.username || '').split(' ')[0])}</h2>
         <p>${dateStr.toUpperCase()}</p>
       </div>
     </div>
@@ -1437,43 +1437,6 @@ window.sendDigest = async function(period) {
   } catch { showToast('Failed to send digest — is email configured?', 'error'); }
 };
 
-async function loadReminders() {
-  try {
-    const data = await fetch(API + '/api/reminders', { headers: headers() }).then(r => r.json());
-    const el = document.getElementById('remindersSection');
-    if (!el) return;
-    const all = [
-      ...data.overdue_ladders.map(r => ({ id: r.ladder_id, type: '🪜 Ladder', last: r.last_inspected })),
-      ...data.overdue_towers.map(r => ({ id: r.tower_id, type: '🏗️ Tower', last: r.last_inspected })),
-      ...data.overdue_mewps.map(r => ({ id: r.mewp_id, type: '🔧 MEWP', last: r.last_inspected })),
-    ];
-    if (all.length === 0) {
-      el.innerHTML = `<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:16px 18px;display:flex;align-items:center;gap:12px">
-        <span style="font-size:24px">🔔</span>
-        <div><strong style="color:#2E7D32">Inspections Up to Date</strong><br><span style="font-size:13px;color:#555">All equipment inspected within the last 7 days.</span></div>
-      </div>`;
-      return;
-    }
-    el.innerHTML = `
-      <div style="background:#FFF3E0;border:2px solid #FF9800;border-radius:10px;padding:0;overflow:hidden">
-        <div style="background:#FF9800;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
-          <div style="font-weight:700;font-size:15px">🔔 Overdue Inspections (7+ days)</div>
-          <div style="background:rgba(255,255,255,0.25);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700">${all.length}</div>
-        </div>
-        ${all.map(r => {
-          const daysAgo = Math.ceil((new Date() - new Date(r.last)) / (1000*60*60*24));
-          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #F0F0F0">
-            <div><strong style="font-size:14px">${r.type}</strong><span style="color:#777;margin-left:8px">${r.id}</span></div>
-            <div style="text-align:right">
-              <span style="display:inline-block;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:#E65100;color:#fff">${daysAgo}d OVERDUE</span>
-              <div style="font-size:11px;color:#999;margin-top:3px">Last: ${r.last}</div>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
-    `;
-  } catch {}
-}
 
 async function loadTrainingAlerts() {
   try {
@@ -1647,8 +1610,14 @@ window.exportReportPdf = function(id) {
 window.updateReport = async function(id) {
   const status = document.getElementById('modalStatus').value;
   const admin_notes = document.getElementById('modalNotes').value;
-  await fetch(`${API}/api/near-miss/${id}`, { method: 'PATCH', headers: headers(), body: JSON.stringify({ status, admin_notes }) });
-  document.querySelector('.modal-overlay').remove();
+  try {
+    const res = await fetch(`${API}/api/near-miss/${id}`, { method: 'PATCH', headers: headers(), body: JSON.stringify({ status, admin_notes }) });
+    if (!res.ok) throw new Error('Update failed (' + res.status + ')');
+  } catch(e) {
+    showToast('Failed to save report — please try again', 'error');
+    return;
+  }
+  document.querySelector('.modal-overlay')?.remove();
   if (status === 'closed') {
     showToast('Report closed — moved to Closed section');
     navigate('closed');
@@ -1660,8 +1629,14 @@ window.updateReport = async function(id) {
 
 window.deleteReport = async function(id) {
   if (!confirm('Are you sure you want to permanently delete this report? This cannot be undone.')) return;
-  await fetch(`${API}/api/near-miss/${id}`, { method: 'DELETE', headers: headers() });
-  document.querySelector('.modal-overlay').remove();
+  try {
+    const res = await fetch(`${API}/api/near-miss/${id}`, { method: 'DELETE', headers: headers() });
+    if (!res.ok) throw new Error('Delete failed (' + res.status + ')');
+  } catch(e) {
+    showToast('Failed to delete report — please try again', 'error');
+    return;
+  }
+  document.querySelector('.modal-overlay')?.remove();
   showToast('Report deleted');
   navigate('closed');
 };
@@ -2066,17 +2041,26 @@ window.addUser = async function() {
   const role = document.getElementById('newRole').value;
   if (!full_name || !username || !password || password.length < 6) { showToast('Please fill all fields (password min 6 chars)', 'error'); return; }
   try {
-    await fetch(`${API}/api/users`, { method: 'POST', headers: headers(), body: JSON.stringify({ full_name, username, password, role }) });
+    const res = await fetch(`${API}/api/users`, { method: 'POST', headers: headers(), body: JSON.stringify({ full_name, username, password, role }) });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || ('HTTP ' + res.status));
+    }
     showToast('User created');
     renderAdminUsers(document.getElementById('appContent'));
-  } catch { showToast('Failed — username may already exist', 'error'); }
+  } catch(e) { showToast('Failed: ' + (e.message || 'username may already exist'), 'error'); }
 };
 
 window.deleteUser = async function(id) {
   if (!confirm('Remove this user?')) return;
-  await fetch(`${API}/api/users/${id}`, { method: 'DELETE', headers: headers() });
-  showToast('User removed');
-  renderAdminUsers(document.getElementById('appContent'));
+  try {
+    const res = await fetch(`${API}/api/users/${id}`, { method: 'DELETE', headers: headers() });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    showToast('User removed');
+    renderAdminUsers(document.getElementById('appContent'));
+  } catch(e) {
+    showToast('Failed to remove user — please try again', 'error');
+  }
 };
 
 // ═══════════════════════════════════════
@@ -2483,7 +2467,8 @@ async function renderTBList(container) {
         </thead>
         <tbody>
           ${tbTalksData.map(t => {
-            const att = typeof t.attendees === 'string' ? JSON.parse(t.attendees) : (t.attendees || []);
+            let att = [];
+            try { att = typeof t.attendees === 'string' ? JSON.parse(t.attendees) : (t.attendees || []); } catch { att = []; }
             return `<tr>
               <td style="white-space:nowrap">${t.talk_date ? new Date(t.talk_date).toLocaleDateString('en-GB') : '—'}</td>
               <td><div style="display:flex;align-items:center;gap:8px;min-width:180px">${(() => { const lib = TOOLBOX_LIBRARY.find(l => l.topic === t.topic); const c = lib ? lib.color : '#8B1A1A'; const ic = lib ? lib.icon : 'megaphone'; return `<span style=\"width:28px;height:28px;border-radius:8px;background:${c};display:inline-flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0\">${tbIcon(ic, 16, '#fff')}</span>`; })()}<strong>${esc(t.topic)}</strong></div></td>
@@ -2695,7 +2680,8 @@ async function renderTBDetail(container) {
     talk = await res.json();
   } catch(e) { container.innerHTML = '<p>Error loading talk.</p>'; return; }
 
-  const attendees = typeof talk.attendees === 'string' ? JSON.parse(talk.attendees) : (talk.attendees || []);
+  let attendees = [];
+  try { attendees = typeof talk.attendees === 'string' ? JSON.parse(talk.attendees) : (talk.attendees || []); } catch { attendees = []; }
 
   container.innerHTML = `
     <div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap">
@@ -3514,7 +3500,7 @@ function renderOMManager(c) {
 // PDF EXPORT
 // ═══════════════════════════════════════
 window.exportPDF = function(type, data) {
-  if (typeof data === 'string') data = JSON.parse(data);
+  if (typeof data === 'string') { try { data = JSON.parse(data); } catch { data = {}; } }
 
   // Helper functions
   const row = (label, value) => `<tr><td class="lbl">${label}</td><td>${value || '\u2014'}</td></tr>`;
@@ -4332,7 +4318,7 @@ function wireTrainingNameWarning() {
     const match = operatives.find(u => norm(u.full_name) === typed);
     if (match) {
       warn.innerHTML = '⚠️ <strong>' + esc(match.full_name) + '</strong> already has a login. Pick them from the dropdown so the record links to their My Training page. ' +
-        '<button type="button" class="btn btn-sm" style="margin-left:6px;background:#92400e;color:#fff;border:0;padding:4px 10px" onclick="trainPickOperative(' + match.id + ')">Use ' + esc(match.full_name.split(' ')[0]) + ' instead</button>';
+        '<button type="button" class="btn btn-sm" style="margin-left:6px;background:#92400e;color:#fff;border:0;padding:4px 10px" onclick="trainPickOperative(' + match.id + ')">Use ' + esc((match.full_name || '').split(' ')[0]) + ' instead</button>';
       warn.style.display = 'block';
     } else {
       warn.style.display = 'none';

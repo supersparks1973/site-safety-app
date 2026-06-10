@@ -1299,24 +1299,6 @@ async function startApp() {
   setInterval(checkDigestSchedule, 30 * 60 * 1000);
   checkDigestSchedule();
 
-  // ═══════ INSPECTION REMINDERS ═══════
-  app.get('/api/reminders', authenticate, adminOnly, async (req, res) => {
-    // Find equipment not inspected in the last 7 days
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const cutoff = sevenDaysAgo.toISOString().split('T')[0];
-
-    const ladders = await pool.query(`SELECT ladder_id, MAX(date) as last_inspected FROM ladder_inspections GROUP BY ladder_id HAVING MAX(date) < $1`, [cutoff]);
-    const towers = await pool.query(`SELECT tower_id, MAX(date) as last_inspected FROM tower_inspections GROUP BY tower_id HAVING MAX(date) < $1`, [cutoff]);
-    const mewps = await pool.query(`SELECT mewp_id, MAX(date) as last_inspected FROM mewp_inspections GROUP BY mewp_id HAVING MAX(date) < $1`, [cutoff]);
-
-    res.json({
-      overdue_ladders: ladders.rows,
-      overdue_towers: towers.rows,
-      overdue_mewps: mewps.rows
-    });
-  });
-
   // ═══════ TRAINING EXPIRY API ═══════
   app.get('/api/training-alerts', authenticate, adminOnly, async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
