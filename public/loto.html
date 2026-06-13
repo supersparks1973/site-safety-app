@@ -1118,13 +1118,13 @@ function buildRegisterPdf(){
   const rows = state.requests.flatMap(req=>req.isolations.map(iso=>{
     const b = state.boards[iso.dbRef];
     const c = b?b.circuits.find(x=>x.key===iso.circuitKey):null;
-    return [req.ref, req.details.project||'', req.details.client||'', iso.dbRef, iso.circuitKey||'', iso.description||(c?c.description:'')||'', iso.lockNo||'', iso.status, iso.isolatedBy||'', fmtDate(iso.date), iso.deadTest||'', iso.reinstatedBy||''];
+    return [req.ref, req.details.project||'', req.details.client||'', iso.dbRef, iso.circuitKey||'', iso.description||(c?c.description:'')||'', iso.building||'', iso.location||'', iso.devicePoint||'', iso.deviceType||'', iso.deadTest||'', fmtDate(iso.date), iso.time||''];
   }));
   doc.autoTable({
     startY:y, theme:'grid', styles:{fontSize:7,cellPadding:3},
     headStyles:{fillColor:[139,26,26]},
-    head:[['Req Ref','Project','Client','DB','Circuit','Description','Lock','Status','Isolated By','Date','Dead Test','Reinstated By']],
-    body: rows.length?rows:[['(no isolations logged)','','','','','','','','','','','']]
+    head:[['Req Ref','Project','Client','DB','Circuit','Description','Building','Location','Isolation Point','Device','Dead Test','Date','Time']],
+    body: rows.length?rows:[['(no isolations logged)','','','','','','','','','','','','']]
   });
   const pages = doc.internal.getNumberOfPages();
   for(let p=1;p<=pages;p++){
@@ -1170,11 +1170,11 @@ function exportExcel(id){
     ['Contact Number',req.details.contact,'Permit / Work Ref',req.details.permitRef],
     [],
     ['2. ISOLATION REQUIREMENTS'],
-    ['#','DB','Circuit','Description','Isolation Point','Device','Lock No.','Dead Test','Status','Isolated By','Date','Time'],
+    ['#','DB','Circuit','Description','Building','Location','Isolation Point','Device','Dead Test','Date','Time'],
     ...req.isolations.map((iso,i)=>{
       const b = state.boards[iso.dbRef];
       const c = b?b.circuits.find(x=>x.key===iso.circuitKey):null;
-      return [i+1, iso.dbRef, iso.circuitKey, iso.description||(c?c.description:''), iso.devicePoint, iso.deviceType, iso.lockNo, iso.deadTest, iso.status, iso.isolatedBy, fmtDate(iso.date), iso.time];
+      return [i+1, iso.dbRef, iso.circuitKey, iso.description||(c?c.description:''), iso.building||'', iso.location||'', iso.devicePoint, iso.deviceType, iso.deadTest, fmtDate(iso.date), iso.time];
     }),
     [],
     ['3. RISK REVIEW / PRECAUTIONS'],
@@ -1235,11 +1235,11 @@ function exportRegisterExcel(){
     ['MASTER LOTO REGISTER'],
     ['Document No.','MP-LOTO-001','Printed',new Date().toLocaleDateString('en-GB')],
     [],
-    ['Request Ref','Project','Client','DB','Circuit','Description','Lock No.','Status','Isolated By','Date','Time','Dead Test','Reinstated By'],
+    ['Request Ref','Project','Client','DB','Circuit','Description','Building','Location','Isolation Point','Device','Dead Test','Date','Time'],
     ...state.requests.flatMap(req=>req.isolations.map(iso=>{
       const b = state.boards[iso.dbRef];
       const c = b?b.circuits.find(x=>x.key===iso.circuitKey):null;
-      return [req.ref, req.details.project, req.details.client, iso.dbRef, iso.circuitKey, iso.description||(c?c.description:''), iso.lockNo, iso.status, iso.isolatedBy, fmtDate(iso.date), iso.time, iso.deadTest, iso.reinstatedBy];
+      return [req.ref, req.details.project, req.details.client, iso.dbRef, iso.circuitKey, iso.description||(c?c.description:''), iso.building||'', iso.location||'', iso.devicePoint||'', iso.deviceType||'', iso.deadTest, fmtDate(iso.date), iso.time];
     }))
   ];
   const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -1320,14 +1320,13 @@ function previewExcel(id){
 
       <h4>2. Isolation Requirements</h4>
       <table>
-        <thead><tr><th>#</th><th>DB</th><th>Circuit</th><th>Description</th><th>Isolation Point</th><th>Device</th><th>Lock</th><th>Dead Test</th><th>Status</th><th>Isolated By</th><th>Date</th><th>Time</th></tr></thead>
+        <thead><tr><th>#</th><th>DB</th><th>Circuit</th><th>Description</th><th>Building</th><th>Location</th><th>Isolation Point</th><th>Device</th><th>Dead Test</th><th>Date</th><th>Time</th></tr></thead>
         <tbody>${req.isolations.length?req.isolations.map((iso,i)=>`<tr>
           <td>${i+1}</td><td>${iso.dbRef}</td><td><b>${iso.circuitKey||''}</b></td>
-          <td>${escape(circDesc(iso))}</td><td>${escape(iso.devicePoint||'')}</td>
-          <td>${iso.deviceType||''}</td><td>${escape(iso.lockNo||'')}</td>
-          <td>${iso.deadTest||''}</td><td>${iso.status}</td>
-          <td>${escape(iso.isolatedBy||'')}</td><td>${fmtDate(iso.date)}</td><td>${iso.time||''}</td>
-        </tr>`).join(''):'<tr><td colspan="12" style="text-align:center;color:#6b7280;font-style:italic">No isolations logged</td></tr>'}</tbody>
+          <td>${escape(circDesc(iso))}</td><td>${escape(iso.building||'')}</td><td>${escape(iso.location||'')}</td>
+          <td>${escape(iso.devicePoint||'')}</td><td>${iso.deviceType||''}</td>
+          <td>${iso.deadTest||''}</td><td>${fmtDate(iso.date)}</td><td>${iso.time||''}</td>
+        </tr>`).join(''):'<tr><td colspan="11" style="text-align:center;color:#6b7280;font-style:italic">No isolations logged</td></tr>'}</tbody>
       </table>
 
       <h4>3. Risk Review / Precautions</h4>
@@ -1383,7 +1382,7 @@ function previewRegisterExcel(){
         <tr><td><b>Document No.</b></td><td>MP-LOTO-001</td><td><b>Printed</b></td><td colspan="3">${new Date().toLocaleDateString('en-GB')}</td></tr>
       </table>
       <table>
-        <thead><tr><th>Req Ref</th><th>Project</th><th>Client</th><th>DB</th><th>Circuit</th><th>Description</th><th>Lock</th><th>Status</th><th>Isolated By</th><th>Date</th><th>Dead Test</th></tr></thead>
+        <thead><tr><th>Req Ref</th><th>Project</th><th>Client</th><th>DB</th><th>Circuit</th><th>Description</th><th>Building</th><th>Location</th><th>Isolation Point</th><th>Device</th><th>Dead Test</th><th>Date</th><th>Time</th></tr></thead>
         <tbody>${rows.length?rows.map(({req,iso,desc})=>`<tr>
           <td><b>${escape(req.ref)}</b></td>
           <td>${escape(req.details.project||'')}</td>
@@ -1391,12 +1390,14 @@ function previewRegisterExcel(){
           <td>${iso.dbRef}</td>
           <td><b>${iso.circuitKey||''}</b></td>
           <td>${escape(desc)}</td>
-          <td>${escape(iso.lockNo||'')}</td>
-          <td>${iso.status}</td>
-          <td>${escape(iso.isolatedBy||'')}</td>
-          <td>${fmtDate(iso.date)}</td>
+          <td>${escape(iso.building||'')}</td>
+          <td>${escape(iso.location||'')}</td>
+          <td>${escape(iso.devicePoint||'')}</td>
+          <td>${iso.deviceType||''}</td>
           <td>${iso.deadTest||''}</td>
-        </tr>`).join(''):'<tr><td colspan="11" style="text-align:center;color:#6b7280;font-style:italic">No isolations logged</td></tr>'}</tbody>
+          <td>${fmtDate(iso.date)}</td>
+          <td>${iso.time||''}</td>
+        </tr>`).join(''):'<tr><td colspan="13" style="text-align:center;color:#6b7280;font-style:italic">No isolations logged</td></tr>'}</tbody>
       </table>
     </div>
   `;
