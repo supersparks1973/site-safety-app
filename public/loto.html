@@ -995,13 +995,14 @@ function buildRequestPdf(req){
   } else {
     doc.autoTable({
       startY:y+6, theme:'grid',
-      styles:{fontSize:8, cellPadding:5, overflow:'linebreak', minCellHeight:20, valign:'middle'},
-      headStyles:{fillColor:[139,26,26]},
-      head:[['#','DB','Circuit','Description','Device','Lock','Dead Test','Status','By','Date']],
+      styles:{fontSize:7, cellPadding:3, overflow:'linebreak', minCellHeight:18, valign:'middle'},
+      headStyles:{fillColor:[139,26,26], fontSize:7},
+      head:[['#','DB','Circuit','Description','Building','Location','Isolation Point','Device','Dead Test','Date','Time']],
+      columnStyles:{0:{cellWidth:16,halign:'center'},1:{cellWidth:58},2:{cellWidth:30},3:{cellWidth:96},4:{cellWidth:54},5:{cellWidth:54},6:{cellWidth:52},7:{cellWidth:36},8:{cellWidth:34},9:{cellWidth:42},10:{cellWidth:26}},
       body: req.isolations.map((iso,i)=>{
         const b = state.boards[iso.dbRef];
         const c = b?b.circuits.find(x=>x.key===iso.circuitKey):null;
-        return [String(i+1).padStart(2,'0'), iso.dbRef, iso.circuitKey, iso.description||(c?c.description:'')||'', iso.deviceType||'', iso.lockNo||'', iso.deadTest||'', iso.status, iso.isolatedBy||'', fmtDate(iso.date)];
+        return [String(i+1).padStart(2,'0'), iso.dbRef, iso.circuitKey, iso.description||(c?c.description:'')||'', iso.building||'', iso.location||'', iso.devicePoint||'', iso.deviceType||'', iso.deadTest||'', fmtDate(iso.date), iso.time||''];
       })
     });
     y = doc.lastAutoTable.finalY + 22;
