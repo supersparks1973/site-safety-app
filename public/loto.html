@@ -1090,35 +1090,19 @@ function exportPdf(id){
 }
 
 // Open a generated PDF in a new browser tab so it previews and prints reliably.
-// This page usually runs inside the portal iframe, where the in-page modal renders
-// off-screen and window.print() prints the wrong document. A programmatic <a target=_blank>
-// click opens a real top-level tab on user gesture and is not treated as a blocked pop-up.
+// (The in-page modal preview fails when this page runs inside the portal iframe,
+//  and window.print() prints the wrong document, so we open the PDF directly.)
 function openPdfInTab(doc, filename){
-  let url;
   try{
-    url = URL.createObjectURL(doc.output('blob'));
-  }catch(err){
-    alert('Sorry — the PDF could not be generated: ' + (err && err.message ? err.message : err));
-    return;
-  }
-  try{
-    const a = document.createElement('a');
-    a.href = url; a.target = '_blank'; a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }catch(err){
+    const url = doc.output('bloburl');
     const w = window.open(url, '_blank');
     if(!w){
-      try{
-        doc.save(filename);
-        alert('Your browser blocked the new tab, so the PDF was downloaded instead — open it to view or print.');
-      }catch(_){
-        alert('Unable to open the PDF: ' + (err && err.message ? err.message : err));
-      }
+      doc.save(filename);
+      alert('Your browser blocked the pop-up, so the PDF was downloaded instead — open it to view or print.');
     }
+  }catch(e){
+    try{ doc.save(filename); }catch(_){}
   }
-  setTimeout(function(){ try{ URL.revokeObjectURL(url); }catch(_){} }, 120000);
 }
 
 function previewPdf(id){
