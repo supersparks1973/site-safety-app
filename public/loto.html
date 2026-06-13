@@ -440,7 +440,7 @@ function renderRequest(){
         <button class="btn btn-sm btn-primary" onclick="previewPdf('${r.id}')">👁 Preview</button>
         <button class="btn btn-sm btn-secondary" onclick="exportPdf('${r.id}')">📄 PDF</button>
         <button class="btn btn-sm btn-secondary" onclick="exportExcel('${r.id}')">📊 Excel</button>
-        <button class="btn btn-sm btn-secondary" onclick="previewPdf('${r.id}')">🖨 Print</button>
+        <button class="btn btn-sm btn-secondary" onclick="window.print()">🖨 Print</button>
         <button class="btn btn-sm btn-danger" onclick="deleteRequest('${r.id}')">Delete</button>
       </div>
     </h2>
@@ -619,7 +619,7 @@ function renderRegister(){
         <button class="btn btn-sm btn-primary" onclick="previewRegisterPdf()">👁 Preview</button>
         <button class="btn btn-sm btn-secondary" onclick="exportRegisterPdf()">📄 PDF</button>
         <button class="btn btn-sm btn-secondary" onclick="exportRegisterExcel()">📊 Excel</button>
-        <button class="btn btn-sm btn-secondary" onclick="previewRegisterPdf()">🖨 Print</button>
+        <button class="btn btn-sm btn-secondary" onclick="window.print()">🖨 Print</button>
       </div>
     </h2>
     <div class="filter-bar no-print">
@@ -1089,26 +1089,15 @@ function exportPdf(id){
   doc.save(`LOTO-${req.ref}.pdf`);
 }
 
-// Open a generated PDF in a new browser tab so it previews and prints reliably.
-// (The in-page modal preview fails when this page runs inside the portal iframe,
-//  and window.print() prints the wrong document, so we open the PDF directly.)
-function openPdfInTab(doc, filename){
-  try{
-    const url = doc.output('bloburl');
-    const w = window.open(url, '_blank');
-    if(!w){
-      doc.save(filename);
-      alert('Your browser blocked the pop-up, so the PDF was downloaded instead — open it to view or print.');
-    }
-  }catch(e){
-    try{ doc.save(filename); }catch(_){}
-  }
-}
-
 function previewPdf(id){
   const req = state.requests.find(r=>r.id===id);
   if(!req){ alert('Request not found'); return; }
-  openPdfInTab(buildRequestPdf(req), `LOTO-${req.ref}.pdf`);
+  const doc = buildRequestPdf(req);
+  const url = doc.output('bloburl');
+  openPreview(`PDF Preview — LOTO Request ${req.ref}`, {iframeUrl:url}, [
+    {label:'⬇ Download PDF', primary:true, onClick:()=>doc.save(`LOTO-${req.ref}.pdf`)},
+    {label:'📊 Preview Excel', onClick:()=>previewExcel(id)}
+  ]);
 }
 
 function buildRegisterPdf(){
@@ -1151,7 +1140,12 @@ function exportRegisterPdf(){
 }
 
 function previewRegisterPdf(){
-  openPdfInTab(buildRegisterPdf(), `LOTO-Master-Register-${todayIso()}.pdf`);
+  const doc = buildRegisterPdf();
+  const url = doc.output('bloburl');
+  openPreview('PDF Preview — Master LOTO Register', {iframeUrl:url}, [
+    {label:'⬇ Download PDF', primary:true, onClick:()=>doc.save(`LOTO-Master-Register-${todayIso()}.pdf`)},
+    {label:'📊 Preview Excel', onClick:()=>previewRegisterExcel()}
+  ]);
 }
 
 // ============================================================
