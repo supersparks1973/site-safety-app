@@ -7,6 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <style>
 :root{
   --brand:#8B1A1A; --brand2:#B22222; --ink:#1a1a1a; --muted:#6b7280;
@@ -689,6 +690,13 @@ function renderSchedule(){
       <div><label>Board Size / Rating</label><input value="${escape(b.size||'')}" oninput="state.boards['${scheduleBoardKey}'].size=this.value;save()"></div>
       <div><label>PFC / Zdb</label><input value="${escape(b.pfc||'')}" oninput="state.boards['${scheduleBoardKey}'].pfc=this.value;save()"></div>
     </div>
+    <div class="no-print" style="margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:8px;background:#fafafa">
+      <label style="font-weight:600;display:block">📎 Circuit Schedule Attachment (PDF)</label>
+      <div class="small" style="margin:4px 0 8px">Attach this board's circuit schedule PDF. It is appended to the end of any LOTO request PDF that isolates a circuit on this board. Keep files under 3 MB.</div>
+      ${b.schedulePdf
+        ? `<div style="display:flex;align-items:center;gap:10px"><span class="status s-isolated">${escape(b.scheduleName||'circuit-schedule.pdf')}</span><button class="btn btn-sm btn-ghost" onclick="viewSchedulePdf()">View</button><button class="btn btn-sm btn-danger" onclick="removeSchedulePdf()">Remove</button></div>`
+        : `<input type="file" accept="application/pdf" onchange="uploadSchedulePdf(this.files&&this.files[0])">`}
+    </div>
     <h3>Circuits <button class="btn btn-sm btn-secondary" onclick="addCircuit()">+ Circuit</button></h3>
     <div style="overflow-x:auto">
     <table class="data">
@@ -726,6 +734,55 @@ function removeCircuit(i){
   state.boards[scheduleBoardKey].circuits.splice(i,1);
   save(); renderSchedule();
 }
+// ---------- Circuit schedule PDF attachment (per board) ----------
+function uploadSchedulePdf(file){
+  if(!file) return;
+  if(file.type!=='application/pdf'){ alert('Please choose a PDF file.'); return; }
+  if(file.size > 3*1024*1024){ alert('That PDF is '+(file.size/1048576).toFixed(1)+' MB. Please attach a PDF under 3 MB so it fits in browser storage.'); return; }
+  const reader = new FileReader();
+  reader.onload = e=>{
+    const board = state.boards[scheduleBoardKey];
+    const prevPdf = board.schedulePdf, prevName = board.scheduleName;
+    board.schedulePdf = e.target.result;
+    board.scheduleName = file.name;
+    try{ save(); }
+    catch(err){
+      board.schedulePdf = prevPdf||''; board.scheduleName = prevName||'';
+      alert('Could not save the attachment — your browser storage is full. Try a smaller PDF, or remove other attachments/logo first.');
+      return;
+    }
+    renderSchedule();
+  };
+  reader.onerror = ()=> alert('Could not read that file. Please try again.');
+  reader.readAsDataURL(file);
+}
+function removeSchedulePdf(){
+  if(!confirm('Remove the attached circuit schedule from this board?')) return;
+  state.boards[scheduleBoardKey].schedulePdf = '';
+  state.boards[scheduleBoardKey].scheduleName = '';
+  save(); renderSchedule();
+}
+function viewSchedulePdf(){
+  const b = state.boards[scheduleBoardKey];
+  if(!b || !b.schedulePdf) return;
+  try{
+    const bytes = dataUrlToBytes(b.schedulePdf);
+    const url = URL.createObjectURL(new Blob([bytes], {type:'application/pdf'}));
+    const a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>{ try{ URL.revokeObjectURL(url); }catch(_){} }, 120000);
+  }catch(e){ alert('Could not open the attachment: '+e.message); }
+}
+// Decode a data: URL (base64) into a Uint8Array of raw bytes.
+function dataUrlToBytes(dataUrl){
+  const b64 = String(dataUrl).split(',')[1] || '';
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+  return arr;
+}
+
 function addBoard(){
   const name = prompt('New DB reference (e.g. DB-EB2M):');
   if(!name) return;
@@ -1084,20 +1141,51 @@ function buildRequestPdf(req){
   return doc;
 }
 
-function exportPdf(id){
-  const req = state.requests.find(r=>r.id===id);
-  if(!req){ alert('Request not found'); return; }
+// Build the request PDF and append any attached circuit-schedule PDFs (for the DBs
+// referenced in this request) as extra pages. Returns raw PDF bytes (Uint8Array).
+// Falls back to the plain LOTO PDF if nothing is attached or pdf-lib is unavailable.
+async function buildRequestPdfBytes(req){
   const doc = buildRequestPdf(req);
-  doc.save(`LOTO-${req.ref}.pdf`);
+  const baseBytes = new Uint8Array(doc.output('arraybuffer'));
+  const dbRefs = [...new Set(req.isolations.map(i=>i.dbRef).filter(Boolean))];
+  const attachments = dbRefs.map(r=>state.boards[r]).filter(b=>b && b.schedulePdf);
+  if(!attachments.length || !window.PDFLib) return baseBytes;
+  try{
+    const { PDFDocument } = window.PDFLib;
+    const merged = await PDFDocument.load(baseBytes);
+    for(const b of attachments){
+      try{
+        const src = await PDFDocument.load(dataUrlToBytes(b.schedulePdf));
+        const pages = await merged.copyPages(src, src.getPageIndices());
+        pages.forEach(p=>merged.addPage(p));
+      }catch(inner){ console.error('Could not append schedule for', b.ref, inner); }
+    }
+    return await merged.save();
+  }catch(e){ console.error('Schedule merge failed, using base PDF:', e); return baseBytes; }
 }
 
-function previewPdf(id){
+function downloadPdfBytes(bytes, filename){
+  const url = URL.createObjectURL(new Blob([bytes], {type:'application/pdf'}));
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>{ try{ URL.revokeObjectURL(url); }catch(_){} }, 120000);
+}
+
+async function exportPdf(id){
   const req = state.requests.find(r=>r.id===id);
   if(!req){ alert('Request not found'); return; }
-  const doc = buildRequestPdf(req);
-  const url = doc.output('bloburl');
+  const bytes = await buildRequestPdfBytes(req);
+  downloadPdfBytes(bytes, `LOTO-${req.ref}.pdf`);
+}
+
+async function previewPdf(id){
+  const req = state.requests.find(r=>r.id===id);
+  if(!req){ alert('Request not found'); return; }
+  const bytes = await buildRequestPdfBytes(req);
+  const url = URL.createObjectURL(new Blob([bytes], {type:'application/pdf'}));
   openPreview(`PDF Preview — LOTO Request ${req.ref}`, {iframeUrl:url}, [
-    {label:'⬇ Download PDF', primary:true, onClick:()=>doc.save(`LOTO-${req.ref}.pdf`)},
+    {label:'⬇ Download PDF', primary:true, onClick:()=>downloadPdfBytes(bytes, `LOTO-${req.ref}.pdf`)},
     {label:'📊 Preview Excel', onClick:()=>previewExcel(id)}
   ]);
 }
