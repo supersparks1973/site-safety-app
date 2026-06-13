@@ -922,6 +922,32 @@ document.getElementById('tabs').addEventListener('click', e=>{
 // ============================================================
 // EXPORTS — PDF
 // ============================================================
+// Preload the Man Projects logo (/logo.png) into a data URL so it can be
+// embedded in PDFs as a default when no custom logo has been uploaded.
+let MP_LOGO = null, MP_LOGO_AR = 1.5;
+(function preloadLogo(){
+  try{
+    const img = new Image();
+    img.onload = ()=>{
+      try{
+        const cv = document.createElement('canvas');
+        cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+        cv.getContext('2d').drawImage(img,0,0);
+        MP_LOGO = cv.toDataURL('image/png');
+        if(img.naturalHeight) MP_LOGO_AR = img.naturalWidth/img.naturalHeight;
+      }catch(e){}
+    };
+    img.src = '/logo.png';
+  }catch(e){}
+})();
+// Draw the header logo for a PDF, preferring a user-uploaded logo, else the MP logo.
+function drawPdfLogo(doc, x, y, h){
+  const logo = state.settings.logo || MP_LOGO;
+  if(!logo) return;
+  const w = state.settings.logo ? 60 : h*MP_LOGO_AR;
+  try{ doc.addImage(logo,'PNG',x,y,w,h); }catch(e){}
+}
+
 function buildRequestPdf(req){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:'pt',format:'a4'});
@@ -929,26 +955,24 @@ function buildRequestPdf(req){
   let y = 40;
 
   // header
-  if(state.settings.logo){
-    try{ doc.addImage(state.settings.logo,'PNG',40,y,60,40); }catch(e){}
-  }
-  doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  drawPdfLogo(doc, 40, y, 46);
+  doc.setFont('helvetica','bold'); doc.setFontSize(15);
   doc.setTextColor(139,26,26);
-  doc.text(state.settings.company, W/2, y+16, {align:'center'});
+  doc.text(state.settings.company, W/2, y+18, {align:'center'});
   doc.setFontSize(11);
-  doc.text('LOTO CONTRACTOR SYSTEM — REQUEST, ISOLATION & CLOSE-OUT', W/2, y+32, {align:'center'});
+  doc.text('LOTO CONTRACTOR SYSTEM — REQUEST, ISOLATION & CLOSE-OUT', W/2, y+38, {align:'center'});
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(80);
-  doc.text(`Document No. MP-LOTO-FRM-001 · Rev 1 · Ref ${req.ref} · Printed ${new Date().toLocaleDateString('en-GB')}`, W/2, y+46, {align:'center'});
-  y += 60;
-  doc.setDrawColor(139,26,26); doc.setLineWidth(1.2); doc.line(40,y,W-40,y); y += 14;
+  doc.text(`Document No. MP-LOTO-FRM-001 · Rev 1 · Ref ${req.ref} · Printed ${new Date().toLocaleDateString('en-GB')}`, W/2, y+54, {align:'center'});
+  y += 74;
+  doc.setDrawColor(139,26,26); doc.setLineWidth(1.2); doc.line(40,y,W-40,y); y += 22;
 
   // Section 1
   doc.setTextColor(139,26,26); doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text('1. REQUEST DETAILS', 40, y); y+=4;
+  doc.text('1. REQUEST DETAILS', 40, y); y+=6;
   doc.autoTable({
-    startY:y+2,
+    startY:y+4,
     theme:'grid',
-    styles:{fontSize:9,cellPadding:4},
+    styles:{fontSize:9,cellPadding:6},
     headStyles:{fillColor:[139,26,26]},
     body:[
       ['Project / Site', req.details.project||'', 'Request No.', req.ref],
@@ -958,19 +982,19 @@ function buildRequestPdf(req){
     ],
     columnStyles:{0:{fontStyle:'bold',fillColor:[253,242,242],cellWidth:100},2:{fontStyle:'bold',fillColor:[253,242,242],cellWidth:100}}
   });
-  y = doc.lastAutoTable.finalY + 14;
+  y = doc.lastAutoTable.finalY + 22;
 
   // Section 2 - isolations
   doc.setTextColor(139,26,26); doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text('2. ISOLATION REQUIREMENTS', 40, y);
+  doc.text('2. ISOLATION REQUIREMENTS', 40, y); y+=6;
   if(req.isolations.length===0){
     doc.setFont('helvetica','italic'); doc.setTextColor(120); doc.setFontSize(9);
     doc.text('No isolations logged.', 40, y+16);
     y += 24;
   } else {
     doc.autoTable({
-      startY:y+4, theme:'grid',
-      styles:{fontSize:8, cellPadding:3, overflow:'linebreak'},
+      startY:y+6, theme:'grid',
+      styles:{fontSize:8, cellPadding:5, overflow:'linebreak', minCellHeight:20, valign:'middle'},
       headStyles:{fillColor:[139,26,26]},
       head:[['#','DB','Circuit','Description','Device','Lock','Dead Test','Status','By','Date']],
       body: req.isolations.map((iso,i)=>{
@@ -979,16 +1003,16 @@ function buildRequestPdf(req){
         return [String(i+1).padStart(2,'0'), iso.dbRef, iso.circuitKey, iso.description||(c?c.description:'')||'', iso.deviceType||'', iso.lockNo||'', iso.deadTest||'', iso.status, iso.isolatedBy||'', fmtDate(iso.date)];
       })
     });
-    y = doc.lastAutoTable.finalY + 14;
+    y = doc.lastAutoTable.finalY + 22;
   }
 
   // Section 3 - risk
   if(y > 700){ doc.addPage(); y = 40; }
   doc.setTextColor(139,26,26); doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text('3. RISK REVIEW / PRECAUTIONS', 40, y);
+  doc.text('3. RISK REVIEW / PRECAUTIONS', 40, y); y+=6;
   doc.autoTable({
     startY:y+4, theme:'grid',
-    styles:{fontSize:9,cellPadding:4},
+    styles:{fontSize:9,cellPadding:6},
     headStyles:{fillColor:[139,26,26]},
     body:[
       ['Permit to Work', req.risk.permit, 'Test Equipment', req.risk.testKit],
@@ -998,16 +1022,16 @@ function buildRequestPdf(req){
     ],
     columnStyles:{0:{fontStyle:'bold',fillColor:[253,242,242]},2:{fontStyle:'bold',fillColor:[253,242,242]}}
   });
-  y = doc.lastAutoTable.finalY + 6;
+  y = doc.lastAutoTable.finalY + 12;
   doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(40);
-  doc.text('Additional Controls / Comments:', 40, y); y += 10;
+  doc.text('Additional Controls / Comments:', 40, y); y += 14;
   const commentLines = doc.splitTextToSize(req.risk.comments||'-', W-80);
-  doc.text(commentLines, 40, y); y += commentLines.length*11 + 10;
+  doc.text(commentLines, 40, y); y += commentLines.length*13 + 16;
 
   // Section 4 - signatures
   if(y > 640){ doc.addPage(); y = 40; }
   doc.setTextColor(139,26,26); doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text('4. AUTHORISATION AND SIGN-OFF', 40, y); y += 8;
+  doc.text('4. AUTHORISATION AND SIGN-OFF', 40, y); y += 12;
   const roles = [
     ['Requested By','requested'],['Reviewed By','reviewed'],['Authorised By','authorised'],
     ['Work Completed By','completed'],['Supply Reinstated By','reinstated']
@@ -1081,7 +1105,7 @@ function buildRegisterPdf(){
   const doc = new jsPDF({unit:'pt',format:'a4',orientation:'landscape'});
   const W = doc.internal.pageSize.getWidth();
   let y = 40;
-  if(state.settings.logo){ try{ doc.addImage(state.settings.logo,'PNG',40,y,60,40); }catch(e){} }
+  drawPdfLogo(doc, 40, y, 40);
   doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(139,26,26);
   doc.text(state.settings.company, W/2, y+16, {align:'center'});
   doc.setFontSize(11);
