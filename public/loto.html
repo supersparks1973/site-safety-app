@@ -290,7 +290,7 @@ function newIsolation(){
     id: uid(),
     dbRef:'',
     circuitKey:'', // e.g. 11R
-    description:'', devicePoint:'', deviceType:'MCB',
+    description:'', building:'', location:'', devicePoint:'', deviceType:'MCB',
     lockNo:'', deadTest:'Pending',
     status:'Pending', isolatedBy:'', date:'', time:'',
     reinstatedBy:'', reinstatedDate:''
@@ -413,6 +413,8 @@ function renderRequest(){
       <td><input list="loto-db-list" value="${escape(iso.dbRef||'')}" placeholder="e.g. DB-EB1M" oninput="updIso('${iso.id}','dbRef',this.value);upd()" style="min-width:90px"></td>
       <td><input list="loto-circuit-list" value="${escape(iso.circuitKey||'')}" placeholder="e.g. 11R" oninput="updIsoCircuit('${iso.id}',this.value);upd()" style="min-width:80px"></td>
       <td class="${phaseClass}" style="font-size:11px"><input value="${escape(iso.description || (circuit?circuit.description:'') || '')}" placeholder="Description" oninput="updIso('${iso.id}','description',this.value)" style="min-width:180px">${circuit?'<div class="small" style="margin-top:2px">'+ (circuit.mcbA||'')+'A '+(circuit.mcbType||'')+'</div>':''}</td>
+      <td><input value="${escape(iso.building||'')}" placeholder="Building" oninput="updIso('${iso.id}','building',this.value)" style="min-width:120px"></td>
+      <td><input value="${escape(iso.location||'')}" placeholder="Location" oninput="updIso('${iso.id}','location',this.value)" style="min-width:120px"></td>
       <td><input value="${escape(iso.devicePoint||'')}" oninput="updIso('${iso.id}','devicePoint',this.value)"></td>
       <td><select onchange="updIso('${iso.id}','deviceType',this.value)" style="min-width:160px">${DEVICE_TYPES.map(d=>`<option ${iso.deviceType===d?'selected':''}>${d}</option>`).join('')}</select></td>
       <td><select onchange="updIso('${iso.id}','deadTest',this.value)"><option>Pending</option><option ${iso.deadTest==='Verified'?'selected':''}>Verified</option><option ${iso.deadTest==='Failed'?'selected':''}>Failed</option><option ${iso.deadTest==='N/A'?'selected':''}>N/A</option></select></td>
@@ -465,7 +467,7 @@ function renderRequest(){
     <datalist id="loto-circuit-list">${Object.values(state.boards).flatMap(br=>br.circuits).map(c=>`<option value="${escape(c.key||'')}">${escape(c.description||'')}</option>`).join('')}</datalist>
     <div style="overflow-x:auto">
     <table class="data">
-      <thead><tr><th>#</th><th>DB</th><th>Circuit / Way</th><th>Description</th><th>Isolation Point</th><th>Device</th><th>Dead Test</th><th>Date</th><th>Time</th><th class="no-print"></th></tr></thead>
+      <thead><tr><th>#</th><th>DB</th><th>Circuit / Way</th><th>Description</th><th>Building</th><th>Location</th><th>Isolation Point</th><th>Device</th><th>Dead Test</th><th>Date</th><th>Time</th><th class="no-print"></th></tr></thead>
       <tbody>${isoRows}</tbody>
     </table></div>`}
   </div>
