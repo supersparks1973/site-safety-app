@@ -1014,14 +1014,12 @@ function buildRequestPdf(req){
   // header — centred logo on its own line, title block beneath it (avoids overlap)
   drawPdfLogo(doc, (W-100)/2, y, 39);
   y += 52;
-  doc.setFont('helvetica','bold'); doc.setFontSize(15);
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
   doc.setTextColor(139,26,26);
-  doc.text(state.settings.company, W/2, y, {align:'center'});
-  doc.setFontSize(11);
-  doc.text('LOTO CONTRACTOR SYSTEM — REQUEST, ISOLATION & CLOSE-OUT', W/2, y+18, {align:'center'});
+  doc.text('LOTO CONTRACTOR SYSTEM — REQUEST, ISOLATION & CLOSE-OUT', W/2, y, {align:'center'});
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(80);
-  doc.text(`Document No. MP-LOTO-FRM-001 · Rev 1 · Ref ${req.ref} · Printed ${new Date().toLocaleDateString('en-GB')}`, W/2, y+33, {align:'center'});
-  y += 46;
+  doc.text(`Document No. MP-LOTO-FRM-001 · Rev 1 · Ref ${req.ref} · Printed ${new Date().toLocaleDateString('en-GB')}`, W/2, y+15, {align:'center'});
+  y += 28;
   doc.setDrawColor(139,26,26); doc.setLineWidth(1.2); doc.line(40,y,W-40,y); y += 22;
 
   // Section 1
