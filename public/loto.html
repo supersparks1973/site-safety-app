@@ -418,7 +418,6 @@ function renderRequest(){
       <td><input value="${escape(iso.location||'')}" placeholder="Location" oninput="updIso('${iso.id}','location',this.value)" style="min-width:120px"></td>
       <td><input value="${escape(iso.devicePoint||'')}" oninput="updIso('${iso.id}','devicePoint',this.value)"></td>
       <td><select onchange="updIso('${iso.id}','deviceType',this.value)" style="min-width:160px">${DEVICE_TYPES.map(d=>`<option ${iso.deviceType===d?'selected':''}>${d}</option>`).join('')}</select></td>
-      <td><select onchange="updIso('${iso.id}','deadTest',this.value)"><option>Pending</option><option ${iso.deadTest==='Verified'?'selected':''}>Verified</option><option ${iso.deadTest==='Failed'?'selected':''}>Failed</option><option ${iso.deadTest==='N/A'?'selected':''}>N/A</option></select></td>
       <td><input type="date" value="${iso.date||''}" oninput="updIso('${iso.id}','date',this.value)"></td>
       <td><input type="time" value="${iso.time||''}" oninput="updIso('${iso.id}','time',this.value)"></td>
       <td class="row-actions"><button class="icon-btn" title="Remove" onclick="removeIso('${iso.id}')">🗑</button></td>
@@ -468,7 +467,7 @@ function renderRequest(){
     <datalist id="loto-circuit-list">${Object.values(state.boards).flatMap(br=>br.circuits).map(c=>`<option value="${escape(c.key||'')}">${escape(c.description||'')}</option>`).join('')}</datalist>
     <div style="overflow-x:auto">
     <table class="data">
-      <thead><tr><th>#</th><th>DB</th><th>Circuit / Way</th><th>Description</th><th>Building</th><th>Location</th><th>Isolation Point</th><th>Device</th><th>Dead Test</th><th>Date</th><th>Time</th><th class="no-print"></th></tr></thead>
+      <thead><tr><th>#</th><th>DB</th><th>Circuit / Way</th><th>Description</th><th>Building</th><th>Location</th><th>Isolation Point</th><th>Device</th><th>Date</th><th>Time</th><th class="no-print"></th></tr></thead>
       <tbody>${isoRows}</tbody>
     </table></div>`}
   </div>
@@ -636,7 +635,7 @@ function renderRegister(){
       <thead><tr>
         <th>Request Ref</th><th>Project</th><th>Client</th><th>DB</th><th>Circuit</th>
         <th>Description</th><th>Lock No.</th><th>Status</th><th>Isolated By</th><th>Date</th>
-        <th>Dead Test</th><th>Reinstated By</th>
+        <th>Reinstated By</th>
       </tr></thead>
       <tbody>${filtered.map(({iso,req})=>{
         const board = state.boards[iso.dbRef];
@@ -652,7 +651,7 @@ function renderRegister(){
           <td><span class="status s-${iso.status.toLowerCase().replace(/\\s+/g,'').replace('re-energise','ready')}">${iso.status}</span></td>
           <td>${escape(iso.isolatedBy||'')}</td>
           <td>${fmtDate(iso.date)}</td>
-          <td>${iso.deadTest||''}</td>
+          
           <td>${escape(iso.reinstatedBy||'')}</td>
         </tr>`;
       }).join('')}</tbody>
@@ -1052,12 +1051,12 @@ function buildRequestPdf(req){
       startY:y+6, theme:'grid',
       styles:{fontSize:7, cellPadding:3, overflow:'linebreak', minCellHeight:18, valign:'middle'},
       headStyles:{fillColor:[139,26,26], fontSize:7},
-      head:[['#','DB','Circuit','Description','Building','Location','Isolation Point','Device','Dead Test','Date','Time']],
-      columnStyles:{0:{cellWidth:16,halign:'center'},1:{cellWidth:58},2:{cellWidth:30},3:{cellWidth:96},4:{cellWidth:54},5:{cellWidth:54},6:{cellWidth:52},7:{cellWidth:36},8:{cellWidth:34},9:{cellWidth:42},10:{cellWidth:26}},
+      head:[['#','DB','Circuit','Description','Building','Location','Isolation Point','Device','Date','Time']],
+      columnStyles:{0:{cellWidth:16,halign:'center'},1:{cellWidth:58},2:{cellWidth:30},3:{cellWidth:96},4:{cellWidth:54},5:{cellWidth:54},6:{cellWidth:52},7:{cellWidth:36},8:{cellWidth:42},9:{cellWidth:26}},
       body: req.isolations.map((iso,i)=>{
         const b = state.boards[iso.dbRef];
         const c = b?b.circuits.find(x=>x.key===iso.circuitKey):null;
-        return [String(i+1).padStart(2,'0'), iso.dbRef, iso.circuitKey, iso.description||(c?c.description:'')||'', iso.building||'', iso.location||'', iso.devicePoint||'', iso.deviceType||'', iso.deadTest||'', fmtDate(iso.date), iso.time||''];
+        return [String(i+1).padStart(2,'0'), iso.dbRef, iso.circuitKey, iso.description||(c?c.description:'')||'', iso.building||'', iso.location||'', iso.devicePoint||'', iso.deviceType||'', fmtDate(iso.date), iso.time||''];
       })
     });
     y = doc.lastAutoTable.finalY + 22;
@@ -1231,13 +1230,13 @@ function buildRegisterPdf(){
   const rows = state.requests.flatMap(req=>req.isolations.map(iso=>{
     const b = state.boards[iso.dbRef];
     const c = b?b.circuits.find(x=>x.key===iso.circuitKey):null;
-    return [req.ref, req.details.project||'', req.details.client||'', iso.dbRef, iso.circuitKey||'', iso.description||(c?c.description:'')||'', iso.building||'', iso.location||'', iso.devicePoint||'', iso.deviceType||'', iso.deadTest||'', fmtDate(iso.date), iso.time||''];
+    return [req.ref, req.details.project||'', req.details.client||'', iso.dbRef, iso.circuitKey||'', iso.description||(c?c.description:'')||'', iso.building||'', iso.location||'', iso.devicePoint||'', iso.deviceType||'', fmtDate(iso.date), iso.time||''];
   }));
   doc.autoTable({
     startY:y, theme:'grid', styles:{fontSize:7,cellPadding:3},
     headStyles:{fillColor:[139,26,26]},
-    head:[['Req Ref','Project','Client','DB','Circuit','Description','Building','Location','Isolation Point','Device','Dead Test','Date','Time']],
-    body: rows.length?rows:[['(no isolations logged)','','','','','','','','','','','','']]
+    head:[['Req Ref','Project','Client','DB','Circuit','Description','Building','Location','Isolation Point','Device','Date','Time']],
+    body: rows.length?rows:[['(no isolations logged)','','','','','','','','','','','']]
   });
   const pages = doc.internal.getNumberOfPages();
   for(let p=1;p<=pages;p++){
@@ -1283,11 +1282,11 @@ function exportExcel(id){
     ['Contact Number',req.details.contact,'Permit / Work Ref',req.details.permitRef],
     [],
     ['2. ISOLATION REQUIREMENTS'],
-    ['#','DB','Circuit','Description','Building','Location','Isolation Point','Device','Dead Test','Date','Time'],
+    ['#','DB','Circuit','Description','Building','Location','Isolation Point','Device','Date','Time'],
     ...req.isolations.map((iso,i)=>{
       const b = state.boards[iso.dbRef];
       const c = b?b.circuits.find(x=>x.key===iso.circuitKey):null;
-      return [i+1, iso.dbRef, iso.circuitKey, iso.description||(c?c.description:''), iso.building||'', iso.location||'', iso.devicePoint, iso.deviceType, iso.deadTest, fmtDate(iso.date), iso.time];
+      return [i+1, iso.dbRef, iso.circuitKey, iso.description||(c?c.description:''), iso.building||'', iso.location||'', iso.devicePoint, iso.deviceType, fmtDate(iso.date), iso.time];
     }),
     [],
     ['3. RISK REVIEW / PRECAUTIONS'],
@@ -1348,11 +1347,11 @@ function exportRegisterExcel(){
     ['MASTER LOTO REGISTER'],
     ['Document No.','MP-LOTO-001','Printed',new Date().toLocaleDateString('en-GB')],
     [],
-    ['Request Ref','Project','Client','DB','Circuit','Description','Building','Location','Isolation Point','Device','Dead Test','Date','Time'],
+    ['Request Ref','Project','Client','DB','Circuit','Description','Building','Location','Isolation Point','Device','Date','Time'],
     ...state.requests.flatMap(req=>req.isolations.map(iso=>{
       const b = state.boards[iso.dbRef];
       const c = b?b.circuits.find(x=>x.key===iso.circuitKey):null;
-      return [req.ref, req.details.project, req.details.client, iso.dbRef, iso.circuitKey, iso.description||(c?c.description:''), iso.building||'', iso.location||'', iso.devicePoint||'', iso.deviceType||'', iso.deadTest, fmtDate(iso.date), iso.time];
+      return [req.ref, req.details.project, req.details.client, iso.dbRef, iso.circuitKey, iso.description||(c?c.description:''), iso.building||'', iso.location||'', iso.devicePoint||'', iso.deviceType||'', fmtDate(iso.date), iso.time];
     }))
   ];
   const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -1433,13 +1432,13 @@ function previewExcel(id){
 
       <h4>2. Isolation Requirements</h4>
       <table>
-        <thead><tr><th>#</th><th>DB</th><th>Circuit</th><th>Description</th><th>Building</th><th>Location</th><th>Isolation Point</th><th>Device</th><th>Dead Test</th><th>Date</th><th>Time</th></tr></thead>
+        <thead><tr><th>#</th><th>DB</th><th>Circuit</th><th>Description</th><th>Building</th><th>Location</th><th>Isolation Point</th><th>Device</th><th>Date</th><th>Time</th></tr></thead>
         <tbody>${req.isolations.length?req.isolations.map((iso,i)=>`<tr>
           <td>${i+1}</td><td>${iso.dbRef}</td><td><b>${iso.circuitKey||''}</b></td>
           <td>${escape(circDesc(iso))}</td><td>${escape(iso.building||'')}</td><td>${escape(iso.location||'')}</td>
           <td>${escape(iso.devicePoint||'')}</td><td>${iso.deviceType||''}</td>
-          <td>${iso.deadTest||''}</td><td>${fmtDate(iso.date)}</td><td>${iso.time||''}</td>
-        </tr>`).join(''):'<tr><td colspan="11" style="text-align:center;color:#6b7280;font-style:italic">No isolations logged</td></tr>'}</tbody>
+          <td>${fmtDate(iso.date)}</td><td>${iso.time||''}</td>
+        </tr>`).join(''):'<tr><td colspan="10" style="text-align:center;color:#6b7280;font-style:italic">No isolations logged</td></tr>'}</tbody>
       </table>
 
       <h4>3. Risk Review / Precautions</h4>
@@ -1495,7 +1494,7 @@ function previewRegisterExcel(){
         <tr><td><b>Document No.</b></td><td>MP-LOTO-001</td><td><b>Printed</b></td><td colspan="3">${new Date().toLocaleDateString('en-GB')}</td></tr>
       </table>
       <table>
-        <thead><tr><th>Req Ref</th><th>Project</th><th>Client</th><th>DB</th><th>Circuit</th><th>Description</th><th>Building</th><th>Location</th><th>Isolation Point</th><th>Device</th><th>Dead Test</th><th>Date</th><th>Time</th></tr></thead>
+        <thead><tr><th>Req Ref</th><th>Project</th><th>Client</th><th>DB</th><th>Circuit</th><th>Description</th><th>Building</th><th>Location</th><th>Isolation Point</th><th>Device</th><th>Date</th><th>Time</th></tr></thead>
         <tbody>${rows.length?rows.map(({req,iso,desc})=>`<tr>
           <td><b>${escape(req.ref)}</b></td>
           <td>${escape(req.details.project||'')}</td>
@@ -1507,10 +1506,10 @@ function previewRegisterExcel(){
           <td>${escape(iso.location||'')}</td>
           <td>${escape(iso.devicePoint||'')}</td>
           <td>${iso.deviceType||''}</td>
-          <td>${iso.deadTest||''}</td>
+          
           <td>${fmtDate(iso.date)}</td>
           <td>${iso.time||''}</td>
-        </tr>`).join(''):'<tr><td colspan="13" style="text-align:center;color:#6b7280;font-style:italic">No isolations logged</td></tr>'}</tbody>
+        </tr>`).join(''):'<tr><td colspan="12" style="text-align:center;color:#6b7280;font-style:italic">No isolations logged</td></tr>'}</tbody>
       </table>
     </div>
   `;
