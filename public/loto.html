@@ -1148,7 +1148,15 @@ async function buildRequestPdfBytes(req){
   const doc = buildRequestPdf(req);
   const baseBytes = new Uint8Array(doc.output('arraybuffer'));
   const dbRefs = [...new Set(req.isolations.map(i=>i.dbRef).filter(Boolean))];
-  const attachments = dbRefs.map(r=>state.boards[r]).filter(b=>b && b.schedulePdf);
+  // Resolve each DB reference against the board KEY (e.g. BB-EC2DD) or the board's
+  // editable DB Ref field (e.g. BB-EC2DD-4), so the schedule attaches regardless of
+  // which value the isolation used. Dedupe the resolved boards.
+  const seen = new Set();
+  const attachments = [];
+  for(const r of dbRefs){
+    const hit = state.boards[r] || Object.values(state.boards).find(b=>b && b.ref===r);
+    if(hit && hit.schedulePdf && !seen.has(hit)){ seen.add(hit); attachments.push(hit); }
+  }
   if(!attachments.length || !window.PDFLib) return baseBytes;
   try{
     const { PDFDocument } = window.PDFLib;
