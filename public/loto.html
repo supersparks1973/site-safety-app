@@ -1157,7 +1157,26 @@ async function buildRequestPdfBytes(req){
     const hit = state.boards[r] || Object.values(state.boards).find(b=>b && b.ref===r);
     if(hit && hit.schedulePdf && !seen.has(hit)){ seen.add(hit); attachments.push(hit); }
   }
-  if(!attachments.length || !window.PDFLib) return baseBytes;
+  // ── Temporary diagnostic: explain in plain English when nothing attaches ──
+  if(!window.PDFLib){
+    try{ alert('Circuit schedule could not be added: the PDF tool did not load. Please check your internet connection and refresh the page, then try again.'); }catch(_){}
+    return baseBytes;
+  }
+  if(!attachments.length){
+    const withSched = Object.entries(state.boards)
+      .filter(([k,b])=>b && b.schedulePdf)
+      .map(([k,b])=>(b.ref && b.ref!==k) ? (k+' (DB Ref: '+b.ref+')') : k);
+    let msg = 'No circuit schedule was added to this LOTO PDF.\n\n';
+    msg += 'This request isolates DB: ' + (dbRefs.length ? dbRefs.join(', ') : '(none set on the isolation rows)') + '\n\n';
+    if(withSched.length){
+      msg += 'Boards that currently have a schedule attached IN THIS BROWSER:\n  ' + withSched.join('\n  ') + '\n\n';
+      msg += 'The DB on the isolation row must match one of the above (key or DB Ref).';
+    } else {
+      msg += 'No board in THIS browser has a schedule PDF stored. The attachment is saved only in the browser where it was uploaded — if you uploaded it on another device or browser, re-upload it here.';
+    }
+    try{ alert(msg); }catch(_){}
+    return baseBytes;
+  }
   try{
     const { PDFDocument } = window.PDFLib;
     const merged = await PDFDocument.load(baseBytes, { ignoreEncryption: true });
