@@ -1152,10 +1152,10 @@ async function buildRequestPdfBytes(req){
   if(!attachments.length || !window.PDFLib) return baseBytes;
   try{
     const { PDFDocument } = window.PDFLib;
-    const merged = await PDFDocument.load(baseBytes);
+    const merged = await PDFDocument.load(baseBytes, { ignoreEncryption: true });
     for(const b of attachments){
       try{
-        const src = await PDFDocument.load(dataUrlToBytes(b.schedulePdf));
+        const src = await PDFDocument.load(dataUrlToBytes(b.schedulePdf), { ignoreEncryption: true });
         const pages = await merged.copyPages(src, src.getPageIndices());
         pages.forEach(p=>merged.addPage(p));
       }catch(inner){ console.error('Could not append schedule for', b.ref, inner); }
