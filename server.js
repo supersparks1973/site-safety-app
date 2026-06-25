@@ -61,6 +61,7 @@ async function startApp() {
     date TEXT NOT NULL, time TEXT NOT NULL, location TEXT NOT NULL,
     description TEXT NOT NULL, potential_severity TEXT NOT NULL,
     immediate_actions TEXT, weather_conditions TEXT, witnesses TEXT,
+    hazard_category TEXT, further_action TEXT, corrective_action TEXT,
     photos TEXT, signature TEXT, status TEXT DEFAULT 'open', admin_notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
@@ -245,6 +246,11 @@ async function startApp() {
   };
   await Promise.all(['near_miss_reports','ladder_inspections','tower_inspections','mewp_inspections'].map(migrateSig));
 
+  // Add near-miss classification columns to existing table if not present
+  for (const col of ['hazard_category','further_action','corrective_action']) {
+    try { await pool.query(`ALTER TABLE near_miss_reports ADD COLUMN IF NOT EXISTS ${col} TEXT`); } catch(e) { console.warn(`Migration: near_miss_reports.${col}:`, e.message); }
+  }
+
   // Allow completion_date to be NULL for existing training_records table
   try { await pool.query(`ALTER TABLE training_records ALTER COLUMN completion_date DROP NOT NULL`); } catch(e) { console.warn('Migration: training_records.completion_date NULLABLE:', e.message); }
 
@@ -407,8 +413,8 @@ async function startApp() {
     try {
       const d = req.body;
       const { rows } = await pool.query(
-        'INSERT INTO near_miss_reports (user_id, date, time, location, description, potential_severity, immediate_actions, weather_conditions, witnesses, photos, signature) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id',
-        [req.user.id, d.date, d.time, d.location, d.description, d.potential_severity, d.immediate_actions || '', d.weather_conditions || '', d.witnesses || '', d.photos || '', d.signature || '']);
+        'INSERT INTO near_miss_reports (user_id, date, time, location, description, potential_severity, immediate_actions, weather_conditions, witnesses, hazard_category, further_action, corrective_action, photos, signature) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id',
+        [req.user.id, d.date, d.time, d.location, d.description, d.potential_severity, d.immediate_actions || '', d.weather_conditions || '', d.witnesses || '', d.hazard_category || '', d.further_action || '', d.corrective_action || '', d.photos || '', d.signature || '']);
       sendAdminEmail(`New Near Miss Report #${rows[0].id}`,
         `<h2>Near Miss Report</h2><p><strong>Reported by:</strong> ${req.user.full_name}</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Severity:</strong> ${d.potential_severity}</p><p><strong>Description:</strong> ${d.description}</p>`);
       // Auto-create an action for High severity near-misses
@@ -707,11 +713,14 @@ async function startApp() {
               ] })
             ] : []),
 
-            ...(r.weather_conditions || r.witnesses ? [
+            ...(r.hazard_category || r.weather_conditions || r.witnesses || r.further_action || r.corrective_action ? [
               h.sh("ADDITIONAL INFORMATION"),
               new Table({ width: { size: h.pw, type: WidthType.DXA }, columnWidths: [2200, 7160], rows: [
+                ...(r.hazard_category ? [new TableRow({ children: [h.lbl("Hazard Category", 2200), h.val(r.hazard_category, 7160)] })] : []),
                 ...(r.weather_conditions ? [new TableRow({ children: [h.lbl("Weather", 2200), h.val(r.weather_conditions, 7160)] })] : []),
                 ...(r.witnesses ? [new TableRow({ children: [h.lbl("Witnesses", 2200), h.val(r.witnesses, 7160)] })] : []),
+                ...(r.further_action ? [new TableRow({ children: [h.lbl("Further Action", 2200), h.val(r.further_action, 7160)] })] : []),
+                ...(r.corrective_action ? [new TableRow({ children: [h.lbl("Corrective Action", 2200), h.val(r.corrective_action, 7160)] })] : []),
               ] })
             ] : []),
 

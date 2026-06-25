@@ -1131,7 +1131,20 @@ function renderNearMissForm(c) {
             <label><input type="radio" name="potential_severity" value="Critical"> Critical</label>
           </div>
         </div>
+        <div class="form-group"><label>Hazard category</label>
+          <select name="hazard_category">
+            <option value="">-- Select --</option>
+            <option>Slips / Trips / Falls</option><option>Work at Height</option><option>Manual Handling</option><option>Plant / Machinery</option><option>Electrical</option><option>Falling / Dropped Object</option><option>Vehicle / Traffic</option><option>Hazardous Substance</option><option>Fire / Explosion</option><option>Housekeeping</option><option>PPE</option><option>Other</option>
+          </select>
+        </div>
         <div class="form-group"><label>Immediate actions taken</label><textarea name="immediate_actions" placeholder="What did you do straight away?" rows="2"></textarea></div>
+        <div class="form-group"><label>Further action required?</label>
+          <div class="radio-group">
+            <label><input type="radio" name="further_action" value="Yes"> Yes</label>
+            <label><input type="radio" name="further_action" value="No"> No</label>
+          </div>
+        </div>
+        <div class="form-group"><label>Recommended corrective action</label><textarea name="corrective_action" placeholder="What should be done to prevent recurrence?" rows="2"></textarea></div>
       </div>
       <div class="form-section">
         <h3>🌤️ Additional Info</h3>
@@ -1687,6 +1700,9 @@ window.showReportDetail = async function(id) {
         ${r.immediate_actions ? `<p><strong>Immediate Actions:</strong> ${esc(r.immediate_actions)}</p>` : ''}
         ${r.weather_conditions ? `<p><strong>Weather:</strong> ${esc(r.weather_conditions)}</p>` : ''}
         ${r.witnesses ? `<p><strong>Witnesses:</strong> ${esc(r.witnesses)}</p>` : ''}
+        ${r.hazard_category ? `<p><strong>Hazard Category:</strong> ${esc(r.hazard_category)}</p>` : ''}
+        ${r.further_action ? `<p><strong>Further Action Required:</strong> ${esc(r.further_action)}</p>` : ''}
+        ${r.corrective_action ? `<p><strong>Corrective Action:</strong> ${esc(r.corrective_action)}</p>` : ''}
         ${photos.length > 0 ? `<div class="modal-photos">${photos.map(p => `<img src="${esc(p)}" alt="Photo">`).join('')}</div>` : ''}
         <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
         <div class="form-group"><label>Status</label>
@@ -3635,9 +3651,12 @@ window.exportPDF = function(type, data) {
       ${section('DESCRIPTION')}
       <div class="text-block">${data.description}</div>
       ${data.immediate_actions ? section('IMMEDIATE ACTIONS TAKEN') + '<div class="text-block">' + data.immediate_actions + '</div>' : ''}
-      ${data.weather_conditions || data.witnesses ? section('ADDITIONAL INFORMATION') + '<table class="dt">' +
+      ${data.hazard_category || data.weather_conditions || data.witnesses || data.further_action || data.corrective_action ? section('ADDITIONAL INFORMATION') + '<table class="dt">' +
+        (data.hazard_category ? row('Hazard Category', data.hazard_category) : '') +
         (data.weather_conditions ? row('Weather Conditions', data.weather_conditions) : '') +
-        (data.witnesses ? row('Witnesses', data.witnesses) : '') + '</table>' : ''}
+        (data.witnesses ? row('Witnesses', data.witnesses) : '') +
+        (data.further_action ? row('Further Action Required', data.further_action) : '') +
+        (data.corrective_action ? row('Corrective Action', data.corrective_action) : '') + '</table>' : ''}
       ${data.admin_notes ? section('ADMIN NOTES') + '<div class="text-block" style="background:#FFF8E1;border-left:4px solid #F9A825">' + data.admin_notes + '</div>' : ''}
       ${data.signature ? section('SIGNATURE') + '<div style="margin-top:8px"><img src="' + data.signature + '" style="max-width:250px;max-height:80px;border:1px solid #ddd;border-radius:4px"></div>' : ''}
     `;
