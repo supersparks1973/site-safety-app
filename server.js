@@ -13,6 +13,7 @@ const PDFDocument = require('pdfkit');
 const compression = require('compression');
 const webpush = require('web-push');
 const QRCode = require('qrcode');
+const ExcelJS = require('exceljs');
 
 
 const app = express();
@@ -35,14 +36,15 @@ if (process.env.SMTP_HOST) {
   });
 }
 
-async function sendAdminEmail(subject, html) {
+async function sendAdminEmail(subject, html, attachments) {
   if (!transporter || !ADMIN_EMAIL) return;
   try {
     await transporter.sendMail({
       from: process.env.SMTP_USER || 'noreply@sitesafety.local',
       to: ADMIN_EMAIL,
       subject: `[Site Safety] ${subject}`,
-      html
+      html,
+      ...(attachments && attachments.length ? { attachments } : {})
     });
   } catch (err) {
     console.error('Email send failed:', err.message);
@@ -239,6 +241,12 @@ async function startApp() {
     }
     webpush.setVapidDetails('mailto:ian@manprojects.co.uk', vapidPublicKey, vapidPrivateKey);
   }
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS monthly_archives (
+    id SERIAL PRIMARY KEY, period TEXT NOT NULL UNIQUE,
+    filename TEXT NOT NULL, row_count INTEGER NOT NULL DEFAULT 0,
+    file_data TEXT NOT NULL, generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
 
   // Add signature column to existing tables if not present
   const migrateSig = async (table) => {
@@ -1281,6 +1289,135 @@ async function startApp() {
     }
   });
 
+  // ═══════ MONTHLY INSPECTION ARCHIVE ═══════
+  // Build an .xlsx summary of all ladder/tower/MEWP inspections in a given month.
+  async function buildMonthlyArchiveWorkbook(year, month) {
+    const start = `${year}-${String(month).padStart(2,'0')}-01`;
+    const nMonth = month === 12 ? 1 : month + 1;
+    const nYear  = month === 12 ? year + 1 : year;
+    const end = `${nYear}-${String(nMonth).padStart(2,'0')}-01`;
+
+    const [ladder, tower, mewp] = await Promise.all([
+      pool.query("SELECT l.*, u.full_name AS inspected_by FROM ladder_inspections l JOIN users u ON l.user_id = u.id WHERE l.date >= $1 AND l.date < $2 ORDER BY l.date", [start, end]),
+      pool.query("SELECT t.*, u.full_name AS inspected_by FROM tower_inspections t JOIN users u ON t.user_id = u.id WHERE t.date >= $1 AND t.date < $2 ORDER BY t.date", [start, end]),
+      pool.query("SELECT m.*, u.full_name AS inspected_by FROM mewp_inspections m JOIN users u ON m.user_id = u.id WHERE m.date >= $1 AND m.date < $2 ORDER BY m.date", [start, end]),
+    ]);
+
+    const items = [
+      ...ladder.rows.map(r => ({ ref: `LAD-${String(r.id).padStart(4,'0')}`, type: 'Ladder', equipment: r.ladder_id, r })),
+      ...tower.rows.map(r  => ({ ref: `TWR-${String(r.id).padStart(4,'0')}`, type: 'Tower',  equipment: r.tower_id,  r })),
+      ...mewp.rows.map(r   => ({ ref: `MEW-${String(r.id).padStart(4,'0')}`, type: 'MEWP',   equipment: r.mewp_id,   r })),
+    ].sort((a,b) => String(a.r.date).localeCompare(String(b.r.date)));
+
+    const monthName = new Date(`${start}T00:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'ManProjects Ltd Site Safety Portal';
+    wb.created = new Date();
+    const ws = wb.addWorksheet(monthName, { views: [{ state: 'frozen', ySplit: 1 }] });
+    ws.columns = [
+      { header: 'Ref', key: 'ref', width: 12 },
+      { header: 'Date', key: 'date', width: 12 },
+      { header: 'Type', key: 'type', width: 10 },
+      { header: 'Equipment ID', key: 'equipment', width: 16 },
+      { header: 'Location', key: 'location', width: 28 },
+      { header: 'Inspected By', key: 'inspected_by', width: 22 },
+      { header: 'Safe To Use', key: 'safe', width: 12 },
+      { header: 'Defects Found', key: 'defects', width: 40 },
+      { header: 'Actions Taken', key: 'actions', width: 40 },
+    ];
+    const hdr = ws.getRow(1);
+    hdr.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    hdr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF8B1A1A' } };
+    hdr.alignment = { vertical: 'middle' };
+
+    for (const it of items) {
+      const r = it.r;
+      const row = ws.addRow({
+        ref: it.ref, date: r.date || '', type: it.type, equipment: it.equipment || '',
+        location: r.location || '', inspected_by: r.inspected_by || '',
+        safe: r.safe_to_use || '', defects: r.defects_found || '', actions: r.actions_taken || '',
+      });
+      row.alignment = { vertical: 'top', wrapText: true };
+      if (r.safe_to_use === 'No') {
+        const cell = row.getCell('safe');
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8D7DA' } };
+        cell.font = { bold: true, color: { argb: 'FF8B0000' } };
+      }
+    }
+    ws.autoFilter = { from: 'A1', to: 'I1' };
+
+    const buffer = Buffer.from(await wb.xlsx.writeBuffer());
+    const filename = `Inspections_${year}-${String(month).padStart(2,'0')}.xlsx`;
+    return { buffer, rowCount: items.length, filename, monthName };
+  }
+
+  async function generateAndStoreArchive(year, month, opts) {
+    const email = !opts || opts.email !== false;
+    const period = `${year}-${String(month).padStart(2,'0')}`;
+    const { buffer, rowCount, filename, monthName } = await buildMonthlyArchiveWorkbook(year, month);
+    const { rows } = await pool.query(
+      `INSERT INTO monthly_archives (period, filename, row_count, file_data, generated_at)
+       VALUES ($1,$2,$3,$4,CURRENT_TIMESTAMP)
+       ON CONFLICT (period) DO UPDATE SET filename=EXCLUDED.filename, row_count=EXCLUDED.row_count, file_data=EXCLUDED.file_data, generated_at=CURRENT_TIMESTAMP
+       RETURNING id, period, filename, row_count, generated_at`,
+      [period, filename, rowCount, buffer.toString('base64')]);
+    if (email) {
+      await sendAdminEmail(`Monthly Inspection Archive — ${monthName}`,
+        `<h2 style="color:#8B1A1A">ManProjects Ltd — Monthly Inspection Archive</h2>
+         <p>Attached is the inspection summary spreadsheet for <strong>${monthName}</strong>.</p>
+         <p>Total inspections: <strong>${rowCount}</strong> (ladder, tower and MEWP).</p>
+         <p style="font-size:12px;color:#888">Generated automatically by the Site Safety Portal. Also available under Monthly Archives in the app.</p>`,
+        [{ filename, content: buffer }]);
+    }
+    return rows[0];
+  }
+
+  // Generate any missing archives for the last few completed months (idempotent).
+  async function checkMonthlyArchive() {
+    try {
+      const now = new Date();
+      for (let back = 1; back <= 3; back++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - back, 1);
+        const year = d.getFullYear(), month = d.getMonth() + 1;
+        const period = `${year}-${String(month).padStart(2,'0')}`;
+        const { rows } = await pool.query('SELECT 1 FROM monthly_archives WHERE period = $1', [period]);
+        if (rows.length === 0) {
+          await generateAndStoreArchive(year, month, { email: back === 1 });
+          console.log(`Monthly archive generated for ${period}`);
+        }
+      }
+    } catch (e) {
+      console.error('checkMonthlyArchive error:', e.message);
+    }
+  }
+
+  app.get('/api/archives', authenticate, adminOnly, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT id, period, filename, row_count, generated_at FROM monthly_archives ORDER BY period DESC');
+      res.json(rows);
+    } catch(e) { console.error('GET /api/archives', e); res.status(500).json({ error: e.message }); }
+  });
+
+  app.get('/api/archives/:id/download', authenticate, adminOnly, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT filename, file_data FROM monthly_archives WHERE id = $1', [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Archive not found' });
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${rows[0].filename}"`);
+      res.send(Buffer.from(rows[0].file_data, 'base64'));
+    } catch(e) { console.error('GET /api/archives/:id/download', e); res.status(500).json({ error: e.message }); }
+  });
+
+  app.post('/api/archives/run', authenticate, adminOnly, async (req, res) => {
+    try {
+      const now = new Date();
+      const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const archive = await generateAndStoreArchive(d.getFullYear(), d.getMonth() + 1, { email: true });
+      res.json({ success: true, archive });
+    } catch(e) { console.error('POST /api/archives/run', e); res.status(500).json({ error: e.message }); }
+  });
+
   // ═══════ EMAIL DIGEST ═══════
   async function sendDigest(period) {
     if (!transporter || !ADMIN_EMAIL) return;
@@ -1328,6 +1465,7 @@ async function startApp() {
   let lastDailyDigest = null;
   let lastWeeklyDigest = null;
   function checkDigestSchedule() {
+    checkMonthlyArchive().catch(err => console.error('Monthly archive error:', err.message));
     const now = new Date();
     const hour = now.getHours();
     const day = now.getDay(); // 0=Sun

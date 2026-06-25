@@ -352,6 +352,7 @@ body.read-only-mode .hide-readonly{display:none!important}
           <li><a data-page="reports"><span class="nav-icon">⚠️</span>Open Reports</a></li>
           <li><a data-page="closed"><span class="nav-icon">✅</span>Closed Reports</a></li>
           <li><a data-page="inspections"><span class="nav-icon">📋</span>Inspections</a></li>
+          <li><a data-page="archives"><span class="nav-icon">🗄️</span>Monthly Archives</a></li>
           <li><a data-page="actions"><span class="nav-icon">🎯</span>Actions <span id="actionsBadge" class="actions-badge"></span></a></li>
           <li><a data-page="rescue-plans"><span class="nav-icon">🆘</span>Rescue Plans</a></li>
           <li><a data-page="training"><span class="nav-icon">🎓</span>Training</a></li>
@@ -1017,6 +1018,7 @@ function renderPage(page) {
     'reports': renderAdminReports,
     'closed': renderClosedReports,
     'inspections': renderAdminInspections,
+    'archives': renderArchives,
     'actions': renderActions,
     'trends': renderTrends,
     'schedule': renderSchedule,
@@ -2090,6 +2092,61 @@ window.deleteInspection = async function(type, id, btn) {
 // ═══════════════════════════════════════
 // DOWNLOAD WORD DOC HELPER
 // ═══════════════════════════════════════
+async function renderArchives(c) {
+  c.innerHTML = '<h2 style="margin-bottom:16px;display:flex;align-items:center;gap:8px">🗄️ Monthly Archives</h2><div class="card" style="text-align:center;padding:30px;color:var(--text-light)">Loading…</div>';
+  const fmtPeriod = (p) => { const [y,m] = p.split('-'); return new Date(`${y}-${m}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }); };
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : '';
+  try {
+    const list = await fetch(`${API}/api/archives`, { headers: headers() }).then(r => r.json());
+    const body = (list || []).map(a => `
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:12px">${fmtPeriod(a.period)}</td>
+        <td style="padding:12px;text-align:center">${a.row_count}</td>
+        <td style="padding:12px;color:var(--text-light);font-size:13px">${fmtDate(a.generated_at)}</td>
+        <td style="padding:12px;text-align:right"><button class="btn btn-outline btn-sm" style="width:auto" onclick="downloadArchive(${a.id}, '${a.period}')">⬇️ Download</button></td>
+      </tr>`).join('');
+    c.innerHTML = `
+      <h2 style="margin-bottom:8px;display:flex;align-items:center;gap:8px">🗄️ Monthly Archives</h2>
+      <p style="color:var(--text-light);margin-bottom:16px">Spreadsheet summaries of all ladder, tower and MEWP inspections. Generated automatically at the start of each month for the previous month and emailed to the admin address.</p>
+      <div style="margin-bottom:16px"><button class="btn btn-primary btn-sm" style="width:auto" onclick="runArchiveNow(this)">⚙️ Generate last month now</button></div>
+      <div class="card" style="padding:0;overflow:hidden">
+        ${(list && list.length) ? `<table style="width:100%;border-collapse:collapse">
+          <thead><tr style="background:#f8fafc;text-align:left">
+            <th style="padding:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-light)">Month</th>
+            <th style="padding:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-light);text-align:center">Inspections</th>
+            <th style="padding:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-light)">Generated</th>
+            <th></th>
+          </tr></thead><tbody>${body}</tbody></table>`
+        : '<div style="text-align:center;padding:30px;color:var(--text-light)">No archives yet. They generate automatically each month, or use “Generate last month now”.</div>'}
+      </div>`;
+  } catch(e) {
+    console.error(e);
+    c.innerHTML = '<h2 style="display:flex;align-items:center;gap:8px">🗄️ Monthly Archives</h2><div class="card" style="padding:20px">Failed to load archives.</div>';
+  }
+}
+
+window.downloadArchive = async function(id, period) {
+  try {
+    const res = await fetch(`${API}/api/archives/${id}/download`, { headers: headers() });
+    if (!res.ok) throw new Error('Download failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `Inspections_${period}.xlsx`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch(e) { alert('Could not download archive.'); }
+};
+
+window.runArchiveNow = async function(btn) {
+  btn.disabled = true; const old = btn.textContent; btn.textContent = 'Generating…';
+  try {
+    const res = await fetch(`${API}/api/archives/run`, { method: 'POST', headers: headers() });
+    if (!res.ok) throw new Error('failed');
+    await renderArchives(document.getElementById('appContent'));
+  } catch(e) { alert('Could not generate archive.'); btn.disabled = false; btn.textContent = old; }
+};
+
 window.downloadDocx = async function(type, id, name) {
   const endpoints = {
     'near-miss': 'near-miss',
