@@ -2969,13 +2969,8 @@ const SITE_TEMPLATES = [
         { header: 'AUTHORISATION', rows: ['Issued By','Signature','Accepted By','Signature','Date / Time'] },
         { header: 'PERMIT CANCELLATION', rows: ['Work Completed','Area Left Safe','Cancelled By','Signature','Date / Time'] },
       ] },
-    { key: 'inspection-checklist', name: 'Site Inspection Checklist', desc: 'General site safety inspection with action tracking', icon: '📋',
-      sections: [
-        { header: 'INSPECTION DETAILS', rows: ['Site / Project','Date','Inspector','Area Inspected'] },
-        { header: 'INSPECTION ITEMS', table: ['Item','Yes','No','N/A','Comments'] },
-        { header: 'ACTIONS REQUIRED', table: ['Action','Responsible Person','Due Date','Completed'] },
-        { header: 'SIGN-OFF', rows: ['Inspector Signature','Date'] },
-      ] },
+    { key: 'site-inspection', name: 'Site Inspection Checklist', desc: 'Fillable general site safety inspection — access, PPE, work at height, electrical, fire, welfare, COSHH, actions and sign-off', icon: '📋',
+      pdfUrl: '/Site-Inspection-Checklist.pdf' },
   ]},
   { category: 'Project Documents', icon: '🏗️', templates: [
     { key: 'works-signoff', name: 'Works Sign-Off Sheet', desc: 'Fillable job completion sheet — site details, works carried out, materials, completion checklist and client sign-off', icon: '✍️',
