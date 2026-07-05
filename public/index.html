@@ -2972,7 +2972,7 @@ const SITE_TEMPLATES = [
     { key: 'site-inspection', name: 'Site Inspection Checklist', desc: 'Fillable general site safety inspection — access, PPE, work at height, electrical, fire, welfare, COSHH, actions and sign-off', icon: '📋',
       pdfUrl: '/Site-Inspection-Checklist.pdf' },
     { key: 'harness-lanyard-register', name: 'Harness & Lanyard Register', desc: 'Excel register for work-at-height PPE — 6-monthly thorough examination tracker with detailed inspection checklist and guidance notes', icon: '🪢',
-      xlsxUrl: '/Harness-Lanyard-Register.xlsx' },
+      xlsxUrl: '/Harness-Lanyard-Register.xlsx', previewUrl: '/Harness-Lanyard-Register-Preview.pdf' },
   ]},
   { category: 'Project Documents', icon: '🏗️', templates: [
     { key: 'works-signoff', name: 'Works Sign-Off Sheet', desc: 'Fillable job completion sheet — site details, works carried out, materials, completion checklist and client sign-off', icon: '✍️',
@@ -3043,6 +3043,13 @@ function renderSiteTemplates(c) {
               </div>
               <div style="padding:14px 20px;background:white;border-top:1px solid #f3f4f6;margin-top:auto;display:flex;gap:8px">
                 ${t.xlsxUrl ? `
+                ${t.previewUrl ? `
+                <button style="padding:10px 14px;border:1px solid ${cc.accent};border-radius:10px;background:white;color:${cc.accent};font-weight:600;font-size:13.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:opacity 0.15s"
+                        onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"
+                        onclick="window.open('${t.previewUrl}','_blank')">
+                  <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  Preview
+                </button>` : ''}
                 <a href="${t.xlsxUrl}" download style="flex:1;padding:10px 16px;border:none;border-radius:10px;background:${cc.accent};color:white;font-weight:600;font-size:13.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;transition:opacity 0.15s"
                         onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
                   <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
