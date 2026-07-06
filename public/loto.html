@@ -1107,13 +1107,18 @@ function buildRequestPdf(req){
     body: sigRowsPdf,
     columnStyles:{0:{fontStyle:'bold',fillColor:[253,242,242],cellWidth:110},3:{cellWidth:140}},
     didDrawCell: (data)=>{
-      if(data.section==='body' && data.column.index===3){
-        const role = roles[data.row.index][1];
-        const sig = req.authorisation[role+'Sig'];
+      try{
+        if(data.section!=='body' || data.column.index!==3) return;
+        // Look the role up by the row's label text rather than trusting the
+        // row index, which is not reliable in this autoTable version.
+        const raw = data.row && data.row.raw;
+        const entry = (raw && roles.find(r=>r[0]===raw[0])) || roles[data.row.index];
+        if(!entry) return;
+        const sig = req.authorisation[entry[1]+'Sig'];
         if(sig){
           try{ doc.addImage(sig,'PNG',data.cell.x+3,data.cell.y+3,data.cell.width-6,data.cell.height-6); }catch(e){}
         }
-      }
+      }catch(e){ console.error('Signature cell skipped:', e); }
     }
   });
   y = doc.lastAutoTable.finalY + 10;
