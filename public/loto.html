@@ -1005,6 +1005,10 @@ function drawPdfLogo(doc, x, y, h){
 }
 
 function buildRequestPdf(req){
+  // Older requests may be missing whole sections - fill with safe defaults
+  // so the PDF still builds instead of failing silently.
+  req.details = req.details||{}; req.risk = req.risk||{};
+  req.authorisation = req.authorisation||{}; req.isolations = req.isolations||[];
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:'pt',format:'a4'});
   const W = doc.internal.pageSize.getWidth();
@@ -1196,17 +1200,38 @@ function downloadPdfBytes(bytes, filename){
   setTimeout(()=>{ try{ URL.revokeObjectURL(url); }catch(_){} }, 120000);
 }
 
+// Explain PDF failures in plain English instead of failing silently.
+function pdfProblemMessage(e){
+  if(!window.jspdf || !window.jspdf.jsPDF)
+    return 'The PDF library did not load. Check your internet connection (and any ad/content blocker), then refresh the page and try again.';
+  if(!(window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable))
+    return 'Part of the PDF library (tables) did not load. Refresh the page and try again.';
+  return 'Technical detail: ' + ((e && e.message) ? e.message : e);
+}
+
 async function exportPdf(id){
   const req = state.requests.find(r=>r.id===id);
   if(!req){ alert('Request not found'); return; }
-  const bytes = await buildRequestPdfBytes(req);
-  downloadPdfBytes(bytes, `LOTO-${req.ref}.pdf`);
+  try{
+    const bytes = await buildRequestPdfBytes(req);
+    downloadPdfBytes(bytes, `LOTO-${req.ref}.pdf`);
+  }catch(e){
+    console.error('exportPdf failed:', e);
+    alert('Sorry - this PDF could not be created.\n\n' + pdfProblemMessage(e));
+  }
 }
 
 async function previewPdf(id){
   const req = state.requests.find(r=>r.id===id);
   if(!req){ alert('Request not found'); return; }
-  const bytes = await buildRequestPdfBytes(req);
+  let bytes;
+  try{
+    bytes = await buildRequestPdfBytes(req);
+  }catch(e){
+    console.error('previewPdf failed:', e);
+    alert('Sorry - this PDF preview could not be created.\n\n' + pdfProblemMessage(e));
+    return;
+  }
   const url = URL.createObjectURL(new Blob([bytes], {type:'application/pdf'}));
   openPreview(`PDF Preview — LOTO Request ${req.ref}`, {iframeUrl:url}, [
     {label:'⬇ Download PDF', primary:true, onClick:()=>downloadPdfBytes(bytes, `LOTO-${req.ref}.pdf`)},
