@@ -1403,6 +1403,72 @@ async function startApp() {
     } catch(e) { res.status(500).json({ error: e.message }); }
   });
 
+  // Run the training certificate check on demand (admin only).
+  // Re-scans every record, works out what is expired / expiring, sends push
+  // notifications to the operative + admins, emails a summary to the admin
+  // mailbox and returns the counts so the UI can refresh itself.
+  app.post('/api/training/check', authenticate, adminOnly, async (req, res) => {
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const day14 = new Date(now); day14.setDate(day14.getDate() + 14);
+    const day30 = new Date(now); day30.setDate(day30.getDate() + 30);
+    const d14 = day14.toISOString().split('T')[0];
+    const d30 = day30.toISOString().split('T')[0];
+    const sel = `SELECT t.id, t.course_name, t.card_number, t.expiry_date, t.user_id,
+                        COALESCE(u.full_name, t.external_name, 'Unknown') AS who
+                   FROM training_records t LEFT JOIN users u ON t.user_id = u.id`;
+    try {
+      const { rows: expired }  = await pool.query(`${sel} WHERE t.expiry_date IS NOT NULL AND t.expiry_date < $1 ORDER BY t.expiry_date ASC`, [today]);
+      const { rows: within14 } = await pool.query(`${sel} WHERE t.expiry_date >= $1 AND t.expiry_date <= $2 ORDER BY t.expiry_date ASC`, [today, d14]);
+      const { rows: within30 } = await pool.query(`${sel} WHERE t.expiry_date > $1 AND t.expiry_date <= $2 ORDER BY t.expiry_date ASC`, [d14, d30]);
+      const { rows: total }    = await pool.query('SELECT COUNT(*)::int AS n FROM training_records');
+
+      const { rows: admins } = await pool.query("SELECT id FROM users WHERE role IN ('admin','project_manager')");
+      const adminIds = admins.map(r => r.id);
+      const daysBetween = (a, b) => Math.ceil((new Date(a) - new Date(b)) / 86400000);
+
+      let pushed = 0;
+      const notify = async (r, title, body) => {
+        const recipients = new Set(adminIds);
+        if (r.user_id) recipients.add(r.user_id);
+        try { pushed += await sendPushToUsers([...recipients], { title, body, url: '/', tag: `training-${r.id}` }) || 0; }
+        catch (e) { console.warn('push training-check failed:', e.message); }
+      };
+      for (const r of expired) {
+        const d = daysBetween(today, r.expiry_date);
+        await notify(r, `❌ ${r.course_name} expired`, `${r.who} — expired ${d} day${d === 1 ? '' : 's'} ago (${r.expiry_date})`);
+      }
+      for (const r of [...within14, ...within30]) {
+        const d = daysBetween(r.expiry_date, today);
+        await notify(r, `🎓 ${r.course_name} expiring`, `${r.who} — expires in ${d} day${d === 1 ? '' : 's'} (${r.expiry_date})`);
+      }
+
+      // Email summary to the admin mailbox (silently skipped if SMTP isn't configured).
+      let emailed = false;
+      if (transporter && ADMIN_EMAIL && (expired.length || within14.length || within30.length)) {
+        const tr = (r, note, bg) => `<tr style="background:${bg}"><td style="padding:8px;border:1px solid #ddd">${r.who}</td><td style="padding:8px;border:1px solid #ddd">${r.course_name}${r.card_number && r.card_number !== 'N/A' ? ' · ' + r.card_number : ''}</td><td style="padding:8px;border:1px solid #ddd">${r.expiry_date}</td><td style="padding:8px;border:1px solid #ddd">${note}</td></tr>`;
+        const html = `
+          <h2 style="color:#8B1A1A">ManProjects Ltd — Training Certificate Check</h2>
+          <p>Checked ${total[0].n} record${total[0].n === 1 ? '' : 's'} on ${today}: <strong>${expired.length} expired</strong>, <strong>${within14.length}</strong> expiring within 14 days, <strong>${within30.length}</strong> expiring within 30 days.</p>
+          <table style="border-collapse:collapse;width:100%">
+            <tr style="background:#f5f5f5"><th style="padding:8px;border:1px solid #ddd;text-align:left">Operative</th><th style="padding:8px;border:1px solid #ddd;text-align:left">Course</th><th style="padding:8px;border:1px solid #ddd;text-align:left">Expiry</th><th style="padding:8px;border:1px solid #ddd;text-align:left">Status</th></tr>
+            ${expired.map(r => tr(r, `Expired ${daysBetween(today, r.expiry_date)}d ago`, '#f8d7da')).join('')}
+            ${within14.map(r => tr(r, `${daysBetween(r.expiry_date, today)} days left`, '#fff3cd')).join('')}
+            ${within30.map(r => tr(r, `${daysBetween(r.expiry_date, today)} days left`, '#ffffff')).join('')}
+          </table>
+          <p style="margin-top:20px;font-size:12px;color:#888">ManProjects Ltd — Site Safety System</p>`;
+        await sendAdminEmail('Training Certificate Check', html);
+        emailed = true;
+      }
+
+      res.json({
+        success: true, checked_at: new Date().toISOString(),
+        total: total[0].n, expired: expired.length, within14: within14.length, within30: within30.length,
+        pushed, emailed
+      });
+    } catch (e) { console.error('POST /api/training/check', e); res.status(500).json({ error: e.message }); }
+  });
+
   // ═══════ TRENDS DASHBOARD ═══════
   app.get('/api/trends', authenticate, adminOnly, async (req, res) => {
     try {

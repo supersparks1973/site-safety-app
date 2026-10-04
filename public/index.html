@@ -1636,6 +1636,32 @@ async function renderDashboard(c) {
   } catch(e) { console.error(e); c.innerHTML = '<div class="card"><h3>The dashboard could not load</h3><p style="color:var(--ink-2);margin-top:6px">Check your connection and press refresh.</p><button class="btn btn-outline btn-sm" style="margin-top:12px" onclick="renderDashboard(document.getElementById(\'appContent\'))">Refresh</button></div>'; }
 }
 
+// Admin: run the training certificate check on demand. Re-scans every record on
+// the server, sends expiry push notifications + an email summary, then refreshes
+// whichever training view is on screen.
+window.runTrainingCheck = async function(btn) {
+  const label = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+  try {
+    const r = await fetch(API + '/api/training/check', { method: 'POST', headers: headers() });
+    const d = await r.json();
+    if (!r.ok || !d.success) throw new Error(d.error || 'Check failed');
+    const problems = d.expired + d.within14 + d.within30;
+    const msg = problems === 0
+      ? `Checked ${d.total} record${d.total === 1 ? '' : 's'} — everyone's training is in date`
+      : `Checked ${d.total} record${d.total === 1 ? '' : 's'}: ${d.expired} expired, ${d.within14 + d.within30} expiring within 30 days` + (d.pushed ? ` · ${d.pushed} notification${d.pushed === 1 ? '' : 's'} sent` : '') + (d.emailed ? ' · summary emailed' : '');
+    showToast(msg, problems === 0 ? 'success' : (d.expired ? 'error' : 'warning'));
+    // Refresh whatever training view is showing.
+    if (document.getElementById('trainingAlerts')) loadTrainingAlerts();
+    if (document.getElementById('trainingList')) renderAdminTraining(document.getElementById('appContent'));
+  } catch(e) {
+    console.error('Training check error:', e);
+    showToast('Training check failed — ' + (e.message || 'try again'), 'error');
+  } finally {
+    if (btn && document.body.contains(btn)) { btn.disabled = false; btn.textContent = label; }
+  }
+};
+
 window.sendDigest = async function(period) {
   try {
     await fetch(API + '/api/digest/' + period, { method: 'POST', headers: headers() });
@@ -1650,7 +1676,7 @@ async function loadTrainingAlerts() {
     const el = document.getElementById('trainingAlerts');
     if (!el) return;
     const total = data.expired.length + data.within14.length + data.within30.length;
-    const title = `<div class="dash-section-title">Training <span class="sub">${total === 0 ? 'all in date' : total + ' to chase'}</span></div>`;
+    const title = `<div class="dash-section-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">Training <span class="sub">${total === 0 ? 'all in date' : total + ' to chase'}</span><button id="trainingCheckBtn" class="btn btn-outline btn-sm hide-readonly" style="width:auto;margin-left:auto" onclick="runTrainingCheck(this)" title="Re-check every certificate now and send expiry notifications">Check certificates now</button></div>`;
 
     if (total === 0) {
       el.innerHTML = title + `<div class="ta-card ok"><div class="ta-head"><span class="ta-title">Everyone's training is in date</span></div></div>`;
@@ -2648,6 +2674,7 @@ async function renderAdminTraining(c) {
 
       <div class="hide-readonly" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-outline btn-sm" style="width:auto" onclick="openManageCourses()">⚙️ Manage Courses</button>
+        <button class="btn btn-outline btn-sm" style="width:auto" onclick="runTrainingCheck(this)" title="Re-check every certificate now and send expiry notifications">🔄 Check Certificates Now</button>
       </div>
 
       <div id="trainingList"></div>
