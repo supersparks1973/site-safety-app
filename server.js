@@ -254,6 +254,11 @@ async function startApp() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
   app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+  // Never let browsers hold on to the app shell or service worker — always revalidate.
+  app.use((req, res, next) => {
+    if (req.path === '/' || req.path === '/index.html' || req.path === '/sw.js') res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    next();
+  });
   app.use(express.static(path.join(__dirname, 'public')));
 
   const storage = multer.diskStorage({
@@ -1894,6 +1899,7 @@ async function startApp() {
   });
 
   app.get('*', (req, res) => {
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
   });
 

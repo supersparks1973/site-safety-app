@@ -3895,7 +3895,25 @@ setTimeout(refreshActionsBadge, 1500);
 setInterval(refreshActionsBadge, 5 * 60 * 1000);
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(() => {});
+  navigator.serviceWorker.register('/sw.js').then((reg) => {
+    // Look for a newer version every time the app is opened or brought back to the front.
+    reg.update().catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+  }).catch(() => {});
+  // When a new service worker takes over, reload once so everyone is on the latest version.
+  let _swReloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (_swReloaded) return;
+    _swReloaded = true;
+    const form = document.querySelector('form');
+    if (form && form.querySelector('input:not([type=date]):not([type=time]):not([type=file])[value]:not([value=""]), textarea')) {
+      // Someone is mid-form — don't yank it away; they'll get the update next time.
+      const t = document.getElementById('toast');
+      if (t) { t.textContent = 'A new version is ready — it will load next time you open the app'; t.className = 'toast toast-success show'; setTimeout(() => t.classList.remove('show'), 5000); }
+      return;
+    }
+    window.location.reload();
+  });
 }
 
 // Show offline banner immediately (before login), not just after.
