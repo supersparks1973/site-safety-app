@@ -50,6 +50,109 @@ async function sendAdminEmail(subject, html, attachments) {
   }
 }
 
+// ═══════ SHAREPOINT TRAINING CERTIFICATES (Microsoft Graph) ═══════
+// The portal reads the "Training Certificates" folder on the ManProjects hub
+// SharePoint site. Files are named "<Person> - <Course> - Exp YYYY-MM-DD.ext"
+// (or "- Issued YYYY" / "- Dated YYYY" for qualifications that don't expire),
+// one sub-folder per person, with old certificates moved into "Archive".
+// Needs an Entra ID app registration with Sites.Read.All (application) and
+// these Render environment variables:
+//   MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET
+//   SP_DRIVE_ID            (document library id — defaults to the hub's Shared Documents)
+//   SP_TRAINING_FOLDER     (folder path inside the library — defaults to "Training Certificates")
+const SP_DRIVE_ID = process.env.SP_DRIVE_ID || 'b!zILzQDy7-U2ere0JMgcBRTAqelLSOp1OgN2mbzVZvPRS6_wKvzI3QYJ34JzRaOty';
+const SP_TRAINING_FOLDER = process.env.SP_TRAINING_FOLDER || 'Training Certificates';
+const sharePointConfigured = () => !!(process.env.MS_TENANT_ID && process.env.MS_CLIENT_ID && process.env.MS_CLIENT_SECRET);
+
+let _graphToken = null, _graphTokenExpires = 0;
+async function graphToken() {
+  if (_graphToken && Date.now() < _graphTokenExpires - 60000) return _graphToken;
+  const body = new URLSearchParams({
+    client_id: process.env.MS_CLIENT_ID,
+    client_secret: process.env.MS_CLIENT_SECRET,
+    scope: 'https://graph.microsoft.com/.default',
+    grant_type: 'client_credentials'
+  });
+  const r = await fetch(`https://login.microsoftonline.com/${process.env.MS_TENANT_ID}/oauth2/v2.0/token`, {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body
+  });
+  const j = await r.json();
+  if (!r.ok || !j.access_token) throw new Error(`Microsoft sign-in failed: ${j.error_description || j.error || r.status}`);
+  _graphToken = j.access_token;
+  _graphTokenExpires = Date.now() + (j.expires_in || 3600) * 1000;
+  return _graphToken;
+}
+
+async function graphGet(url) {
+  const token = await graphToken();
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`SharePoint error ${r.status}: ${(j.error && j.error.message) || 'request failed'}`);
+  return j;
+}
+
+// Walk the training folder (skipping Archive folders) and return every file.
+async function listTrainingCertificateFiles() {
+  const base = `https://graph.microsoft.com/v1.0/drives/${SP_DRIVE_ID}`;
+  const encPath = SP_TRAINING_FOLDER.split('/').map(encodeURIComponent).join('/');
+  const files = [];
+  const walk = async (url, folderPath) => {
+    let next = url;
+    while (next) {
+      const page = await graphGet(next);
+      for (const item of page.value || []) {
+        if (item.folder) {
+          if (/archive/i.test(item.name)) continue;
+          await walk(`${base}/items/${item.id}/children?$top=200&$select=id,name,folder,file,webUrl,lastModifiedDateTime`, `${folderPath}/${item.name}`);
+        } else if (item.file) {
+          files.push({ id: item.id, name: item.name, webUrl: item.webUrl, folder: folderPath, modified: item.lastModifiedDateTime });
+        }
+      }
+      next = page['@odata.nextLink'] || null;
+    }
+  };
+  await walk(`${base}/root:/${encPath}:/children?$top=200&$select=id,name,folder,file,webUrl,lastModifiedDateTime`, '');
+  return files;
+}
+
+// "Gary Rouvas - IPAF PAL Card 3a 3b (Front) - Exp 2029-04-30.jpg" → structured record.
+function parseCertificateFilename(name, folder) {
+  const stem = name.replace(/\.[A-Za-z0-9]{2,5}$/, '').trim();
+  const parts = stem.split(/\s+-\s+/);
+  if (parts.length < 2) return null;
+  const last = parts[parts.length - 1];
+  let expiry = null, issued = null;
+  let m;
+  if ((m = last.match(/^(?:Exp(?:iry|ires)?|Expires)\.?\s+(\d{4}-\d{2}-\d{2})$/i))) expiry = m[1];
+  else if ((m = last.match(/^(?:Exp(?:iry|ires)?)\.?\s+(\d{2})[-\/.](\d{2})[-\/.](\d{4})$/i))) expiry = `${m[3]}-${m[2]}-${m[1]}`;
+  else if ((m = last.match(/^(?:Issued|Dated|Completed)\s+(\d{4}(?:-\d{2}(?:-\d{2})?)?)$/i))) issued = m[1];
+  else return null;
+  const dateIdx = parts.length - 1;
+  // "<Person> - <Course> - <Date>" when there are 3+ parts; "<Course> - <Date>" inside a person's folder when only 2.
+  const folderPerson = (folder.split('/').filter(Boolean)[0] || '').trim();
+  let person, courseParts;
+  if (parts.length >= 3) { person = parts[0].trim(); courseParts = parts.slice(1, dateIdx); }
+  else { person = folderPerson; courseParts = parts.slice(0, dateIdx); }
+  if (!person) return null;
+  let course = courseParts.join(' - ').replace(/\s*\((front|back|side \d|page \d)\)\s*/ig, ' ').replace(/\s{2,}/g, ' ').trim();
+  if (!course) return null;
+  return { person, course, expiry, issued };
+}
+
+function guessTrainingCategory(course) {
+  const c = course.toLowerCase();
+  if (/insurance|liability|indemnity/.test(c)) return { category: 'Other', provider: null };
+  if (/cscs|ecs card|ecs h&s|ecs health|jib|skillcard/.test(c)) return { category: 'Competency Card', provider: /ecs|jib/.test(c) ? 'ECS / JIB' : 'CSCS' };
+  if (/ipaf|pasma|harness|working at height|mewp|scaffold|ladder/.test(c)) return { category: 'Working at Height', provider: /ipaf/.test(c) ? 'IPAF' : /pasma/.test(c) ? 'PASMA' : null };
+  if (/first aid|efaw|fatw/.test(c)) return { category: 'First Aid', provider: null };
+  if (/confined/.test(c)) return { category: 'Confined Space', provider: null };
+  if (/asbestos|ukata/.test(c)) return { category: 'Safety Training', provider: /ukata/.test(c) ? 'UKATA' : null };
+  if (/citb|health & safety awareness|smsts|sssts|manual handling|fire|coshh/.test(c)) return { category: 'Safety Training', provider: /citb/.test(c) ? 'CITB' : null };
+  if (/18th|bs ?7671|2391|2382|c&g|city & guilds|electrical|testing|inspection/.test(c)) return { category: 'Electrical', provider: /c&g|city & guilds/.test(c) ? 'City & Guilds' : null };
+  if (/abrasive|forklift|telehandler|plant|cpcs|npors/.test(c)) return { category: 'Equipment Training', provider: null };
+  return { category: 'Other', provider: null };
+}
+
 async function startApp() {
   await pool.query(`CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL,
@@ -236,6 +339,9 @@ async function startApp() {
 
   // Add external_name to training_records and make user_id nullable
   try { await pool.query('ALTER TABLE training_records ADD COLUMN IF NOT EXISTS external_name TEXT'); } catch(e) { console.warn('Migration: training_records.external_name:', e.message); }
+  try { await pool.query('ALTER TABLE training_records ADD COLUMN IF NOT EXISTS sp_item_id TEXT'); } catch(e) { console.warn('Migration: training_records.sp_item_id:', e.message); }
+  try { await pool.query('ALTER TABLE training_records ADD COLUMN IF NOT EXISTS sp_web_url TEXT'); } catch(e) { console.warn('Migration: training_records.sp_web_url:', e.message); }
+  try { await pool.query('ALTER TABLE training_records ADD COLUMN IF NOT EXISTS sp_synced_at TIMESTAMP'); } catch(e) { console.warn('Migration: training_records.sp_synced_at:', e.message); }
   try { await pool.query('ALTER TABLE training_records ALTER COLUMN user_id DROP NOT NULL'); } catch(e) { console.warn('Migration: training_records.user_id NULLABLE:', e.message); }
 
   // Retired features (Oct 2026): rescue plans, toolbox talks — tables removed per product decision.
@@ -1403,6 +1509,96 @@ async function startApp() {
     } catch(e) { res.status(500).json({ error: e.message }); }
   });
 
+  // Pull certificates from the SharePoint "Training Certificates" folder into
+  // training_records. Adds records that are missing, moves expiry dates forward
+  // when a newer certificate has been filed, never deletes anything.
+  const normName = v => String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const sameName = (a, b) => {
+    const x = normName(a), y = normName(b);
+    if (!x || !y) return false;
+    if (x === y) return true;
+    // Tolerate a trailing-letter difference in one word ("Andy Pett" vs "Andy Petts").
+    const xa = x.split(' '), ya = y.split(' ');
+    if (xa.length !== ya.length) return false;
+    return xa.every((w, i) => w === ya[i] || (Math.abs(w.length - ya[i].length) <= 2 && (w.startsWith(ya[i]) || ya[i].startsWith(w)) && Math.min(w.length, ya[i].length) >= 3));
+  };
+  // Portal course names are short ("ECS", "Asb", "IPAF") while the SharePoint
+  // files use full names ("ECS Card", "UKATA Asbestos Awareness", "IPAF PAL Card 3a 3b"),
+  // so compare on a canonical key where a known qualification keyword is present.
+  const COURSE_KEYS = [
+    ['asbestos', /asbestos|ukata|\basb\b/], ['ecs-hs', /\becs\b.*(assessment|health|h s)/], ['ecs', /\becs\b/], ['cscs', /\bcscs\b/], ['ipaf', /\bipaf\b/], ['pasma', /\bpasma\b/],
+    ['smsts', /\bsmsts\b/], ['sssts', /\bsssts\b/], ['first-aid', /first aid|\befaw\b|\bfaw\b|emergency first/],
+    ['18th', /18th|7671|\b2382\b/], ['2391', /\b2391\b/], ['hs-awareness', /health (and|&) safety awareness|\bhsa\b/],
+    ['insurance', /insurance|liability/], ['confined', /confined/], ['manual-handling', /manual handling/], ['fire', /\bfire\b/],
+    ['harness', /harness/], ['abrasive', /abrasive/], ['coshh', /coshh/]
+  ];
+  const courseKey = v => { const n = normName(v); for (const [k, re] of COURSE_KEYS) if (re.test(n)) return k; return n; };
+  const sameCourse = (a, b) => courseKey(a) === courseKey(b);
+
+  async function syncTrainingFromSharePoint() {
+    const result = { files: 0, recognised: 0, added: [], updated: [], unchanged: 0, superseded: [], skipped: [], missing_on_sharepoint: [] };
+    const files = await listTrainingCertificateFiles();
+    result.files = files.length;
+
+    // Parse + keep only the latest certificate per person/course.
+    const latest = new Map();
+    for (const f of files) {
+      const p = parseCertificateFilename(f.name, f.folder);
+      if (!p) { result.skipped.push(`${f.folder.replace(/^\//, '') || '(root)'} / ${f.name}`); continue; }
+      result.recognised++;
+      const key = `${normName(p.person)}|${normName(p.course)}`;
+      const cur = latest.get(key);
+      const rank = p.expiry || (p.issued ? `0${p.issued}` : '');
+      if (!cur) latest.set(key, { ...p, file: f, rank });
+      else if (rank > cur.rank) { result.superseded.push(`${cur.person} — ${cur.course} (${cur.expiry || cur.issued})`); latest.set(key, { ...p, file: f, rank }); }
+      else if (rank < cur.rank) result.superseded.push(`${p.person} — ${p.course} (${p.expiry || p.issued})`);
+      // equal rank = front/back of the same card — ignore the duplicate
+    }
+
+    const { rows: users } = await pool.query('SELECT id, full_name FROM users');
+    const { rows: records } = await pool.query(`SELECT t.*, COALESCE(u.full_name, t.external_name, '') AS operative_name FROM training_records t LEFT JOIN users u ON t.user_id = u.id`);
+    const touched = new Set();
+
+    for (const c of latest.values()) {
+      const user = users.find(u => sameName(u.full_name, c.person));
+      let rec = records.find(r => r.sp_item_id && r.sp_item_id === c.file.id);
+      if (!rec) {
+        const cands = records.filter(r => !touched.has(r.id) && sameName(r.operative_name, c.person) && sameCourse(r.course_name, c.course));
+        rec = cands.find(r => r.expiry_date === c.expiry) || cands.sort((a, b) => String(b.expiry_date || '').localeCompare(String(a.expiry_date || '')))[0];
+      }
+      const completion = c.issued || null;
+      if (rec) {
+        touched.add(rec.id);
+        const newer = c.expiry && (!rec.expiry_date || c.expiry > rec.expiry_date);
+        const older = c.expiry && rec.expiry_date && c.expiry < rec.expiry_date;
+        if (older) { result.superseded.push(`${c.person} — ${c.course} (${c.expiry}) — portal already has ${rec.expiry_date}`); continue; }
+        const changed = newer || rec.sp_item_id !== c.file.id || (user && rec.user_id !== user.id) || (completion && !rec.completion_date);
+        if (!changed) { result.unchanged++; continue; }
+        await pool.query(
+          `UPDATE training_records SET expiry_date = COALESCE($1, expiry_date), completion_date = COALESCE(completion_date, $2),
+                  user_id = COALESCE($3, user_id), external_name = CASE WHEN $3 IS NULL THEN COALESCE(external_name, $4) ELSE external_name END,
+                  sp_item_id = $5, sp_web_url = $6, sp_synced_at = NOW() WHERE id = $7`,
+          [newer ? c.expiry : null, completion, user ? user.id : null, c.person, c.file.id, c.file.webUrl, rec.id]);
+        if (newer) result.updated.push(`${c.person} — ${c.course}: ${rec.expiry_date || 'no expiry'} → ${c.expiry}`);
+        else result.unchanged++;
+      } else {
+        const g = guessTrainingCategory(c.course);
+        const { rows } = await pool.query(
+          `INSERT INTO training_records (user_id, external_name, category, course_name, provider, card_number, completion_date, expiry_date, sp_item_id, sp_web_url, sp_synced_at)
+           VALUES ($1,$2,$3,$4,$5,NULL,$6,$7,$8,$9,NOW()) RETURNING id`,
+          [user ? user.id : null, user ? null : c.person, g.category, c.course, g.provider, completion, c.expiry, c.file.id, c.file.webUrl]);
+        touched.add(rows[0].id);
+        result.added.push(`${c.person} — ${c.course}${c.expiry ? ' (exp ' + c.expiry + ')' : ''}`);
+      }
+    }
+
+    // Records in the portal with no matching certificate on SharePoint — for information only.
+    for (const r of records) {
+      if (!touched.has(r.id)) result.missing_on_sharepoint.push(`${r.operative_name || 'Unknown'} — ${r.course_name}${r.expiry_date ? ' (exp ' + r.expiry_date + ')' : ''}`);
+    }
+    return result;
+  }
+
   // Run the training certificate check on demand (admin only).
   // Re-scans every record, works out what is expired / expiring, sends push
   // notifications to the operative + admins, emails a summary to the admin
@@ -1418,6 +1614,14 @@ async function startApp() {
                         COALESCE(u.full_name, t.external_name, 'Unknown') AS who
                    FROM training_records t LEFT JOIN users u ON t.user_id = u.id`;
     try {
+      // 1) Pull the latest certificates from SharePoint first (if connected).
+      let sharepoint = { configured: sharePointConfigured() };
+      if (sharepoint.configured) {
+        try { sharepoint = { configured: true, ok: true, ...(await syncTrainingFromSharePoint()) }; }
+        catch (e) { console.error('SharePoint sync failed:', e.message); sharepoint = { configured: true, ok: false, error: e.message }; }
+      }
+
+      // 2) Expiry check + notifications on whatever is now in the portal.
       const { rows: expired }  = await pool.query(`${sel} WHERE t.expiry_date IS NOT NULL AND t.expiry_date < $1 ORDER BY t.expiry_date ASC`, [today]);
       const { rows: within14 } = await pool.query(`${sel} WHERE t.expiry_date >= $1 AND t.expiry_date <= $2 ORDER BY t.expiry_date ASC`, [today, d14]);
       const { rows: within30 } = await pool.query(`${sel} WHERE t.expiry_date > $1 AND t.expiry_date <= $2 ORDER BY t.expiry_date ASC`, [d14, d30]);
@@ -1464,7 +1668,7 @@ async function startApp() {
       res.json({
         success: true, checked_at: new Date().toISOString(),
         total: total[0].n, expired: expired.length, within14: within14.length, within30: within30.length,
-        pushed, emailed
+        pushed, emailed, sharepoint
       });
     } catch (e) { console.error('POST /api/training/check', e); res.status(500).json({ error: e.message }); }
   });

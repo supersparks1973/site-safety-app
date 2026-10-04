@@ -262,19 +262,28 @@ body.read-only-mode .hide-readonly{display:none!important}
 /* ── Training matrix ── */
 .training-matrix-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:12px;border:1px solid var(--line);border-radius:var(--radius)}
 .training-matrix{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;background:var(--card)}
-.training-matrix th,.training-matrix td{padding:6px 8px;text-align:center;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft)}
-.training-matrix th:last-child,.training-matrix td:last-child{border-right:none}
+.training-matrix th,.training-matrix td{padding:8px 6px;text-align:center;border-bottom:1px solid var(--line-soft)}
 .training-matrix tr:last-child td{border-bottom:none}
-.tm-name-col{background:var(--ink);color:#fff;font-weight:700;font-size:12px;position:sticky;left:0;z-index:2;min-width:130px;text-align:left!important}
-.tm-course-col{background:var(--ink);color:#fff;font-weight:600;font-size:11px;min-width:70px;max-width:90px;white-space:normal;line-height:1.25}
-.tm-name-cell{font-weight:600;font-size:12px;color:var(--ink);background:var(--card);position:sticky;left:0;z-index:1;text-align:left!important;white-space:nowrap}
-.tm-cell{padding:4px 6px;vertical-align:middle}
-.tm-badge{display:inline-block;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700;line-height:1.3;white-space:nowrap}
-.tm-ok{background:var(--success-soft);color:#145A33}
+.training-matrix tbody tr:hover td{background:#FAFBFC}
+.tm-name-col{background:#F7F8FA;color:var(--ink-2);font-weight:600;font-size:11px;letter-spacing:.02em;text-transform:uppercase;position:sticky;left:0;z-index:2;min-width:140px;text-align:left!important;border-bottom:1px solid var(--line)!important}
+.tm-course-col{background:#F7F8FA;color:var(--ink-2);font-weight:600;font-size:11px;min-width:64px;max-width:96px;white-space:normal;line-height:1.25;border-bottom:1px solid var(--line)!important}
+.tm-name-cell{font-weight:600;font-size:13px;color:var(--ink);background:var(--card);position:sticky;left:0;z-index:1;text-align:left!important;white-space:nowrap;padding-left:12px!important}
+.training-matrix tbody tr:hover .tm-name-cell{background:#FAFBFC}
+.tm-cell{padding:6px 4px;vertical-align:middle}
+.tm-badge{display:inline-block;min-width:34px;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:700;line-height:1.4;white-space:nowrap}
+.tm-ok{background:none;color:var(--success);font-size:15px;font-weight:700;min-width:0;padding:0}
 .tm-exp{background:var(--danger-soft);color:#9A1C14}
 .tm-urg{background:#FFE4CC;color:#8A3B00}
 .tm-wrn{background:var(--warning-soft);color:#7A4A00}
-.tm-na{background:#F3F4F6;color:#A0A6B2;font-size:9px}
+.tm-na{display:inline-block;width:5px;height:5px;border-radius:50%;background:#DADDE3;padding:0;min-width:0}
+.tm-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px}
+.tm-toolbar .tab-bar{margin-bottom:0;padding-bottom:0;flex:1 1 auto}
+.tm-toolbar .tm-actions{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+.tm-toolbar .tm-actions .btn{width:auto}
+.tm-legend-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin:14px 0 8px}
+.tm-legend-row .tm-count{font-size:13px;color:var(--ink-3)}
+.tm-legend-row .tm-keys{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);align-items:center}
+.tm-legend-row .tm-keys span{display:inline-flex;align-items:center;gap:5px}
 .tm-legend{display:flex;gap:10px;flex-wrap:wrap;padding:10px 14px;font-size:12px;align-items:center;background:#FAFBFC;border-top:1px solid var(--line-soft)}
 .tm-legend .tm-badge{font-size:10px;padding:2px 7px}
 
@@ -1646,11 +1655,7 @@ window.runTrainingCheck = async function(btn) {
     const r = await fetch(API + '/api/training/check', { method: 'POST', headers: headers() });
     const d = await r.json();
     if (!r.ok || !d.success) throw new Error(d.error || 'Check failed');
-    const problems = d.expired + d.within14 + d.within30;
-    const msg = problems === 0
-      ? `Checked ${d.total} record${d.total === 1 ? '' : 's'} — everyone's training is in date`
-      : `Checked ${d.total} record${d.total === 1 ? '' : 's'}: ${d.expired} expired, ${d.within14 + d.within30} expiring within 30 days` + (d.pushed ? ` · ${d.pushed} notification${d.pushed === 1 ? '' : 's'} sent` : '') + (d.emailed ? ' · summary emailed' : '');
-    showToast(msg, problems === 0 ? 'success' : (d.expired ? 'error' : 'warning'));
+    showTrainingCheckResult(d);
     // Refresh whatever training view is showing.
     if (document.getElementById('trainingAlerts')) loadTrainingAlerts();
     if (document.getElementById('trainingList')) renderAdminTraining(document.getElementById('appContent'));
@@ -1661,6 +1666,57 @@ window.runTrainingCheck = async function(btn) {
     if (btn && document.body.contains(btn)) { btn.disabled = false; btn.textContent = label; }
   }
 };
+
+function showTrainingCheckResult(d) {
+  const sp = d.sharepoint || {};
+  const list = (title, items, tone) => !items || !items.length ? '' : `
+    <details ${items.length <= 6 ? 'open' : ''} style="margin-top:10px">
+      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:${tone || 'var(--ink)'}">${title} <span style="color:var(--ink-3);font-weight:500">(${items.length})</span></summary>
+      <ul style="margin:6px 0 0 18px;font-size:13px;color:var(--ink-2);line-height:1.5">${items.slice(0, 60).map(i => `<li>${esc(i)}</li>`).join('')}${items.length > 60 ? `<li>…and ${items.length - 60} more</li>` : ''}</ul>
+    </details>`;
+  const stat = (n, lbl, tone) => `<div style="flex:1;min-width:90px;padding:10px 12px;border-radius:10px;background:${tone || '#F7F8FA'}"><div style="font-size:20px;font-weight:700;color:var(--ink)">${n}</div><div style="font-size:12px;color:var(--ink-2)">${lbl}</div></div>`;
+
+  let spHtml;
+  if (!sp.configured) {
+    spHtml = `<div style="padding:12px 14px;border-radius:10px;background:var(--info-soft);font-size:13px;color:var(--ink-2)"><strong style="color:var(--ink)">SharePoint not connected yet.</strong> Only the dates already in the portal were checked. Once the Microsoft 365 connection is set up in Render, this button will also read the Training Certificates folder and update the matrix automatically.</div>`;
+  } else if (!sp.ok) {
+    spHtml = `<div style="padding:12px 14px;border-radius:10px;background:var(--danger-soft);font-size:13px;color:#9A1C14"><strong>Couldn’t read SharePoint:</strong> ${esc(sp.error || 'unknown error')}. The expiry check below used the dates already in the portal.</div>`;
+  } else {
+    spHtml = `
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${stat(sp.recognised, 'certificates read')}
+        ${stat(sp.added.length, 'added', sp.added.length ? 'var(--success-soft)' : null)}
+        ${stat(sp.updated.length, 'renewed', sp.updated.length ? 'var(--success-soft)' : null)}
+        ${stat(sp.unchanged, 'already up to date')}
+      </div>
+      ${list('Added to the matrix', sp.added, 'var(--success)')}
+      ${list('Expiry moved forward', sp.updated, 'var(--success)')}
+      ${list('In the portal but no certificate on SharePoint', sp.missing_on_sharepoint, 'var(--warning)')}
+      ${list('Files not understood (rename to “Name - Course - Exp YYYY-MM-DD”)', sp.skipped, 'var(--ink-2)')}
+      ${list('Older certificates ignored (newer one on file)', sp.superseded, 'var(--ink-3)')}`;
+  }
+  const problems = d.expired + d.within14 + d.within30;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal-overlay" id="trainingCheckModal" onclick="if(event.target===this)this.remove()">
+      <div class="modal" style="max-width:640px">
+        <h3 style="margin-bottom:4px">Certificate check complete</h3>
+        <p style="color:var(--ink-3);font-size:12px;margin-bottom:14px">${new Date(d.checked_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+        <div style="font-size:12px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">SharePoint certificates</div>
+        ${spHtml}
+        <div style="font-size:12px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 8px">Expiry status</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${stat(d.total, 'records checked')}
+          ${stat(d.expired, 'expired', d.expired ? 'var(--danger-soft)' : null)}
+          ${stat(d.within14, 'within 14 days', d.within14 ? '#FFE4CC' : null)}
+          ${stat(d.within30, 'within 30 days', d.within30 ? 'var(--warning-soft)' : null)}
+        </div>
+        <p style="font-size:13px;color:var(--ink-2);margin-top:10px">${problems === 0 ? 'Everyone’s training is in date.' : `${d.pushed ? d.pushed + ' push notification' + (d.pushed === 1 ? '' : 's') + ' sent' : 'No push notifications sent'}${d.emailed ? ' and a summary emailed to the admin mailbox' : ''}.`}</p>
+        <div style="display:flex;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+          <button class="btn btn-primary btn-sm" style="width:auto" onclick="this.closest('.modal-overlay').remove()">Done</button>
+        </div>
+      </div>
+    </div>`);
+}
 
 window.sendDigest = async function(period) {
   try {
@@ -1676,7 +1732,7 @@ async function loadTrainingAlerts() {
     const el = document.getElementById('trainingAlerts');
     if (!el) return;
     const total = data.expired.length + data.within14.length + data.within30.length;
-    const title = `<div class="dash-section-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">Training <span class="sub">${total === 0 ? 'all in date' : total + ' to chase'}</span><button id="trainingCheckBtn" class="btn btn-outline btn-sm hide-readonly" style="width:auto;margin-left:auto" onclick="runTrainingCheck(this)" title="Re-check every certificate now and send expiry notifications">Check certificates now</button></div>`;
+    const title = `<div class="dash-section-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">Training <span class="sub">${total === 0 ? 'all in date' : total + ' to chase'}</span><button id="trainingCheckBtn" class="btn btn-outline btn-sm hide-readonly" style="width:auto;margin-left:auto" onclick="runTrainingCheck(this)" title="Re-check every certificate now and send expiry notifications">Check certificates</button></div>`;
 
     if (total === 0) {
       el.innerHTML = title + `<div class="ta-card ok"><div class="ta-head"><span class="ta-title">Everyone's training is in date</span></div></div>`;
@@ -2665,16 +2721,17 @@ async function renderAdminTraining(c) {
         <button class="btn btn-primary btn-sm" onclick="addTrainingRecord()">Add Record</button>
       </div>
 
-      <div class="tab-bar" style="margin-top:16px">
-        <button class="active" onclick="showTrainingView('matrix',this)">📊 Matrix</button>
-        <button onclick="showTrainingView('all',this)">📋 All Records</button>
-        <button onclick="showTrainingView('expired',this)" style="color:var(--danger)">❌ Expired</button>
-        <button onclick="showTrainingView('expiring',this)" style="color:var(--warning)">⚠️ Expiring</button>
-      </div>
-
-      <div class="hide-readonly" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-outline btn-sm" style="width:auto" onclick="openManageCourses()">⚙️ Manage Courses</button>
-        <button class="btn btn-outline btn-sm" style="width:auto" onclick="runTrainingCheck(this)" title="Re-check every certificate now and send expiry notifications">🔄 Check Certificates Now</button>
+      <div class="tm-toolbar">
+        <div class="tab-bar">
+          <button class="active" onclick="showTrainingView('matrix',this)">Matrix</button>
+          <button onclick="showTrainingView('all',this)">All records</button>
+          <button onclick="showTrainingView('expired',this)">Expired${expired.length ? ` (${expired.length})` : ''}</button>
+          <button onclick="showTrainingView('expiring',this)">Expiring${expiringSoon.length ? ` (${expiringSoon.length})` : ''}</button>
+        </div>
+        <div class="tm-actions hide-readonly">
+          <button class="btn btn-outline btn-sm" onclick="openManageCourses()">Manage courses</button>
+          <button class="btn btn-primary btn-sm" onclick="runTrainingCheck(this)" title="Read the certificates on SharePoint, update the matrix and send expiry notifications">Check certificates</button>
+        </div>
       </div>
 
       <div id="trainingList"></div>
@@ -2789,7 +2846,7 @@ function renderTrainingMatrix(el, records) {
 
   // Status cell helper
   const cellHtml = (rec) => {
-    if (!rec) return '<td class="tm-cell tm-none" title="No record"><span class="tm-badge tm-na">\u2014</span></td>';
+    if (!rec) return '<td class="tm-cell tm-none"><span class="tm-na"></span></td>';
     const exp = rec.expiry_date ? new Date(rec.expiry_date) : null;
     const daysLeft = exp ? Math.ceil((exp - now) / (1000*60*60*24)) : null;
 
@@ -2825,17 +2882,16 @@ function renderTrainingMatrix(el, records) {
   };
 
   el.innerHTML = `
-    <div style="margin-top:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <div style="font-size:13px;color:var(--text-light)">${operatives.length} operatives \u00d7 ${allCourses.length} courses</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:11px">
-        <span style="display:flex;align-items:center;gap:3px"><span style="width:12px;height:12px;border-radius:3px;background:#E6F4EA;border:1px solid #A5D6A7"></span> Valid</span>
-        <span style="display:flex;align-items:center;gap:3px"><span style="width:12px;height:12px;border-radius:3px;background:#FFF3E0;border:1px solid #FFB74D"></span> &lt;30d</span>
-        <span style="display:flex;align-items:center;gap:3px"><span style="width:12px;height:12px;border-radius:3px;background:#FCE8E6;border:1px solid #EF9A9A"></span> &lt;14d</span>
-        <span style="display:flex;align-items:center;gap:3px"><span style="width:12px;height:12px;border-radius:3px;background:#C62828"></span> Expired</span>
-        <span style="display:flex;align-items:center;gap:3px"><span style="width:12px;height:12px;border-radius:3px;background:#F5F5F5;border:1px solid #E0E0E0"></span> None</span>
+    <div class="tm-legend-row">
+      <div class="tm-count">${operatives.length} operatives \u00b7 ${allCourses.length} courses</div>
+      <div class="tm-keys">
+        <span><span class="tm-badge tm-ok">\u2713</span>In date</span>
+        <span><span class="tm-badge tm-wrn">30d</span>Due soon</span>
+        <span><span class="tm-badge tm-urg">14d</span>Urgent</span>
+        <span><span class="tm-badge tm-exp">EXP</span>Expired</span>
       </div>
     </div>
-    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;box-shadow:var(--shadow)">
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;border:1px solid var(--line);background:var(--card)">
       <table class="training-matrix">
         <thead>
           <tr>
@@ -2853,7 +2909,7 @@ function renderTrainingMatrix(el, records) {
         </tbody>
       </table>
     </div>
-    <p style="font-size:11px;color:var(--text-light);margin-top:8px">Tap/hover any cell to see full details. Scroll sideways if more courses are off-screen.</p>
+    <p style="font-size:12px;color:var(--ink-3);margin-top:8px">Hover or tap a cell for the expiry date and card number.</p>
   `;
 }
 
