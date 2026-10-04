@@ -17,10 +17,10 @@
 :root{
   --primary:#8B1A1A;--primary-dark:#6E1313;--primary-soft:#F7E9E9;--primary-tint:#FBF3F3;
   --ink:#1C1F26;--ink-2:#4A5060;--ink-3:#7A8090;
-  --paper:#EEF0F3;--card:#FFFFFF;--line:#D9DDE3;--line-soft:#E9ECF0;
+  --paper:#F2F3F5;--card:#FFFFFF;--line:#E1E4E9;--line-soft:#ECEEF1;
   --danger:#D92D20;--danger-soft:#FEE4E2;--warning:#C77700;--warning-soft:#FFF1D6;--success:#1E7F49;--success-soft:#DDF3E6;--info:#1F5FBF;--info-soft:#E0EAFB;
   --bg:var(--paper);--text:var(--ink);--text-light:var(--ink-2);--border:var(--line);
-  --radius:10px;--radius-sm:7px;--shadow:none;
+  --radius:12px;--radius-sm:8px;--shadow:0 1px 2px rgba(28,31,38,.04),0 4px 14px rgba(28,31,38,.05);
   --font:'Barlow',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   --font-num:'Barlow Semi Condensed','Barlow',-apple-system,sans-serif;
   --nav-w:236px;
@@ -69,7 +69,7 @@ h3{font-size:17px;font-weight:600}
 .form-group .condition-grid select{width:100%;padding:8px;font-size:14px}
 input[type=checkbox]{accent-color:var(--primary)}
 
-.form-section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:14px}
+.form-section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:14px;box-shadow:var(--shadow)}
 .form-section>.form-group:last-child{margin-bottom:0}
 .form-section h3{font-size:16px;margin-bottom:14px;color:var(--primary-dark);display:flex;align-items:center;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--line-soft)}
 
@@ -89,6 +89,7 @@ body.read-only-mode .hide-readonly{display:none!important}
 .app-header{background:var(--card);border-bottom:1px solid var(--line);color:var(--ink);padding:0 16px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
 .app-header .hdr-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px}
 .app-header .hdr-brand img{height:26px}
+.app-header .hdr-title{display:none;font-weight:600;font-size:15px;color:var(--ink-2)}
 .app-header .user-info{display:flex;align-items:center;gap:8px;font-size:14px}
 .app-header .user-badge{background:var(--primary-soft);color:var(--primary-dark);padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
 .header-btn{background:none;border:1px solid var(--line);color:var(--ink-2);cursor:pointer;font-size:16px;padding:5px 9px;border-radius:var(--radius-sm);line-height:1}
@@ -100,10 +101,11 @@ body.read-only-mode .hide-readonly{display:none!important}
 .bottom-nav::-webkit-scrollbar{display:none}
 .bottom-nav button{background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 4px;flex:1 1 0;min-width:0;color:var(--ink-3);cursor:pointer;font-size:11px;font-weight:600;flex-shrink:0;white-space:nowrap;border-radius:var(--radius-sm)}
 .bottom-nav button.active{color:var(--primary-dark);background:var(--primary-soft)}
-.bottom-nav button .nav-icon{font-size:20px;line-height:1}
+.bottom-nav button .nav-icon{width:22px;height:22px;display:inline-flex}
+.bottom-nav button .nav-icon svg{width:22px;height:22px}
 
 /* ── Cards ── */
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:10px;box-shadow:var(--shadow)}
 .card[onclick]{cursor:pointer;transition:border-color .15s}
 .card[onclick]:hover{border-color:var(--ink-3)}
 .card-header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px}
@@ -120,8 +122,8 @@ body.read-only-mode .hide-readonly{display:none!important}
 
 /* ── Stat tiles ── */
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
-.stat-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 14px 12px;position:relative;overflow:hidden}
-.stat-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--primary)}
+.stat-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 14px 12px;position:relative;overflow:hidden;box-shadow:var(--shadow)}
+.stat-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--primary);border-radius:2px 0 0 2px}
 .stat-card .stat-value{font-family:var(--font-num);font-size:34px;font-weight:700;color:var(--ink);line-height:1;letter-spacing:-.01em}
 .stat-card .stat-label{font-size:13px;color:var(--ink-2);margin-top:6px;font-weight:500}
 .stat-card .stat-icon{font-size:18px;margin-bottom:8px;line-height:1}
@@ -136,7 +138,8 @@ body.read-only-mode .hide-readonly{display:none!important}
 .dash-banner .banner-text p{font-size:13px;color:var(--ink-2)}
 .dash-banner .banner-date{margin-left:auto;text-align:right;font-size:13px;color:var(--ink-2);line-height:1.5}
 
-.dash-hero{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--primary);border-radius:var(--radius);padding:22px 22px 18px;margin-bottom:18px}
+.dash-hero{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--primary);border-radius:var(--radius);padding:22px 22px 18px;margin-bottom:18px;box-shadow:var(--shadow)}
+.dash-hero{background:linear-gradient(135deg,#fff 0%,#fff 70%,var(--primary-tint) 100%)}
 .dash-hero .hero-date{font-size:14px;color:var(--ink-2);margin-bottom:8px}
 .dash-hero h2{font-family:var(--font-num);font-size:30px;font-weight:700;line-height:1.15;margin:0 0 14px;max-width:28ch}
 .dash-hero h2 .n{color:var(--primary)}
@@ -152,12 +155,12 @@ body.read-only-mode .hide-readonly{display:none!important}
 .dash-section-title .sub{font-weight:400;color:var(--ink-3);font-size:13px;margin-left:auto}
 
 .quick-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px}
-.quick-action{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 10px;text-align:center;cursor:pointer;transition:border-color .15s;text-decoration:none;color:var(--ink)}
+.quick-action{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 10px;text-align:center;cursor:pointer;transition:border-color .15s;text-decoration:none;color:var(--ink);box-shadow:var(--shadow)}
 .quick-action:hover{border-color:var(--primary)}
 .quick-action .qa-icon{font-size:24px;margin-bottom:6px;display:block;line-height:1}
 .quick-action .qa-label{font-size:13px;font-weight:600;color:var(--ink-2)}
 
-.activity-feed{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.activity-feed{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
 .activity-item{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line-soft)}
 .activity-item:last-child{border-bottom:none}
 .activity-dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex-shrink:0}
@@ -204,7 +207,7 @@ body.read-only-mode .hide-readonly{display:none!important}
 .act-tabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--line);overflow-x:auto}
 .act-tab{padding:10px 14px;border:0;background:transparent;color:var(--ink-2);font-weight:600;font-size:14px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
 .act-tab.active{color:var(--primary-dark);border-bottom-color:var(--primary)}
-.act-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;display:flex;gap:14px;align-items:flex-start;cursor:pointer;transition:border-color .15s}
+.act-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;display:flex;gap:14px;align-items:flex-start;cursor:pointer;transition:border-color .15s;box-shadow:var(--shadow)}
 .act-card:hover{border-color:var(--ink-3)}
 .act-card.overdue{border-left:4px solid var(--danger)}
 .act-card.due-soon{border-left:4px solid var(--warning)}
@@ -225,14 +228,14 @@ body.read-only-mode .hide-readonly{display:none!important}
 .tr-range button{background:transparent;border:0;padding:8px 14px;cursor:pointer;font-size:14px;color:var(--ink-2);font-weight:600}
 .tr-range button.active{background:var(--primary);color:#fff}
 .tr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:18px}
-.tr-tile{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;border-left:4px solid var(--primary)}
+.tr-tile{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;border-left:4px solid var(--primary);box-shadow:var(--shadow)}
 .tr-tile.danger{border-left-color:var(--danger)}.tr-tile.warning{border-left-color:var(--warning)}.tr-tile.success{border-left-color:var(--success)}
 .tr-tile .tr-label{font-size:13px;color:var(--ink-2);font-weight:600;margin-bottom:6px}
 .tr-tile .tr-value{font-family:var(--font-num);font-size:34px;font-weight:700;color:var(--ink);line-height:1}
 .tr-tile .tr-sub{font-size:13px;color:var(--ink-2);margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .tr-trend{display:inline-flex;align-items:center;gap:3px;font-weight:700;padding:2px 8px;border-radius:10px;font-size:12px}
 .tr-trend.up{background:var(--success-soft);color:#145A33}.tr-trend.down{background:var(--danger-soft);color:#9A1C14}.tr-trend.flat{background:#EEF0F3;color:#5B6170}
-.tr-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:16px}
+.tr-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:16px;box-shadow:var(--shadow)}
 .tr-card h3{font-size:15px;color:var(--ink);margin-bottom:14px}
 .tr-locations{width:100%;border-collapse:collapse}
 .tr-locations th,.tr-locations td{text-align:left;padding:10px 12px;font-size:14px;border-bottom:1px solid var(--line-soft)}
@@ -290,18 +293,20 @@ body.read-only-mode .hide-readonly{display:none!important}
 @media(min-width:768px){
   .stats-grid{grid-template-columns:repeat(4,1fr)}
   .bottom-nav{display:none!important}
-  .sidebar{display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;width:var(--nav-w);background:#241214;color:#fff;z-index:110;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .sidebar{display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;width:var(--nav-w);background:linear-gradient(180deg,#2A1517 0%,#1F1012 100%);color:#fff;z-index:110;overflow-y:auto;-webkit-overflow-scrolling:touch}
   .sidebar-brand{padding:18px 18px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.08)}
   .sidebar-brand img{height:30px;border-radius:5px;background:#fff;padding:3px 5px}
   .sidebar-brand h1{font-size:15px;font-weight:700;line-height:1.15}
   .sidebar-brand h1 small{display:block;font-size:12px;font-weight:400;color:rgba(255,255,255,.5);margin-top:2px}
   .sidebar-section{padding:14px 0 4px}
-  .sidebar-section-title{padding:0 18px 6px;font-size:12px;color:rgba(255,255,255,.4);font-weight:600}
+  .sidebar-section-title{padding:4px 20px 6px;font-size:11.5px;color:rgba(255,255,255,.42);font-weight:600;letter-spacing:.02em}
   .sidebar-nav{list-style:none;padding:0 10px;margin:0}
   .sidebar-nav li a{display:flex;align-items:center;gap:10px;padding:9px 10px;color:rgba(255,255,255,.72);text-decoration:none;font-size:14px;font-weight:500;border-radius:7px;cursor:pointer;transition:background .12s,color .12s}
   .sidebar-nav li a:hover{background:rgba(255,255,255,.07);color:#fff}
   .sidebar-nav li a.active{background:var(--primary);color:#fff;font-weight:600}
-  .sidebar-nav li a .nav-icon{font-size:16px;width:22px;text-align:center;flex-shrink:0}
+  .sidebar-nav li a .nav-icon{width:20px;height:20px;flex-shrink:0;display:inline-flex;opacity:.85}
+  .sidebar-nav li a .nav-icon svg{width:20px;height:20px}
+  .sidebar-nav li a.active .nav-icon{opacity:1}
   .sidebar-nav li a .nav-badge{margin-left:auto;background:var(--danger);color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:700}
   .sidebar-footer{margin-top:auto;padding:14px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:13px}
   .sidebar-footer .sidebar-user{display:flex;align-items:center;gap:10px;margin-bottom:10px}
@@ -313,12 +318,33 @@ body.read-only-mode .hide-readonly{display:none!important}
   .sidebar-footer button.signout{background:rgba(255,255,255,.08);border-color:transparent;text-align:center;margin-top:4px;margin-bottom:0}
   .app-header{margin-left:var(--nav-w)}
   .app-header .hdr-brand{display:none}
+  .app-header .hdr-title{display:block}
   .app-content{margin-left:var(--nav-w);max-width:940px;padding:26px 30px;padding-bottom:48px}
 }
 @media(min-width:1200px){.app-content{max-width:1040px}}
+.dash-grid{display:grid;gap:0 22px}
+@media(min-width:1100px){.dash-grid{grid-template-columns:minmax(0,1.35fr) minmax(300px,1fr)}}
+
+/* ── Training alerts ── */
+.ta-card{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:var(--radius);margin-bottom:10px;overflow:hidden;box-shadow:var(--shadow)}
+.ta-card.bad{border-left-color:var(--danger)}.ta-card.warn{border-left-color:var(--warning)}.ta-card.soft{border-left-color:#E5B800}.ta-card.ok{border-left-color:var(--success)}
+.ta-head{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--line-soft)}
+.ta-card.ok .ta-head{border-bottom:0}
+.ta-title{font-weight:700;font-size:14px}
+.ta-count{font-family:var(--font-num);font-weight:700;font-size:13px;background:var(--paper);color:var(--ink-2);padding:2px 9px;border-radius:10px}
+.ta-card.bad .ta-count{background:var(--danger-soft);color:#9A1C14}.ta-card.warn .ta-count{background:var(--warning-soft);color:#7A4A00}
+.ta-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line-soft)}
+.ta-row:last-child{border-bottom:0}
+.ta-who{display:flex;flex-direction:column;min-width:0}
+.ta-who strong{font-size:14px}.ta-who span{font-size:13px;color:var(--ink-2)}
+.ta-when{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0}
+.ta-when small{font-size:12px;color:var(--ink-3);margin-top:2px;font-family:var(--font-num)}
+.ta-pill{font-size:12px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--paper);color:var(--ink-2)}
+.ta-card.bad .ta-pill{background:var(--danger-soft);color:#9A1C14}.ta-card.warn .ta-pill{background:var(--warning-soft);color:#7A4A00}.ta-card.soft .ta-pill{background:#FFF8CC;color:#6B5A00}
+
 /* ── Operative home ── */
 .home-actions{display:grid;gap:10px}
-.home-action{display:flex;align-items:center;gap:16px;width:100%;text-align:left;background:var(--card);border:1.5px solid var(--line);border-radius:var(--radius);padding:16px 18px;cursor:pointer;color:var(--ink);transition:border-color .15s,background .15s;min-height:76px}
+.home-action{display:flex;align-items:center;gap:16px;width:100%;text-align:left;background:var(--card);border:1.5px solid var(--line);border-radius:var(--radius);padding:16px 18px;cursor:pointer;color:var(--ink);transition:border-color .15s,background .15s;min-height:76px;box-shadow:var(--shadow)}
 .home-action:hover{border-color:var(--primary)}
 .home-action:active{background:var(--primary-tint)}
 .home-action .ha-icon{font-size:28px;line-height:1;width:40px;text-align:center;flex-shrink:0}
@@ -382,7 +408,7 @@ body.read-only-mode .hide-readonly{display:none!important}
 /* Admin inspection list */
 .insp-cards{display:none}
 @media(max-width:767px){.insp-table{display:none}.insp-cards{display:grid;gap:10px}}
-.insp-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;cursor:pointer}
+.insp-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;cursor:pointer;box-shadow:var(--shadow)}
 .insp-card.unsafe{border-left:4px solid var(--danger)}
 .insp-card .ic-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
 .insp-card .ic-id{font-weight:700;font-size:16px}
@@ -439,32 +465,32 @@ body.read-only-mode .hide-readonly{display:none!important}
     <div id="sidebarAdminNav">
       <div class="sidebar-section">
         <ul class="sidebar-nav">
-          <li><a data-page="dashboard" class="active"><span class="nav-icon">🏠</span>Dashboard</a></li>
-          <li><a data-page="trends"><span class="nav-icon">📈</span>Trends</a></li>
+          <li><a data-page="dashboard" class="active"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg></span>Dashboard</a></li>
+          <li><a data-page="trends"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></span>Trends</a></li>
         </ul>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Reports</div>
         <ul class="sidebar-nav">
-          <li><a data-page="reports"><span class="nav-icon">⚠️</span>Open near misses</a></li>
-          <li><a data-page="closed"><span class="nav-icon">✅</span>Closed near misses</a></li>
-          <li><a data-page="inspections"><span class="nav-icon">📋</span>Inspections</a></li>
-          <li><a data-page="actions"><span class="nav-icon">🎯</span>Actions <span id="actionsBadge" class="actions-badge"></span></a></li>
-          <li><a data-page="archives"><span class="nav-icon">🗄️</span>Monthly archives</a></li>
+          <li><a data-page="reports"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg></span>Open near misses</a></li>
+          <li><a data-page="closed"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.5 2.5L16 9.5"/></svg></span>Closed near misses</a></li>
+          <li><a data-page="inspections"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="m8.5 12 2 2 4.5-4.5"/><path d="M8.5 17h7"/></svg></span>Inspections</a></li>
+          <li><a data-page="actions"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span>Actions <span id="actionsBadge" class="actions-badge"></span></a></li>
+          <li><a data-page="archives"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M10 13h4"/></svg></span>Monthly archives</a></li>
         </ul>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">People &amp; equipment</div>
         <ul class="sidebar-nav">
-          <li><a data-page="training"><span class="nav-icon">🎓</span>Training</a></li>
-          <li><a data-page="schedule"><span class="nav-icon">📅</span>Inspection schedule <span id="scheduleBadge" class="actions-badge"></span></a></li>
+          <li><a data-page="training"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2.5 9 9.5-4.5L21.5 9 12 13.5 2.5 9z"/><path d="M6.5 11v5c0 1.5 2.5 3 5.5 3s5.5-1.5 5.5-3v-5"/><path d="M21.5 9v6"/></svg></span>Training</a></li>
+          <li><a data-page="schedule"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 3v4M16 3v4"/><path d="m9 15.5 2 2 4-4"/></svg></span>Inspection schedule <span id="scheduleBadge" class="actions-badge"></span></a></li>
         </ul>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Admin</div>
         <ul class="sidebar-nav">
-          <li><a data-page="users"><span class="nav-icon">👥</span>Users</a></li>
-          <li><a data-page="audit-log"><span class="nav-icon">📜</span>Audit log</a></li>
+          <li><a data-page="users"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14c3 0 5.5 2.2 5.5 5.5"/></svg></span>Users</a></li>
+          <li><a data-page="audit-log"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M9 12h7M9 16h7"/></svg></span>Audit log</a></li>
         </ul>
       </div>
     </div>
@@ -473,22 +499,22 @@ body.read-only-mode .hide-readonly{display:none!important}
     <div id="sidebarOpNav" class="hidden">
       <div class="sidebar-section">
         <ul class="sidebar-nav">
-          <li><a data-page="home" class="active"><span class="nav-icon">🏠</span>Home</a></li>
+          <li><a data-page="home" class="active"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg></span>Home</a></li>
         </ul>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Report &amp; inspect</div>
         <ul class="sidebar-nav">
-          <li><a data-page="near-miss"><span class="nav-icon">⚠️</span>Near miss</a></li>
-          <li><a data-page="ladder"><span class="nav-icon">🪜</span>Ladder inspection</a></li>
-          <li><a data-page="tower"><span class="nav-icon">🏗️</span>Tower inspection</a></li>
-          <li><a data-page="mewp"><span class="nav-icon">🔧</span>MEWP inspection</a></li>
+          <li><a data-page="near-miss"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg></span>Near miss</a></li>
+          <li><a data-page="ladder"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v18M17 3v18"/><path d="M7 7h10M7 11h10M7 15h10M7 19h10"/></svg></span>Ladder inspection</a></li>
+          <li><a data-page="tower"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V5M18 21V5"/><path d="M6 5h12"/><path d="M6 9l12 6M18 9 6 15"/><path d="M4 21h16"/><path d="M8 5V3h8v2"/></svg></span>Tower inspection</a></li>
+          <li><a data-page="mewp"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16"/><path d="M6 20v-3h5v3"/><path d="M8.5 17 14 7"/><path d="M11 17 16.5 7"/><rect x="13" y="4" width="8" height="4" rx="1"/></svg></span>MEWP inspection</a></li>
         </ul>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">My records</div>
         <ul class="sidebar-nav">
-          <li><a data-page="my-training"><span class="nav-icon">🎓</span>My training</a></li>
+          <li><a data-page="my-training"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2.5 9 9.5-4.5L21.5 9 12 13.5 2.5 9z"/><path d="M6.5 11v5c0 1.5 2.5 3 5.5 3s5.5-1.5 5.5-3v-5"/><path d="M21.5 9v6"/></svg></span>My training</a></li>
         </ul>
       </div>
     </div>
@@ -510,6 +536,7 @@ body.read-only-mode .hide-readonly{display:none!important}
 
   <header class="app-header">
     <div class="hdr-brand"><img src="/logo.png" alt="ManProjects"> Site Safety</div>
+    <div class="hdr-title" id="hdrTitle"></div>
     <div class="user-info">
       <button id="syncIndicator" class="sync-indicator" onclick="showPendingList()" title="View pending submissions" style="cursor:pointer">⏳ <span id="syncCount">0</span> pending</button>
       <span id="userBadge" class="user-badge"></span>
@@ -523,22 +550,22 @@ body.read-only-mode .hide-readonly{display:none!important}
 
   <!-- Bottom navigation (operative, phone) -->
   <nav id="operativeNav" class="bottom-nav hidden">
-    <button data-page="home" class="active"><span class="nav-icon">🏠</span>Home</button>
-    <button data-page="near-miss"><span class="nav-icon">⚠️</span>Near miss</button>
-    <button data-page="ladder"><span class="nav-icon">🪜</span>Ladder</button>
-    <button data-page="tower"><span class="nav-icon">🏗️</span>Tower</button>
-    <button data-page="mewp"><span class="nav-icon">🔧</span>MEWP</button>
-    <button data-page="my-training"><span class="nav-icon">🎓</span>Training</button>
+    <button data-page="home" class="active"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg></span>Home</button>
+    <button data-page="near-miss"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg></span>Near miss</button>
+    <button data-page="ladder"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v18M17 3v18"/><path d="M7 7h10M7 11h10M7 15h10M7 19h10"/></svg></span>Ladder</button>
+    <button data-page="tower"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V5M18 21V5"/><path d="M6 5h12"/><path d="M6 9l12 6M18 9 6 15"/><path d="M4 21h16"/><path d="M8 5V3h8v2"/></svg></span>Tower</button>
+    <button data-page="mewp"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16"/><path d="M6 20v-3h5v3"/><path d="M8.5 17 14 7"/><path d="M11 17 16.5 7"/><rect x="13" y="4" width="8" height="4" rx="1"/></svg></span>MEWP</button>
+    <button data-page="my-training"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2.5 9 9.5-4.5L21.5 9 12 13.5 2.5 9z"/><path d="M6.5 11v5c0 1.5 2.5 3 5.5 3s5.5-1.5 5.5-3v-5"/><path d="M21.5 9v6"/></svg></span>Training</button>
   </nav>
 
   <!-- Bottom navigation (admin, phone) -->
   <nav id="adminNav" class="bottom-nav hidden">
-    <button data-page="dashboard" class="active"><span class="nav-icon">🏠</span>Dashboard</button>
-    <button data-page="reports"><span class="nav-icon">⚠️</span>Near misses</button>
-    <button data-page="inspections"><span class="nav-icon">📋</span>Inspections</button>
-    <button data-page="actions"><span class="nav-icon">🎯</span>Actions</button>
-    <button data-page="training"><span class="nav-icon">🎓</span>Training</button>
-    <button data-page="users"><span class="nav-icon">👥</span>Users</button>
+    <button data-page="dashboard" class="active"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg></span>Dashboard</button>
+    <button data-page="reports"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg></span>Near misses</button>
+    <button data-page="inspections"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="m8.5 12 2 2 4.5-4.5"/><path d="M8.5 17h7"/></svg></span>Inspections</button>
+    <button data-page="actions"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span>Actions</button>
+    <button data-page="training"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2.5 9 9.5-4.5L21.5 9 12 13.5 2.5 9z"/><path d="M6.5 11v5c0 1.5 2.5 3 5.5 3s5.5-1.5 5.5-3v-5"/><path d="M21.5 9v6"/></svg></span>Training</button>
+    <button data-page="users"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14c3 0 5.5 2.2 5.5 5.5"/></svg></span>Users</button>
   </nav>
 </div>
 
@@ -1085,6 +1112,8 @@ document.querySelectorAll('.bottom-nav button').forEach(btn => {
 
 function navigate(page) {
   state.currentPage = page;
+  const ht = document.getElementById('hdrTitle');
+  if (ht) { const a = document.querySelector(`.sidebar-nav a[data-page="${page}"]`); ht.textContent = a ? a.textContent.replace(/\d+$/, '').trim() : ''; }
   // Update bottom nav (mobile)
   document.querySelectorAll('.bottom-nav button').forEach(b => b.classList.toggle('active', b.dataset.page === page));
   // Update sidebar nav (desktop)
@@ -1527,8 +1556,8 @@ async function renderDashboard(c) {
         </div>
       </div>
 
-      <div id="trainingAlerts" style="margin-bottom:18px"></div>
-
+      <div class="dash-grid">
+      <div class="dash-main">
       <div class="dash-section">
         <div class="dash-section-title">Near misses</div>
         <div class="stats-grid">
@@ -1580,6 +1609,12 @@ async function renderDashboard(c) {
         </div>
       </div>` : ''}
 
+      </div>
+      <div class="dash-side">
+      <div id="trainingAlerts" class="dash-section"></div>
+      </div>
+      </div>
+
       <div class="dash-section hide-readonly">
         <div class="dash-section-title">Email digest</div>
         <div class="card" style="margin:0;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
@@ -1614,74 +1649,28 @@ async function loadTrainingAlerts() {
     const data = await fetch(API + '/api/training-alerts', { headers: headers() }).then(r => r.json());
     const el = document.getElementById('trainingAlerts');
     if (!el) return;
-
     const total = data.expired.length + data.within14.length + data.within30.length;
+    const title = `<div class="dash-section-title">Training <span class="sub">${total === 0 ? 'all in date' : total + ' to chase'}</span></div>`;
 
     if (total === 0) {
-      el.innerHTML = `<div style="background:var(--success-soft);border:1px solid #9FD6B4;border-radius:10px;padding:16px 18px;display:flex;align-items:center;gap:12px">
-        <span style="font-size:24px">✅</span>
-        <div><strong style="color:#145A33">Training is up to date</strong><br><span style="font-size:13px;color:var(--ink-2)">Every operative's qualifications are current.</span></div>
-      </div>`;
+      el.innerHTML = title + `<div class="ta-card ok"><div class="ta-head"><span class="ta-title">Everyone's training is in date</span></div></div>`;
       return;
     }
-
-    const alertRow = (r, badge, color, text) => `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #F0F0F0">
-        <div style="flex:1;min-width:0">
-          <strong style="font-size:14px">${r.operative_name}</strong>
-          <div style="font-size:12px;color:#777;margin-top:2px">${r.course_name}${r.card_number ? ' — ' + r.card_number : ''}</div>
-        </div>
-        <div style="flex-shrink:0;text-align:right">
-          <span style="display:inline-block;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:${color};color:#fff">${text}</span>
-          <div style="font-size:11px;color:#999;margin-top:3px">Expires: ${r.expiry_date}</div>
-        </div>
+    const days = d => Math.ceil(Math.abs(new Date(d) - new Date()) / 86400000);
+    const row = (r, pill) => `
+      <div class="ta-row">
+        <div class="ta-who"><strong>${esc(r.operative_name)}</strong><span>${esc(r.course_name)}${r.card_number && r.card_number !== 'N/A' ? ' · ' + esc(r.card_number) : ''}</span></div>
+        <div class="ta-when"><span class="ta-pill">${pill}</span><small>${esc(r.expiry_date)}</small></div>
       </div>`;
-
-    let html = '';
-
-    if (data.expired.length > 0) {
-      html += `
-        <div style="background:#FFEBEE;border:2px solid #EF5350;border-radius:10px;padding:0;margin-bottom:12px;overflow:hidden">
-          <div style="background:#EF5350;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
-            <div style="font-weight:700;font-size:15px">Expired training</div>
-            <div style="background:rgba(255,255,255,0.25);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700">${data.expired.length}</div>
-          </div>
-          ${data.expired.map(r => {
-            const d = Math.ceil((new Date() - new Date(r.expiry_date)) / (1000*60*60*24));
-            return alertRow(r, 'EXPIRED', '#C62828', 'Expired ' + d + 'd ago');
-          }).join('')}
-        </div>`;
-    }
-
-    if (data.within14.length > 0) {
-      html += `
-        <div style="background:#FFF3E0;border:2px solid #FF9800;border-radius:10px;padding:0;margin-bottom:12px;overflow:hidden">
-          <div style="background:#FF9800;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
-            <div style="font-weight:700;font-size:15px">Expiring within 14 days</div>
-            <div style="background:rgba(255,255,255,0.25);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700">${data.within14.length}</div>
-          </div>
-          ${data.within14.map(r => {
-            const d = Math.ceil((new Date(r.expiry_date) - new Date()) / (1000*60*60*24));
-            return alertRow(r, 'URGENT', '#E65100', d + ' days left');
-          }).join('')}
-        </div>`;
-    }
-
-    if (data.within30.length > 0) {
-      html += `
-        <div style="background:#FFFDE7;border:2px solid #FDD835;border-radius:10px;padding:0;margin-bottom:12px;overflow:hidden">
-          <div style="background:#F9A825;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
-            <div style="font-weight:700;font-size:15px">Expiring within 30 days</div>
-            <div style="background:rgba(255,255,255,0.25);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700">${data.within30.length}</div>
-          </div>
-          ${data.within30.map(r => {
-            const d = Math.ceil((new Date(r.expiry_date) - new Date()) / (1000*60*60*24));
-            return alertRow(r, 'WARNING', '#F57F17', d + ' days left');
-          }).join('')}
-        </div>`;
-    }
-
-    el.innerHTML = html;
+    const block = (tone, heading, rows, pillFn) => rows.length ? `
+      <div class="ta-card ${tone}">
+        <div class="ta-head"><span class="ta-title">${heading}</span><span class="ta-count">${rows.length}</span></div>
+        ${rows.map(r => row(r, pillFn(r))).join('')}
+      </div>` : '';
+    el.innerHTML = title
+      + block('bad', 'Expired', data.expired, r => `${days(r.expiry_date)}d overdue`)
+      + block('warn', 'Expiring within 14 days', data.within14, r => `${days(r.expiry_date)} days`)
+      + block('soft', 'Expiring within 30 days', data.within30, r => `${days(r.expiry_date)} days`);
   } catch(e) { console.error('Training alerts error:', e); }
 }
 
