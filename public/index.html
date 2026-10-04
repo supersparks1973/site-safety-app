@@ -241,6 +241,11 @@ body.read-only-mode .hide-readonly{display:none!important}
 .tr-bar-track{flex:1;height:6px;background:var(--line-soft);border-radius:3px;overflow:hidden}
 .tr-bar-fill{height:100%;background:var(--primary);border-radius:3px}
 .tr-bar-num{font-weight:700;font-size:14px;color:var(--ink);min-width:24px;text-align:right;font-family:var(--font-num)}
+.tr-chart{display:flex;align-items:flex-end;gap:3px;min-width:360px}
+.tr-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center}
+.tr-stack{width:100%;max-width:18px;display:flex;flex-direction:column-reverse;justify-content:flex-start;border-bottom:1px solid var(--line)}
+.tr-stack div{width:100%;border-radius:2px 2px 0 0}
+.tr-col-label{font-size:11px;color:var(--ink-3);margin-top:6px;height:16px;white-space:nowrap;font-family:var(--font-num)}
 .tr-print-btn{margin-left:auto}
 .tr-toolbar .btn{width:auto}
 @media print{
@@ -3150,28 +3155,24 @@ async function loadTrendData() {
   const chart = `
     <div class="tr-card" style="overflow-x:auto">
       <h3>Daily activity — ${fmtRange}${data.site ? ' · ' + esc(data.site) : ''}</h3>
-      <svg width="100%" height="${chartHeight + 30}" viewBox="0 0 ${Math.max(360, days.length * 14)} ${chartHeight + 30}" preserveAspectRatio="none" style="max-width:100%">
+      <div class="tr-chart" style="height:${chartHeight + 30}px">
         ${days.map((d, i) => {
-          const x = i * 14 + 2;
-          const segs = [
-            { val: d.near_miss, color: '#dc2626' },
-            { val: d.ladder + d.tower + d.mewp, color: '#0ea5e9' },
-          ];
-          let yCursor = chartHeight;
-          const bars = segs.map(s => {
-            if (s.val === 0) return '';
-            const h = Math.max(1, (s.val / max) * (chartHeight - 4));
-            yCursor -= h;
-            return `<rect x="${x}" y="${yCursor}" width="10" height="${h}" fill="${s.color}" rx="1"></rect>`;
-          }).join('');
-          const label = (i % showLabelEvery === 0 || i === days.length - 1)
-            ? `<text x="${x + 5}" y="${chartHeight + 14}" font-size="9" fill="#94a3b8" text-anchor="middle">${(d.day || '').slice(5)}</text>`
-            : '';
-          return bars + label;
+          const insp = d.ladder + d.tower + d.mewp;
+          const hNm = d.near_miss ? Math.max(2, (d.near_miss / max) * (chartHeight - 4)) : 0;
+          const hIn = insp ? Math.max(2, (insp / max) * (chartHeight - 4)) : 0;
+          const showLabel = (i % showLabelEvery === 0 || i === days.length - 1);
+          const tip = `${d.day}: ${d.near_miss} near miss, ${insp} inspections`;
+          return `<div class="tr-col" title="${tip}">
+            <div class="tr-stack" style="height:${chartHeight}px">
+              ${hNm ? `<div style="height:${hNm}px;background:var(--danger)"></div>` : ''}
+              ${hIn ? `<div style="height:${hIn}px;background:#0ea5e9"></div>` : ''}
+            </div>
+            <div class="tr-col-label">${showLabel ? esc((d.day || '').slice(5)) : ''}</div>
+          </div>`;
         }).join('')}
-      </svg>
+      </div>
       <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--text-light)">
-        <span><span style="display:inline-block;width:10px;height:10px;background:#dc2626;border-radius:2px;vertical-align:middle"></span> Near miss</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--danger);border-radius:2px;vertical-align:middle"></span> Near miss</span>
         <span><span style="display:inline-block;width:10px;height:10px;background:#0ea5e9;border-radius:2px;vertical-align:middle"></span> Inspections</span>
       </div>
     </div>
