@@ -406,7 +406,7 @@ body.read-only-mode .hide-readonly{display:none!important}
 .sig-hint{position:absolute;left:0;right:0;bottom:10px;text-align:center;font-size:12px;color:var(--ink-3);pointer-events:none}
 .btn-submit{margin-top:8px;padding:18px;font-size:18px}
 /* Admin inspection list */
-.insp-cards{display:none}
+.insp-seg{display:inline-flex;border:1.5px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;background:#fff}.insp-seg button{background:transparent;border:0;border-right:1px solid var(--line);padding:8px 14px;cursor:pointer;font-size:13px;color:var(--ink-2);font-weight:600;white-space:nowrap}.insp-seg button:last-child{border-right:0}.insp-seg button.active{background:var(--primary-soft);color:var(--primary-dark)}.insp-toolbar{display:flex;flex-direction:column;align-items:stretch;gap:10px}.insp-toolbar .insp-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.insp-dates{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2)}.insp-table table{width:100%;border-collapse:collapse;min-width:680px}.insp-table th{padding:10px 14px;text-align:left;font-size:12px;letter-spacing:.02em;text-transform:uppercase;color:var(--ink-3);font-weight:600;background:#FAFBFC;border-bottom:1px solid var(--line);white-space:nowrap}.insp-table th.sortable{cursor:pointer;user-select:none}.insp-table th.sortable:hover{color:var(--ink)}.insp-table td{padding:11px 14px;font-size:14px;border-bottom:1px solid var(--line-soft);vertical-align:middle}.insp-table tr:last-child td{border-bottom:0}.insp-table tr.unsafe td:first-child{box-shadow:inset 3px 0 var(--danger)}.insp-table tbody tr{cursor:pointer}.insp-table tbody tr:hover td{background:#FAFBFC}.insp-table .eq-id{font-weight:600;color:var(--ink)}.insp-table .eq-type{display:block;font-size:12px;color:var(--ink-3);margin-top:1px}.insp-table .muted{color:var(--ink-2)}.insp-table .nowrap{white-space:nowrap}.insp-table .def{font-size:13px;color:#9A1C14;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.insp-cards{display:none}
 @media(max-width:767px){.insp-table{display:none}.insp-cards{display:grid;gap:10px}}
 .insp-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;cursor:pointer;box-shadow:var(--shadow)}
 .insp-card.unsafe{border-left:4px solid var(--danger)}
@@ -1817,21 +1817,24 @@ async function renderAdminInspections(c) {
     <h2 style="margin-bottom:12px">Inspections</h2>
 
     <!-- Filter bar -->
-    <div class="tr-toolbar">
-      <input type="search" id="inspSearch" placeholder="Search operative, equipment ID or location" oninput="setInspFilter('q', this.value)" style="flex:1;min-width:220px">
-
-      <div id="inspTypeChips" class="insp-chip-group" style="display:flex;gap:4px"></div>
-      <div id="inspStatusChips" class="insp-chip-group" style="display:flex;gap:4px"></div>
-
-      <div style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text-light)">
-        <span>From</span><input type="date" id="inspFrom" onchange="setInspFilter('from', this.value)">
-        <span>To</span><input type="date" id="inspTo" onchange="setInspFilter('to', this.value)">
+    <div class="tr-toolbar insp-toolbar">
+      <div class="insp-row">
+        <input type="search" id="inspSearch" placeholder="Search operative, equipment ID or location" oninput="setInspFilter('q', this.value)" style="flex:1;min-width:220px">
+        <div class="insp-dates">
+          <input type="date" id="inspFrom" onchange="setInspFilter('from', this.value)" aria-label="From date">
+          <span>to</span>
+          <input type="date" id="inspTo" onchange="setInspFilter('to', this.value)" aria-label="To date">
+        </div>
       </div>
-
-      <button class="btn btn-outline btn-sm" onclick="resetInspFilters()">Reset</button>
+      <div class="insp-row">
+        <div id="inspTypeChips" class="insp-seg"></div>
+        <div id="inspStatusChips" class="insp-seg"></div>
+        <span style="flex:1"></span>
+        <span id="inspSummary" style="font-size:13px;color:var(--ink-2)"></span>
+        <button id="inspReset" class="btn btn-outline btn-sm" onclick="resetInspFilters()" style="display:none">Clear filters</button>
+      </div>
     </div>
 
-    <div id="inspSummary" style="font-size:13px;color:var(--text-light);margin-bottom:8px"></div>
     <div id="inspectionList">Loading…</div>
   `;
   renderInspectionChips();
@@ -1839,23 +1842,25 @@ async function renderAdminInspections(c) {
 }
 
 function renderInspectionChips() {
-  const chip = (group, val, label, current) => {
-    const active = current === val;
-    return `<button onclick="setInspFilter('${group}', '${val}')" style="padding:7px 12px;border-radius:20px;font-size:13px;font-weight:600;white-space:nowrap;border:1.5px solid ${active ? 'var(--primary)' : 'var(--line)'};background:${active ? 'var(--primary-soft)' : '#fff'};color:${active ? 'var(--primary-dark)' : 'var(--ink)'};cursor:pointer">${label}</button>`;
-  };
+  const chip = (group, val, label, current) =>
+    `<button class="${current === val ? 'active' : ''}" onclick="setInspFilter('${group}', '${val}')">${label}</button>`;
   const t = window._inspFilters.type;
   document.getElementById('inspTypeChips').innerHTML = [
-    chip('type', 'all',    'All types',  t),
-    chip('type', 'ladder', '🪜 Ladder',  t),
-    chip('type', 'tower',  '🏗️ Tower',  t),
-    chip('type', 'mewp',   '🔧 MEWP',    t),
+    chip('type', 'all',    'All types', t),
+    chip('type', 'ladder', 'Ladder',    t),
+    chip('type', 'tower',  'Tower',     t),
+    chip('type', 'mewp',   'MEWP',      t),
   ].join('');
   const s = window._inspFilters.status;
   document.getElementById('inspStatusChips').innerHTML = [
-    chip('status', 'all',    'All',         s),
-    chip('status', 'safe',   'Safe',      s),
-    chip('status', 'unsafe', 'Unsafe',    s),
+    chip('status', 'all',    'Any status', s),
+    chip('status', 'safe',   'Safe',       s),
+    chip('status', 'unsafe', 'Unsafe',     s),
   ].join('');
+  const f = window._inspFilters;
+  const dirty = !!(f.q || f.from || f.to || f.type !== 'all' || f.status !== 'all');
+  const rb = document.getElementById('inspReset');
+  if (rb) rb.style.display = dirty ? '' : 'none';
 }
 
 window.setInspFilter = function(key, value) {
@@ -1929,62 +1934,59 @@ function applyInspectionFilters() {
     return sortDir === 'asc' ? cmp : -cmp;
   });
 
-  summary.textContent = `Showing ${rows.length} of ${all.length} ${all.length === 1 ? 'inspection' : 'inspections'}`;
+  summary.textContent = rows.length === all.length ? `${all.length} ${all.length === 1 ? 'inspection' : 'inspections'}` : `${rows.length} of ${all.length} inspections`;
 
   if (rows.length === 0) {
     list.innerHTML = '<div class="card" style="text-align:center;padding:30px;color:var(--text-light)">No inspections match the current filters.</div>';
     return;
   }
 
-  const typeMeta = {
-    ladder: { icon: '🪜', label: 'Ladder' },
-    tower:  { icon: '🏗️', label: 'Tower'  },
-    mewp:   { icon: '🔧', label: 'MEWP'   },
-  };
+  const typeMeta = { ladder: 'Ladder', tower: 'Tower', mewp: 'MEWP' };
+  const niceDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : '—';
   const sortIndicator = (k) => sortKey === k ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
-  const th = (k, label, align='left') => `<th onclick="sortInspections('${k}')" style="padding:10px 12px;text-align:${align};font-size:13px;color:var(--text-light);font-weight:600;cursor:pointer;user-select:none;background:#FAFBFC;border-bottom:1px solid var(--border);position:sticky;top:0">${label}${sortIndicator(k)}</th>`;
+  const th = (k, label, align='left') => `<th class="sortable" onclick="sortInspections('${k}')" style="text-align:${align}">${label}${sortIndicator(k)}</th>`;
 
   const cards = rows.map(r => {
     const safe = r.safe_to_use === 'Yes';
     const equipId = r.ladder_id || r.tower_id || r.mewp_id || '—';
-    const m = typeMeta[r._type] || { icon: '', label: r._type };
+    const label = typeMeta[r._type] || r._type;
     return `<div class="insp-card ${safe ? '' : 'unsafe'}" onclick="showInspectionDetail('${r._type}', ${r.id})">
-      <div class="ic-top"><span class="ic-id">${m.icon} ${esc(equipId)} <span style="font-weight:500;color:var(--ink-2)">· ${m.label}</span></span><span class="badge ${safe ? 'badge-safe' : 'badge-unsafe'}">${safe ? 'Safe' : 'Unsafe'}</span></div>
-      <div class="ic-meta">${esc(r.location || '—')} · ${esc(r.inspected_by || '—')} · ${esc(r.date || '—')}</div>
+      <div class="ic-top"><span class="ic-id">${esc(equipId)} <span style="font-weight:500;color:var(--ink-2)">· ${label}</span></span><span class="badge ${safe ? 'badge-safe' : 'badge-unsafe'}">${safe ? 'Safe' : 'Unsafe'}</span></div>
+      <div class="ic-meta">${esc(r.location || '—')} · ${esc(r.inspected_by || '—')} · ${niceDate(r.date)}</div>
       ${r.defects_found ? `<div class="ic-def">${esc(String(r.defects_found).substring(0, 120))}${String(r.defects_found).length > 120 ? '…' : ''}</div>` : ''}
     </div>`;
   }).join('');
 
+  const anyDefects = rows.some(r => r.defects_found);
+
   list.innerHTML = `
     <div class="insp-cards">${cards}</div>
     <div class="insp-table" style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:auto">
-      <table style="width:100%;border-collapse:collapse;min-width:760px">
+      <table>
         <thead>
           <tr>
-            ${th('_type', 'Type')}
             ${th('equipment', 'Equipment')}
             ${th('location', 'Location')}
             ${th('inspected_by', 'Operative')}
             ${th('date', 'Date')}
-            ${th('safe_to_use', 'Status', 'center')}
-            <th style="padding:10px 12px;text-align:left;font-size:13px;color:var(--text-light);font-weight:600;background:#FAFBFC;border-bottom:1px solid var(--border)">Defects</th>
+            ${th('safe_to_use', 'Status')}
+            ${anyDefects ? '<th>Defects</th>' : ''}
           </tr>
         </thead>
         <tbody>
           ${rows.map(r => {
             const safe = r.safe_to_use === 'Yes';
             const equipId = r.ladder_id || r.tower_id || r.mewp_id || '—';
-            const m = typeMeta[r._type] || { icon: '', label: r._type };
-            const defectPreview = r.defects_found ? esc(String(r.defects_found).substring(0, 60)) + (String(r.defects_found).length > 60 ? '…' : '') : '<span style="color:var(--text-light)">—</span>';
+            const label = typeMeta[r._type] || r._type;
+            const defectPreview = r.defects_found ? esc(String(r.defects_found)) : '<span class="muted">—</span>';
             return `
-              <tr onclick="showInspectionDetail('${r._type}', ${r.id})" style="cursor:pointer;border-bottom:1px solid var(--line-soft);background:${safe ? '#fff' : 'var(--danger-soft)'}">
-                <td style="padding:11px 12px;font-size:14px;white-space:nowrap"><span style="margin-right:4px">${m.icon}</span>${m.label}</td>
-                <td style="padding:11px 12px;font-size:14px;font-weight:600">${esc(equipId)}</td>
-                <td style="padding:11px 12px;font-size:14px;color:var(--text-light)">${esc(r.location || '—')}</td>
-                <td style="padding:11px 12px;font-size:14px">${esc(r.inspected_by || '—')}</td>
-                <td style="padding:11px 12px;font-size:14px;color:var(--text-light);white-space:nowrap">${esc(r.date || '—')}</td>
-                <td style="padding:11px 12px;text-align:center;white-space:nowrap"><span class="badge ${safe ? 'badge-safe' : 'badge-unsafe'}">${safe ? 'Safe' : 'Unsafe'}</span></td>
-                <td style="padding:11px 12px;font-size:13px;color:#9A1C14;max-width:260px">${defectPreview}</td>
+              <tr class="${safe ? '' : 'unsafe'}" onclick="showInspectionDetail('${r._type}', ${r.id})">
+                <td class="nowrap"><span class="eq-id">${esc(equipId)}</span><span class="eq-type">${label}</span></td>
+                <td class="muted">${esc(r.location || '—')}</td>
+                <td>${esc(r.inspected_by || '—')}</td>
+                <td class="muted nowrap">${niceDate(r.date)}</td>
+                <td class="nowrap"><span class="badge ${safe ? 'badge-safe' : 'badge-unsafe'}">${safe ? 'Safe' : 'Unsafe'}</span></td>
+                ${anyDefects ? `<td class="def" title="${r.defects_found ? esc(String(r.defects_found)) : ''}">${defectPreview}</td>` : ''}
               </tr>`;
           }).join('')}
         </tbody>
