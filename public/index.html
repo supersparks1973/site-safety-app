@@ -70,6 +70,7 @@ h3{font-size:17px;font-weight:600}
 input[type=checkbox]{accent-color:var(--primary)}
 
 .form-section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:14px}
+.form-section>.form-group:last-child{margin-bottom:0}
 .form-section h3{font-size:16px;margin-bottom:14px;color:var(--primary-dark);display:flex;align-items:center;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--line-soft)}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 22px;border:1.5px solid transparent;border-radius:var(--radius-sm);font-size:16px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s,color .15s;width:100%;line-height:1.2}
@@ -340,7 +341,8 @@ body.read-only-mode .hide-readonly{display:none!important}
 .check-row:first-child{padding-top:0}
 .check-row:last-child{border-bottom:0;padding-bottom:0}
 .check-label{font-weight:600;font-size:15px}
-.seg{display:flex;gap:6px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg-opt{min-width:calc(25% - 5px)}
 .seg-opt{flex:1;position:relative}
 .seg-opt input{position:absolute;opacity:0;width:0;height:0}
 .seg-opt span{display:flex;align-items:center;justify-content:center;min-height:44px;padding:8px 6px;border:1.5px solid var(--line);border-radius:var(--radius-sm);background:var(--card);font-weight:600;font-size:15px;color:var(--ink-2);cursor:pointer;user-select:none;transition:background .1s,border-color .1s,color .1s}
@@ -1191,65 +1193,57 @@ async function loadMyRecent() {
 // OPERATIVE: NEAR MISS FORM
 // ═══════════════════════════════════════
 function renderNearMissForm(c) {
+  const sev = [
+    { value: 'Low', label: 'Low', tone: 'good' },
+    { value: 'Medium', label: 'Medium', tone: 'warn' },
+    { value: 'High', label: 'High', tone: 'bad' },
+    { value: 'Critical', label: 'Critical', tone: 'bad' },
+  ];
   c.innerHTML = `
-    <h2 style="margin-bottom:16px;display:flex;align-items:center;gap:8px">Near miss report</h2>
-    <form id="nearMissForm">
+    ${inspectionIntro('Near miss report', 'Something nearly went wrong. Say what happened while it\'s fresh — a few lines is fine.')}
+    <form id="nearMissForm" class="insp-form">
       <div class="form-section">
-        <h3>📅 When & Where</h3>
-        <div class="form-group"><label>Date</label><input type="date" name="date" value="${today()}" required></div>
-        <div class="form-group"><label>Time</label><input type="time" name="time" value="${now()}" required></div>
-        <div class="form-group"><label>Location / Area</label><input type="text" name="location" placeholder="e.g. Level 3, Block A" required></div>
+        <h3>When and where</h3>
+        <div class="form-grid">
+          <div class="form-group"><label>Date</label><input type="date" name="date" value="${today()}" required></div>
+          <div class="form-group"><label>Time</label><input type="time" name="time" value="${now()}" required></div>
+        </div>
+        ${textField('Location / area', 'location', 'placeholder="Site, building and area — e.g. GSK Ware, Bld 32, Level 3" required')}
       </div>
       <div class="form-section">
-        <h3>📝 Incident Details</h3>
-        <div class="form-group"><label>What happened?</label><textarea name="description" placeholder="Describe the near miss in detail..." rows="4" required></textarea></div>
-        <div class="form-group"><label>Potential Severity</label>
-          <div class="radio-group">
-            <label><input type="radio" name="potential_severity" value="Low" required> Low</label>
-            <label><input type="radio" name="potential_severity" value="Medium"> Medium</label>
-            <label><input type="radio" name="potential_severity" value="High"> High</label>
-            <label><input type="radio" name="potential_severity" value="Critical"> Critical</label>
-          </div>
+        <h3>What happened</h3>
+        <div class="form-group"><label>Describe the near miss</label><textarea name="description" placeholder="What was happening, what nearly went wrong, and who was nearby" rows="4" required></textarea></div>
+        <div class="check-list">
+          ${segField('How bad could it have been?', 'potential_severity', sev)}
         </div>
-        <div class="form-group"><label>Hazard category</label>
+        <div class="form-group" style="margin-top:14px"><label>Hazard category</label>
           <select name="hazard_category">
-            <option value="">-- Select --</option>
+            <option value="">Choose…</option>
             <option>Slips / Trips / Falls</option><option>Work at Height</option><option>Manual Handling</option><option>Plant / Machinery</option><option>Electrical</option><option>Falling / Dropped Object</option><option>Vehicle / Traffic</option><option>Hazardous Substance</option><option>Fire / Explosion</option><option>Housekeeping</option><option>PPE</option><option>Other</option>
           </select>
         </div>
-        <div class="form-group"><label>Immediate actions taken</label><textarea name="immediate_actions" placeholder="What did you do straight away?" rows="2"></textarea></div>
-        <div class="form-group"><label>Further action required?</label>
-          <div class="radio-group">
-            <label><input type="radio" name="further_action" value="Yes"> Yes</label>
-            <label><input type="radio" name="further_action" value="No"> No</label>
-          </div>
-        </div>
-        <div class="form-group"><label>Recommended corrective action</label><textarea name="corrective_action" placeholder="What should be done to prevent recurrence?" rows="2"></textarea></div>
+        <div class="form-group"><label>What did you do straight away?</label><textarea name="immediate_actions" placeholder="e.g. Cordoned the area, told the supervisor" rows="2"></textarea></div>
       </div>
       <div class="form-section">
-        <h3>🌤️ Additional Info</h3>
-        <div class="form-group"><label>Weather conditions</label>
+        <h3>Stopping it happening again</h3>
+        <div class="check-list">
+          ${segField('Does it need further action?', 'further_action', [{ value: 'Yes', label: 'Yes', tone: 'bad' }, { value: 'No', label: 'No', tone: 'good' }], { required: false })}
+        </div>
+        <div class="form-group" style="margin-top:14px;margin-bottom:0"><label>What should change?</label><textarea name="corrective_action" placeholder="Your suggestion — the office will follow it up" rows="2"></textarea></div>
+      </div>
+      <div class="form-section">
+        <h3>Other details <span class="h3-hint">optional</span></h3>
+        <div class="form-group"><label>Weather</label>
           <select name="weather_conditions">
-            <option value="">-- Select --</option>
+            <option value="">Choose…</option>
             <option>Dry / Clear</option><option>Rain</option><option>Wind</option><option>Snow / Ice</option><option>Fog</option><option>Hot / Humid</option><option>N/A</option>
           </select>
         </div>
-        <div class="form-group"><label>Witnesses (names)</label><input type="text" name="witnesses" placeholder="e.g. John Smith, Jane Doe"></div>
+        ${textField('Witnesses', 'witnesses', 'placeholder="Names of anyone who saw it"')}
       </div>
-      <div class="form-section">
-        <h3>📷 Photos</h3>
-        <div class="photo-upload" onclick="this.querySelector('input').click()">
-          <input type="file" name="photos" accept="image/*" multiple capture="environment">
-          <p>📷 Tap to take photo or choose from gallery</p>
-        </div>
-        <div class="photo-preview" id="nearMissPhotos"></div>
-      </div>
-      <div class="form-section">
-        <h3>✍️ Operative Signature</h3>
-        <canvas id="nearMissSig" style="width:100%;height:120px;border:2px solid var(--border);border-radius:8px;background:#fff;touch-action:none"></canvas>
-        <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px;width:auto" onclick="clearSignature('nearMissSig')">Clear Signature</button>
-      </div>
-      <button type="submit" class="btn btn-danger" style="margin-top:16px;padding:18px;font-size:18px">⚠️ Submit Near Miss Report</button>
+      ${photoSection('nearMissPhotos')}
+      ${signatureSection('nearMissSig')}
+      <button type="submit" class="btn btn-danger btn-submit">Submit near miss report</button>
     </form>
   `;
   setupPhotoPreview('nearMissForm', 'nearMissPhotos');
@@ -1258,7 +1252,7 @@ function renderNearMissForm(c) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const btn = e.target.querySelector('button[type=submit]');
-    btn.disabled = true; btn.textContent = 'Submitting...';
+    btn.disabled = true; btn.textContent = 'Submitting…';
     try {
       const photos = await uploadPhotos(e.target.querySelector('input[type=file]'));
       const data = Object.fromEntries(fd.entries());
@@ -1266,10 +1260,10 @@ function renderNearMissForm(c) {
       data.signature = getSignatureData('nearMissSig');
       delete data[''];
       await submitForm('near-miss', data);
-      showToast('Near miss report submitted!');
+      showToast('Near miss report submitted');
       navigate('home');
     } catch (err) { showToast('Failed to submit', 'error'); }
-    btn.disabled = false; btn.textContent = '⚠️ Submit Near Miss Report';
+    btn.disabled = false; btn.textContent = 'Submit near miss report';
   });
 }
 
