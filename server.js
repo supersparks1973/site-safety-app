@@ -9,7 +9,6 @@ const nodemailer = require('nodemailer');
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
         Header, Footer, AlignmentType, BorderStyle, WidthType, TabStopType,
         ShadingType, PageNumber, PageBreak, ImageRun } = require('docx');
-const PDFDocument = require('pdfkit');
 const compression = require('compression');
 const webpush = require('web-push');
 const QRCode = require('qrcode');
@@ -101,20 +100,6 @@ async function startApp() {
     actions_taken TEXT, photos TEXT, signature TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  await pool.query(`CREATE TABLE IF NOT EXISTS rescue_plans (
-    id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
-    date TEXT NOT NULL, client_name TEXT NOT NULL, project_name TEXT NOT NULL,
-    location TEXT NOT NULL, operation TEXT NOT NULL, project_manager TEXT NOT NULL,
-    rescue_supervisor TEXT NOT NULL, attendant TEXT, rescue_team TEXT,
-    comms_method TEXT NOT NULL, nearest_hospital TEXT NOT NULL,
-    em_site_manager_name TEXT, em_site_manager_phone TEXT,
-    em_first_aider_name TEXT, em_first_aider_phone TEXT,
-    em_fire_marshal_name TEXT, em_fire_marshal_phone TEXT,
-    rescue_method TEXT NOT NULL, scene_protection TEXT,
-    checklist TEXT, equip_other TEXT, signature TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`);
-
   await pool.query(`CREATE TABLE IF NOT EXISTS training_records (
     id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id),
     external_name TEXT,
@@ -135,19 +120,6 @@ async function startApp() {
     created_by INTEGER REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  await pool.query(`CREATE TABLE IF NOT EXISTS toolbox_talks (
-    id SERIAL PRIMARY KEY,
-    topic TEXT NOT NULL,
-    content TEXT,
-    presenter TEXT NOT NULL,
-    site_project TEXT,
-    talk_date TEXT NOT NULL,
-    attendees TEXT,
-    notes TEXT,
-    created_by INTEGER REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
 
   await pool.query(`CREATE TABLE IF NOT EXISTS inspection_actions (
@@ -265,6 +237,11 @@ async function startApp() {
   // Add external_name to training_records and make user_id nullable
   try { await pool.query('ALTER TABLE training_records ADD COLUMN IF NOT EXISTS external_name TEXT'); } catch(e) { console.warn('Migration: training_records.external_name:', e.message); }
   try { await pool.query('ALTER TABLE training_records ALTER COLUMN user_id DROP NOT NULL'); } catch(e) { console.warn('Migration: training_records.user_id NULLABLE:', e.message); }
+
+  // Retired features (Oct 2026): rescue plans, toolbox talks — tables removed per product decision.
+  for (const t of ['rescue_plans','toolbox_talks']) {
+    try { await pool.query(`DROP TABLE IF EXISTS ${t}`); } catch(e) { console.warn(`Migration: drop ${t}:`, e.message); }
+  }
 
   const { rows: admins } = await pool.query("SELECT id FROM users WHERE role = 'admin'");
   if (admins.length === 0) {
@@ -656,25 +633,6 @@ async function startApp() {
     return { maroon, grey, bds, cm, pw, lbl, val, condCell, sh, mkHeader, mkFooter, pageProps, logoData, niceicData };
   };
 
-  // Topic metadata mirrors public/index.html TOOLBOX_LIBRARY for Word doc rendering
-  const TOOLBOX_TOPIC_META = {
-    'Working at Height':         { color: 'F97316', summary: 'Fall protection, ladders, scaffolding and MEWPs.' },
-    'Manual Handling':           { color: '0EA5E9', summary: 'Safe lifting techniques and the TILE method.' },
-    'Electrical Safety':         { color: 'EAB308', summary: 'Isolation, LOTO and live work controls.' },
-    'Fire Safety':               { color: 'DC2626', summary: 'Routes, alarms, extinguishers and hot work permits.' },
-    'PPE Requirements':          { color: 'EA580C', summary: 'Minimum site PPE and inspection.' },
-    'Confined Space Entry':      { color: '8B5CF6', summary: 'Permit, atmospheric testing and standby.' },
-    'Asbestos Awareness':        { color: '92400E', summary: 'Recognise, avoid disturbing and report ACMs.' },
-    'COSHH \u2014 Hazardous Substances': { color: '059669', summary: 'SDS, COSHH assessments and safe storage.' },
-    'Slips, Trips and Falls':    { color: 'CA8A04', summary: 'Most common workplace injury \u2014 housekeeping is key.' },
-    'Permit to Work Systems':    { color: '4F46E5', summary: 'High-risk activity authorisation and controls.' },
-    'Noise at Work':             { color: '0D9488', summary: 'Action levels, hearing protection and zones.' },
-    'Scaffold Safety':           { color: '475569', summary: 'Inspection tags, alterations and access.' },
-    'Lone Working':              { color: '06B6D4', summary: 'Check-in routines and emergency procedures.' },
-    'Hot Works':                 { color: 'B91C1C', summary: 'Welding, cutting, grinding \u2014 permit and fire watch.' },
-    'Mental Health & Wellbeing': { color: 'EC4899', summary: 'Talk, listen, signpost \u2014 it is OK not to be OK.' },
-  };
-
   // Near-miss Word doc
   app.get('/api/near-miss/:id/docx', authenticate, async (req, res) => {
     try {
@@ -1027,165 +985,6 @@ async function startApp() {
 
       res.json({ recent, weekly });
     } catch(e) { res.status(500).json({ error: e.message }); }
-  });
-
-  // ═══════ RESCUE PLANS ═══════
-  app.post('/api/rescue-plan', authenticate, async (req, res) => {
-    try {
-      const d = req.body;
-      const { rows } = await pool.query(
-        `INSERT INTO rescue_plans (user_id, date, client_name, project_name, location, operation, project_manager,
-          rescue_supervisor, attendant, rescue_team, comms_method, nearest_hospital,
-          em_site_manager_name, em_site_manager_phone, em_first_aider_name, em_first_aider_phone,
-          em_fire_marshal_name, em_fire_marshal_phone, rescue_method, scene_protection, checklist, equip_other, signature)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING id`,
-        [req.user.id, d.date, d.client_name, d.project_name, d.location, d.operation, d.project_manager,
-         d.rescue_supervisor, d.attendant || '', d.rescue_team || '', d.comms_method, d.nearest_hospital,
-         d.em_site_manager_name || '', d.em_site_manager_phone || '', d.em_first_aider_name || '', d.em_first_aider_phone || '',
-         d.em_fire_marshal_name || '', d.em_fire_marshal_phone || '', d.rescue_method, d.scene_protection || '',
-         d.checklist || '{}', d.equip_other || '', d.signature || '']);
-      sendAdminEmail(`New Rescue Plan: ${d.project_name}`,
-        `<h2>Rescue Plan Submitted</h2><p><strong>By:</strong> ${req.user.full_name}</p><p><strong>Client:</strong> ${d.client_name}</p><p><strong>Project:</strong> ${d.project_name}</p><p><strong>Location:</strong> ${d.location}</p><p><strong>Rescue Supervisor:</strong> ${d.rescue_supervisor}</p>`);
-      res.json({ id: rows[0].id, message: 'Rescue plan submitted' });
-    } catch(e) { console.error('POST /api/rescue-plan', e); res.status(500).json({ error: e.message }); }
-  });
-
-  app.get('/api/rescue-plan', authenticate, async (req, res) => {
-    if (['admin', 'project_manager', 'external_view'].includes(req.user.role)) {
-      const { rows } = await pool.query('SELECT r.*, u.full_name as submitted_by FROM rescue_plans r JOIN users u ON r.user_id = u.id ORDER BY r.created_at DESC');
-      res.json(rows);
-    } else {
-      const { rows } = await pool.query('SELECT r.*, u.full_name as submitted_by FROM rescue_plans r JOIN users u ON r.user_id = u.id WHERE r.user_id = $1 ORDER BY r.created_at DESC', [req.user.id]);
-      res.json(rows);
-    }
-  });
-
-  app.get('/api/rescue-plan/:id/docx', authenticate, async (req, res) => {
-    const { rows } = await pool.query('SELECT r.*, u.full_name as submitted_by FROM rescue_plans r JOIN users u ON r.user_id = u.id WHERE r.id = $1', [req.params.id]);
-    if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
-    const p = rows[0];
-    let checklist = {};
-    try { checklist = JSON.parse(p.checklist || '{}'); } catch(e) { console.warn(`rescue plan #${p.id} checklist JSON.parse failed:`, e.message); }
-
-    const maroon = "8B1A1A";
-    const grey = "4A4A4A";
-    const bdr = { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" };
-    const bds = { top: bdr, bottom: bdr, left: bdr, right: bdr };
-    const cm = { top: 60, bottom: 60, left: 100, right: 100 };
-    const pw = 9360;
-
-    const lbl = (text, w) => new TableCell({ borders: bds, width: { size: w, type: WidthType.DXA }, shading: { fill: "E8E8E8", type: ShadingType.CLEAR }, margins: cm,
-      children: [new Paragraph({ children: [new TextRun({ text, bold: true, font: "Arial", size: 20, color: grey })] })] });
-    const val = (text, w, span) => new TableCell({ borders: bds, width: { size: w, type: WidthType.DXA }, margins: cm, columnSpan: span || 1,
-      children: [new Paragraph({ children: [new TextRun({ text: text || '—', font: "Arial", size: 20 })] })] });
-    const sh = (num, title) => new Paragraph({ spacing: { before: 300, after: 120 },
-      children: [new TextRun({ text: `${num}. ${title}`, bold: true, font: "Arial", size: 24, color: maroon })] });
-    const ci = (key, label) => new Paragraph({ spacing: { before: 40, after: 40 },
-      children: [new TextRun({ text: (checklist[key] === 'Yes' ? '\u2611' : '\u2610') + '  ' + label, font: "Arial", size: 20 })] });
-
-    const doc = new Document({
-      styles: { default: { document: { run: { font: "Arial", size: 22 } } } },
-      sections: [{
-        properties: {
-          page: { size: { width: 11906, height: 16838 }, margin: { top: 1200, right: 1200, bottom: 1200, left: 1200 } }
-        },
-        headers: { default: new Header({ children: [new Paragraph({
-          border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: maroon, space: 4 } },
-          children: [
-            new TextRun({ text: "ManProjects", bold: true, font: "Arial", size: 22, color: grey }),
-            new TextRun({ text: " Ltd", font: "Arial", size: 18, color: "999999" }),
-            new TextRun({ text: "    Electrical and Mechanical Building Services", font: "Arial", size: 14, color: "999999" }),
-          ]
-        })] }) },
-        footers: { default: new Footer({ children: [new Paragraph({
-          alignment: AlignmentType.CENTER,
-          border: { top: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC", space: 4 } },
-          children: [
-            new TextRun({ text: "ManProjects Ltd \u2014 Rescue Plan  |  Page ", font: "Arial", size: 16, color: "999999" }),
-            new TextRun({ children: [PageNumber.CURRENT], font: "Arial", size: 16, color: "999999" }),
-          ]
-        })] }) },
-        children: [
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 0 },
-            children: [new TextRun({ text: "MAN PROJECTS LTD", bold: true, font: "Arial", size: 32, color: maroon })] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80, after: 40 },
-            children: [new TextRun({ text: "RESCUE PLAN / EMERGENCY RESPONSE", bold: true, font: "Arial", size: 24, color: grey })] }),
-
-          sh("1", "PROJECT DETAILS"),
-          new Table({ width: { size: pw, type: WidthType.DXA }, columnWidths: [2200, 2480, 2200, 2480], rows: [
-            new TableRow({ children: [lbl("Client Name", 2200), val(p.client_name, 2480), lbl("Project Name", 2200), val(p.project_name, 2480)] }),
-            new TableRow({ children: [lbl("Location", 2200), val(p.location, 2480), lbl("Operation", 2200), val(p.operation, 2480)] }),
-            new TableRow({ children: [lbl("Project Manager", 2200), val(p.project_manager, 2480), lbl("Date", 2200), val(p.date, 2480)] }),
-            new TableRow({ children: [lbl("Submitted By", 2200), val(p.submitted_by, 7160, 3)] }),
-          ] }),
-
-          sh("2", "PERSONS RESPONSIBLE FOR RESCUE"),
-          new Table({ width: { size: pw, type: WidthType.DXA }, columnWidths: [2200, 2480, 2200, 2480], rows: [
-            new TableRow({ children: [lbl("Rescue Supervisor", 2200), val(p.rescue_supervisor, 2480), lbl("Attendant", 2200), val(p.attendant, 2480)] }),
-            new TableRow({ children: [lbl("Rescue Team", 2200), val(p.rescue_team, 7160, 3)] }),
-          ] }),
-
-          sh("3", "COMMUNICATION & EMERGENCY CONTACTS"),
-          new Table({ width: { size: pw, type: WidthType.DXA }, columnWidths: [2200, 2480, 2200, 2480], rows: [
-            new TableRow({ children: [lbl("Comms Method", 2200), val(p.comms_method, 2480), lbl("Nearest Hospital", 2200), val(p.nearest_hospital, 2480)] }),
-            new TableRow({ children: [lbl("Site Manager", 2200), val(p.em_site_manager_name, 2480), lbl("Phone", 2200), val(p.em_site_manager_phone, 2480)] }),
-            new TableRow({ children: [lbl("First Aider", 2200), val(p.em_first_aider_name, 2480), lbl("Phone", 2200), val(p.em_first_aider_phone, 2480)] }),
-            new TableRow({ children: [lbl("Fire Marshal", 2200), val(p.em_fire_marshal_name, 2480), lbl("Phone", 2200), val(p.em_fire_marshal_phone, 2480)] }),
-          ] }),
-
-          sh("4", "RESCUE PROCEDURE"),
-          new Table({ width: { size: pw, type: WidthType.DXA }, columnWidths: [2200, 7160], rows: [
-            new TableRow({ children: [lbl("Planned Rescue Method", 2200), val(p.rescue_method, 7160, 3)] }),
-            new TableRow({ children: [lbl("Scene Protection", 2200), val(p.scene_protection, 7160, 3)] }),
-          ] }),
-
-          sh("5", "PRE-RESCUE CHECKLIST"),
-          new Table({ width: { size: pw, type: WidthType.DXA }, columnWidths: [pw], rows: [
-            new TableRow({ children: [new TableCell({ borders: bds, width: { size: pw, type: WidthType.DXA }, margins: cm, children: [
-              ci('check_team_briefed', 'Rescue team briefed and competent'),
-              ci('check_equipment_checked', 'Rescue equipment checked and in position'),
-              ci('check_comms_tested', 'Communications tested'),
-              ci('check_first_aid', 'First aid provision confirmed'),
-              ci('check_access_routes', 'Access / egress routes confirmed'),
-              ci('check_emergency_services', 'Emergency services access confirmed'),
-            ] })] })
-          ] }),
-
-          sh("6", "RESCUE EQUIPMENT AVAILABLE"),
-          new Table({ width: { size: pw, type: WidthType.DXA }, columnWidths: [4680, 4680], rows: [
-            new TableRow({ children: [
-              new TableCell({ borders: bds, width: { size: 4680, type: WidthType.DXA }, margins: cm, children: [
-                ci('equip_harness', 'Full body harness'), ci('equip_lanyard', 'Rescue lanyard / rope'),
-                ci('equip_tripod', 'Tripod / davit system'), ci('equip_winch', 'Winch / descent device'),
-              ] }),
-              new TableCell({ borders: bds, width: { size: 4680, type: WidthType.DXA }, margins: cm, children: [
-                ci('equip_first_aid', 'First aid kit'), ci('equip_stretcher', 'Stretcher / spine board'),
-                ci('equip_radio', 'Two-way radios'), ci('equip_gas_monitor', 'Gas monitor'),
-              ] })
-            ] }),
-          ] }),
-
-          ...(p.signature ? [
-            sh("7", "SIGNATURE"),
-            new Paragraph({ children: [new TextRun({ text: "Operative signature captured digitally in the Site Safety App.", font: "Arial", size: 20, color: "888888", italics: true })] }),
-          ] : []),
-
-          new Paragraph({ spacing: { before: 400 }, alignment: AlignmentType.CENTER,
-            children: [new TextRun({ text: "ManProjects Ltd \u2014 Rescue Plan \u2014 Confidential", font: "Arial", size: 16, color: "999999" })] }),
-        ]
-      }]
-    });
-
-    const buffer = await Packer.toBuffer(doc);
-    const filename = `Rescue_Plan_${p.project_name.replace(/[^a-zA-Z0-9]/g, '_')}_${p.date}.docx`;
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(buffer);
-  });
-
-  app.delete('/api/rescue-plan/:id', authenticate, adminOnly, async (req, res) => {
-    await pool.query('DELETE FROM rescue_plans WHERE id = $1', [req.params.id]);
-    res.json({ success: true });
   });
 
   // ═══════ TRAINING MATRIX ═══════
@@ -1615,7 +1414,7 @@ async function startApp() {
         let sql = `SELECT COUNT(*)::int AS n FROM ${table} WHERE created_at >= $1 AND created_at < $2`;
         if (siteFilter) {
           params.push(siteFilter);
-          sql += ` AND COALESCE(${table === 'toolbox_talks' ? 'site_project' : 'location'}, '') ILIKE $${params.length}`;
+          sql += ` AND COALESCE(location, '') ILIKE $${params.length}`;
         }
         if (extra) sql += ' ' + extra;
         const r = await pool.query(sql, params);
@@ -1633,7 +1432,6 @@ async function startApp() {
         ld, ldPrev, ldUnsafe,
         tw, twPrev, twUnsafe,
         mw, mwPrev, mwUnsafe,
-        tb, tbPrev,
       ] = await Promise.all([
         countQ('near_miss_reports', startIso, endIso),
         countQ('near_miss_reports', prevStartIso, prevEndIso),
@@ -1647,8 +1445,6 @@ async function startApp() {
         countQ('mewp_inspections', startIso, endIso),
         countQ('mewp_inspections', prevStartIso, prevEndIso),
         countQ('mewp_inspections', startIso, endIso, "AND safe_to_use = 'No'"),
-        countQ('toolbox_talks', startIso, endIso),
-        countQ('toolbox_talks', prevStartIso, prevEndIso),
       ]);
 
       // Action stats — site filter doesn't apply directly to actions, so we ignore it here.
@@ -1666,31 +1462,27 @@ async function startApp() {
                COALESCE(nm.c, 0)::int AS near_miss,
                COALESCE(ld.c, 0)::int AS ladder,
                COALESCE(tw.c, 0)::int AS tower,
-               COALESCE(mw.c, 0)::int AS mewp,
-               COALESCE(tb.c, 0)::int AS toolbox
+               COALESCE(mw.c, 0)::int AS mewp
         FROM days d
         LEFT JOIN (SELECT created_at::date AS day, COUNT(*)::int AS c FROM near_miss_reports WHERE created_at >= $1 AND created_at < $2 GROUP BY 1) nm ON nm.day = d.day
         LEFT JOIN (SELECT created_at::date AS day, COUNT(*)::int AS c FROM ladder_inspections WHERE created_at >= $1 AND created_at < $2 GROUP BY 1) ld ON ld.day = d.day
         LEFT JOIN (SELECT created_at::date AS day, COUNT(*)::int AS c FROM tower_inspections WHERE created_at >= $1 AND created_at < $2 GROUP BY 1) tw ON tw.day = d.day
         LEFT JOIN (SELECT created_at::date AS day, COUNT(*)::int AS c FROM mewp_inspections WHERE created_at >= $1 AND created_at < $2 GROUP BY 1) mw ON mw.day = d.day
-        LEFT JOIN (SELECT created_at::date AS day, COUNT(*)::int AS c FROM toolbox_talks WHERE created_at >= $1 AND created_at < $2 GROUP BY 1) tb ON tb.day = d.day
         ORDER BY d.day`;
       const dailyR = await pool.query(dailySql, [startIso, endIso]);
 
-      // Top locations across near miss + 3 inspection tables (toolbox uses site_project)
+      // Top locations across near miss + 3 inspection tables
       const topR = await pool.query(`
         WITH all_loc AS (
           SELECT TRIM(location) AS loc, 'near_miss' AS src FROM near_miss_reports WHERE created_at >= $1 AND created_at < $2 AND location IS NOT NULL AND location <> ''
           UNION ALL SELECT TRIM(location), 'ladder' FROM ladder_inspections WHERE created_at >= $1 AND created_at < $2 AND location IS NOT NULL AND location <> ''
           UNION ALL SELECT TRIM(location), 'tower' FROM tower_inspections WHERE created_at >= $1 AND created_at < $2 AND location IS NOT NULL AND location <> ''
           UNION ALL SELECT TRIM(location), 'mewp' FROM mewp_inspections WHERE created_at >= $1 AND created_at < $2 AND location IS NOT NULL AND location <> ''
-          UNION ALL SELECT TRIM(site_project), 'toolbox' FROM toolbox_talks WHERE created_at >= $1 AND created_at < $2 AND site_project IS NOT NULL AND site_project <> ''
         )
         SELECT loc,
                COUNT(*)::int AS total,
                SUM(CASE WHEN src='near_miss' THEN 1 ELSE 0 END)::int AS near_miss,
-               SUM(CASE WHEN src IN ('ladder','tower','mewp') THEN 1 ELSE 0 END)::int AS inspections,
-               SUM(CASE WHEN src='toolbox' THEN 1 ELSE 0 END)::int AS toolbox
+               SUM(CASE WHEN src IN ('ladder','tower','mewp') THEN 1 ELSE 0 END)::int AS inspections
         FROM all_loc
         GROUP BY loc
         ORDER BY total DESC
@@ -1703,12 +1495,8 @@ async function startApp() {
           UNION ALL SELECT TRIM(location) FROM ladder_inspections WHERE location IS NOT NULL AND location <> ''
           UNION ALL SELECT TRIM(location) FROM tower_inspections WHERE location IS NOT NULL AND location <> ''
           UNION ALL SELECT TRIM(location) FROM mewp_inspections WHERE location IS NOT NULL AND location <> ''
-          UNION ALL SELECT TRIM(site_project) FROM toolbox_talks WHERE site_project IS NOT NULL AND site_project <> ''
         )
         SELECT loc, COUNT(*)::int AS n FROM all_loc GROUP BY loc ORDER BY n DESC LIMIT 25`);
-
-      // Toolbox talk topics — ranked
-      const topicsR = await pool.query(`SELECT topic, COUNT(*)::int AS n FROM toolbox_talks WHERE created_at >= $1 AND created_at < $2 ${siteFilter ? "AND COALESCE(site_project,'') ILIKE $3" : ''} GROUP BY topic ORDER BY n DESC LIMIT 8`, siteFilter ? [startIso, endIso, siteFilter] : [startIso, endIso]);
 
       // Training compliance summary
       let training = { active: 0, expired: 0, expiring_30d: 0 };
@@ -1734,12 +1522,10 @@ async function startApp() {
             mewp:   { total: mw, prev: mwPrev, unsafe: mwUnsafe }
           },
           actions: { open: aOpen.rows[0].n, overdue: aOverdue.rows[0].n, completed: aCompleted.rows[0].n, prev_completed: aCompletedPrev.rows[0].n },
-          toolbox: { total: tb, prev: tbPrev },
           training,
         },
         daily: dailyR.rows,
         top_locations: topR.rows,
-        toolbox_topics: topicsR.rows,
         sites: sitesR.rows.map(r => r.loc),
       });
     } catch(e) { console.error('GET /api/trends', e); res.status(500).json({ error: e.message }); }
@@ -2104,881 +1890,6 @@ async function startApp() {
       if (d.assigned_to) await pool.query('UPDATE inspection_actions SET assigned_to = $1 WHERE id = $2', [d.assigned_to, id]);
       logAudit(req, 'created', 'action', id, `Manual action: ${d.title}`, null);
       res.json({ id });
-    } catch(e) { res.status(500).json({ error: e.message }); }
-  });
-
-  // ═══════ TOOLBOX TALKS ═══════
-  app.get('/api/toolbox-talks', authenticate, async (req, res) => {
-    try {
-      const { rows } = await pool.query('SELECT t.*, u.full_name as created_by_name FROM toolbox_talks t LEFT JOIN users u ON t.created_by = u.id ORDER BY t.talk_date DESC, t.created_at DESC');
-      res.json(rows);
-    } catch(e) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.get('/api/toolbox-talks/:id', authenticate, async (req, res) => {
-    try {
-      const { rows } = await pool.query('SELECT t.*, u.full_name as created_by_name FROM toolbox_talks t LEFT JOIN users u ON t.created_by = u.id WHERE t.id = $1', [req.params.id]);
-      if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
-      res.json(rows[0]);
-    } catch(e) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.post('/api/toolbox-talks', authenticate, async (req, res) => {
-    try {
-      const d = req.body;
-      const { rows } = await pool.query(
-        'INSERT INTO toolbox_talks (topic, content, presenter, site_project, talk_date, attendees, notes, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
-        [d.topic, d.content || null, d.presenter, d.site_project || null, d.talk_date, JSON.stringify(d.attendees || []), d.notes || null, req.user.id]
-      );
-      logAudit(req, 'created', 'toolbox-talks', rows[0].id, `Toolbox talk: ${d.topic}${d.site_project ? ' at ' + d.site_project : ''}`, null);
-      res.json(rows[0]);
-    } catch(e) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.delete('/api/toolbox-talks/:id', authenticate, adminOnly, async (req, res) => {
-    try {
-      await pool.query('DELETE FROM toolbox_talks WHERE id = $1', [req.params.id]);
-      logAudit(req, 'deleted', 'toolbox-talks', req.params.id, 'Toolbox talk deleted', null);
-      res.json({ message: 'Deleted' });
-    } catch(e) { res.status(500).json({ error: e.message }); }
-  });
-
-  // Toolbox Talk Word Doc export
-  app.get('/api/toolbox-talks/:id/docx', authenticate, async (req, res) => {
-    try {
-      const { rows } = await pool.query('SELECT t.*, u.full_name as created_by_name FROM toolbox_talks t LEFT JOIN users u ON t.created_by = u.id WHERE t.id = $1', [req.params.id]);
-      if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
-      const t = rows[0];
-      const attendees = typeof t.attendees === 'string' ? JSON.parse(t.attendees) : (t.attendees || []);
-      const h = docxHelpers();
-      const halfW = h.pw / 2;
-      const renderTalkContent = (raw) => {
-        if (!raw || !raw.trim()) return [new Paragraph({ children: [new TextRun({ text: 'No content recorded.', font: 'Arial', size: 20 })], spacing: { after: 200 } })];
-        const normalized = raw.replace(/\s*\u2022\s*/g, '\n\u2022 ').replace(/^\n/, '');
-        const lines = normalized.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-        return lines.map(line => {
-          if (line.startsWith('\u2022')) {
-            const text = line.replace(/^\u2022\s*/, '');
-            return new Paragraph({
-              indent: { left: 360, hanging: 360 },
-              spacing: { after: 80 },
-              children: [
-                new TextRun({ text: '\u2022  ', font: 'Arial', size: 20 }),
-                new TextRun({ text, font: 'Arial', size: 20 })
-              ]
-            });
-          }
-          // Sub-heading style: a line that ends with ':' and is reasonably short
-          if (line.endsWith(':') && line.length < 80) {
-            return new Paragraph({
-              spacing: { before: 160, after: 60 },
-              children: [new TextRun({ text: line, bold: true, font: 'Arial', size: 22, color: '4A4A4A' })]
-            });
-          }
-          return new Paragraph({
-            spacing: { after: 120 },
-            children: [new TextRun({ text: line, font: 'Arial', size: 20 })]
-          });
-        });
-      };
-      const meta = TOOLBOX_TOPIC_META[t.topic] || { color: '8B1A1A', summary: '' };
-      const bannerCell = new TableCell({
-        borders: { top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' } },
-        shading: { fill: meta.color, type: ShadingType.CLEAR },
-        margins: { top: 200, bottom: 200, left: 280, right: 280 },
-        children: [
-          new Paragraph({ children: [new TextRun({ text: 'TOOLBOX TALK', bold: true, font: 'Arial', size: 18, color: 'FFFFFF' })] }),
-          new Paragraph({ spacing: { before: 40 }, children: [new TextRun({ text: t.topic || 'Toolbox Talk', bold: true, font: 'Arial', size: 32, color: 'FFFFFF' })] }),
-          ...(meta.summary ? [new Paragraph({ spacing: { before: 40 }, children: [new TextRun({ text: meta.summary, italics: true, font: 'Arial', size: 18, color: 'FFFFFF' })] })] : []),
-        ]
-      });
-      const topicBanner = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [new TableRow({ children: [bannerCell] })] });
-      const doc = new Document({
-        styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
-        sections: [{
-          properties: h.pageProps,
-          headers: h.mkHeader('Toolbox Talk Record'),
-          footers: h.mkFooter('Toolbox Talk Record'),
-          children: [
-            topicBanner,
-            new Paragraph({ spacing: { before: 240 } }),
-            new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
-              new TableRow({ children: [h.lbl('Topic', halfW), h.val(t.topic || '', halfW)] }),
-              new TableRow({ children: [h.lbl('Date', halfW), h.val(t.talk_date ? new Date(t.talk_date).toLocaleDateString('en-GB') : '', halfW)] }),
-              new TableRow({ children: [h.lbl('Presenter', halfW), h.val(t.presenter || '', halfW)] }),
-              new TableRow({ children: [h.lbl('Site / Project', halfW), h.val(t.site_project || '', halfW)] }),
-            ] }),
-            new Paragraph({ spacing: { before: 200 } }),
-            h.sh('TALK CONTENT'),
-            ...renderTalkContent(t.content),
-            new Paragraph({ spacing: { before: 200 } }),
-            h.sh('ATTENDEES'),
-            new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
-              new TableRow({ children: [h.lbl('#', 1000), h.lbl('Name', 5000), h.lbl('Signed', 3360)] }),
-              ...attendees.map((a, i) => new TableRow({ children: [
-                h.val(String(i + 1), 1000),
-                h.val(typeof a === 'string' ? a : (a.name || ''), 5000),
-                h.val(a.signed ? '✓' : '', 3360)
-              ] }))
-            ] }),
-            ...(t.notes ? [
-              new Paragraph({ spacing: { before: 200 } }),
-              h.sh('NOTES'),
-              new Paragraph({ children: [new TextRun({ text: t.notes, font: 'Arial', size: 20 })], spacing: { after: 200 } })
-            ] : [])
-          ]
-        }]
-      });
-      const buf = await Packer.toBuffer(doc);
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      res.setHeader('Content-Disposition', `attachment; filename="Toolbox-Talk-${t.id}.docx"`);
-      res.send(buf);
-    } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
-  });
-
-  // ═══════ SITE TEMPLATES ═══════
-  app.get('/api/site-templates/:key/docx', authenticate, async (req, res) => {
-    try {
-      const h = docxHelpers();
-      const key = req.params.key;
-      const templates = {
-        'risk-assessment': {
-          title: 'Risk Assessment',
-          docType: 'Risk Assessment Form',
-          sections: [
-            { header: 'PROJECT DETAILS', rows: [['Project Name',''],['Site Address',''],['Client',''],['Assessment Date',''],['Assessor',''],['Review Date','']] },
-            { header: 'HAZARD IDENTIFICATION & RISK CONTROL', table: { heads: ['Hazard','Who at Risk','Existing Controls','Severity (1-5)','Likelihood (1-5)','Risk Rating','Additional Controls','Residual Risk'], rows: Array(8).fill(['','','','','','','','']) } },
-            { header: 'SIGN-OFF', rows: [['Assessed By',''],['Signature',''],['Date',''],['Approved By',''],['Signature',''],['Date','']] },
-          ]
-        },
-        'method-statement': {
-          title: 'Method Statement',
-          docType: 'Method Statement',
-          sections: [
-            { header: 'PROJECT INFORMATION', rows: [['Project Name',''],['Site Address',''],['Client',''],['Document Ref',''],['Revision',''],['Date','']] },
-            { header: 'SCOPE OF WORKS', freeText: true, lines: 6 },
-            { header: 'SEQUENCE OF OPERATIONS', table: { heads: ['Step','Activity','Hazards','Controls','Responsible Person'], rows: Array(10).fill(['','','','','']) } },
-            { header: 'PLANT & EQUIPMENT', freeText: true, lines: 4 },
-            { header: 'PPE REQUIREMENTS', freeText: true, lines: 3 },
-            { header: 'EMERGENCY PROCEDURES', freeText: true, lines: 4 },
-            { header: 'SIGN-OFF', rows: [['Prepared By',''],['Date',''],['Approved By',''],['Date','']] },
-          ]
-        },
-        'permit-to-work': {
-          title: 'Permit to Work',
-          docType: 'Permit to Work',
-          sections: [
-            { header: 'PERMIT DETAILS', rows: [['Permit Number',''],['Permit Type',''],['Date Issued',''],['Valid From',''],['Valid To',''],['Location',''],['Description of Work','']] },
-            { header: 'HAZARDS IDENTIFIED', freeText: true, lines: 4 },
-            { header: 'PRECAUTIONS REQUIRED', freeText: true, lines: 4 },
-            { header: 'PPE REQUIREMENTS', freeText: true, lines: 3 },
-            { header: 'ISOLATION DETAILS', rows: [['Isolation Point(s)',''],['Isolation Method',''],['Isolated By',''],['Proved Dead By','']] },
-            { header: 'AUTHORISATION', rows: [['Issued By',''],['Signature',''],['Accepted By',''],['Signature',''],['Date / Time','']] },
-            { header: 'PERMIT CANCELLATION', rows: [['Work Completed',''],['Area Left Safe',''],['Cancelled By',''],['Signature',''],['Date / Time','']] },
-          ]
-        },
-        'inspection-checklist': {
-          title: 'Site Inspection Checklist',
-          docType: 'Inspection Checklist',
-          sections: [
-            { header: 'INSPECTION DETAILS', rows: [['Site / Project',''],['Date',''],['Inspector',''],['Area Inspected','']] },
-            { header: 'INSPECTION ITEMS', table: { heads: ['Item','Yes','No','N/A','Comments'], rows: [
-              ['PPE being worn correctly','','','',''],['Housekeeping acceptable','','','',''],['Access/egress clear','','','',''],
-              ['Fire extinguishers accessible','','','',''],['First aid kit available','','','',''],['Scaffold tagged and safe','','','',''],
-              ['Edge protection in place','','','',''],['Electrical leads in good condition','','','',''],['COSHH storage correct','','','',''],
-              ['Welfare facilities clean','','','',''],['Signage displayed','','','',''],['Waste segregated correctly','','','',''],
-              ['','','','',''],['','','','',''],['','','','',''],
-            ] } },
-            { header: 'ACTIONS REQUIRED', table: { heads: ['Action','Responsible Person','Due Date','Completed'], rows: Array(6).fill(['','','','']) } },
-            { header: 'SIGN-OFF', rows: [['Inspector Signature',''],['Date','']] },
-          ]
-        },
-        'hot-work-permit': {
-          title: 'Hot Work Permit',
-          docType: 'Hot Work Permit',
-          sections: [
-            { header: 'PERMIT DETAILS', rows: [['Permit Number',''],['Date',''],['Location',''],['Description of Hot Work',''],['Equipment to be Used','']] },
-            { header: 'PRE-WORK CHECKS', table: { heads: ['Check','Yes','No','N/A'], rows: [
-              ['Area cleared of combustible materials','','',''],['Fire extinguisher available at work point','','',''],
-              ['Fire watch person assigned','','',''],['Smoke/heat detectors isolated (with permit)','','',''],
-              ['Combustible floors protected','','',''],['Flammable liquids/gases removed','','',''],
-              ['Adjacent areas checked','','',''],['Ventilation adequate','','',''],
-            ] } },
-            { header: 'AUTHORISATION', rows: [['Issued By',''],['Signature',''],['Date / Time',''],['Accepted By',''],['Signature','']] },
-            { header: 'FIRE WATCH', rows: [['Fire Watch Duration (min 60 mins after)',''],['Fire Watch Person',''],['All Clear Confirmed',''],['Signature',''],['Date / Time','']] },
-          ]
-        },
-        'project-handover': {
-          title: 'Project Handover Form',
-          docType: 'Project Handover',
-          sections: [
-            { header: 'PROJECT DETAILS', rows: [['Project Name',''],['Client',''],['Site Address',''],['Contract Value',''],['Start Date',''],['Completion Date',''],['ManProjects Project Manager','']] },
-            { header: 'HANDOVER CHECKLIST', table: { heads: ['Item','Completed','N/A','Comments'], rows: [
-              ['O&M Manuals provided','','',''],['As-built drawings issued','','',''],['Test certificates provided','','',''],
-              ['Commissioning records issued','','',''],['Spare parts/keys handed over','','',''],['Training provided to client','','',''],
-              ['Defects/snags list completed','','',''],['Building log book updated','','',''],['Warranties issued','','',''],
-              ['Final account agreed','','',''],
-            ] } },
-            { header: 'CLIENT ACCEPTANCE', rows: [['Client Name',''],['Signature',''],['Date',''],['ManProjects Representative',''],['Signature',''],['Date','']] },
-          ]
-        },
-        'commissioning-record': {
-          title: 'Commissioning Record',
-          docType: 'Commissioning Record',
-          sections: [
-            { header: 'PROJECT INFORMATION', rows: [['Project Name',''],['Site Address',''],['System/Equipment',''],['Manufacturer',''],['Model/Serial No',''],['Location/Zone',''],['Date Commissioned','']] },
-            { header: 'PRE-COMMISSIONING CHECKS', table: { heads: ['Check','Pass','Fail','N/A','Comments'], rows: [
-              ['Installation complete','','','',''],['Visual inspection satisfactory','','','',''],
-              ['Electrical connections verified','','','',''],['Fixings secure','','','',''],
-              ['Labelling complete','','','',''],['Access for maintenance confirmed','','','',''],
-              ['','','','',''],['','','','',''],
-            ] } },
-            { header: 'TEST RESULTS', table: { heads: ['Test','Expected Value','Measured Value','Pass/Fail'], rows: Array(8).fill(['','','','']) } },
-            { header: 'SIGN-OFF', rows: [['Commissioned By',''],['Signature',''],['Date',''],['Witnessed By',''],['Signature',''],['Date','']] },
-          ]
-        },
-        'daily-site-diary': {
-          title: 'Daily Site Diary',
-          docType: 'Daily Site Diary',
-          sections: [
-            { header: 'SITE DETAILS', rows: [['Project Name',''],['Site Address',''],['Date',''],['Weather Conditions',''],['Temperature (approx)',''],['Completed By','']] },
-            { header: 'PERSONNEL ON SITE', table: { heads: ['Name','Company','Trade/Role','Hours'], rows: Array(10).fill(['','','','']) } },
-            { header: 'WORK CARRIED OUT TODAY', freeText: true, lines: 8 },
-            { header: 'MATERIALS DELIVERED', freeText: true, lines: 4 },
-            { header: 'VISITORS', table: { heads: ['Name','Company','Purpose','Time In','Time Out'], rows: Array(4).fill(['','','','','']) } },
-            { header: 'ISSUES / DELAYS', freeText: true, lines: 4 },
-            { header: 'SIGN-OFF', rows: [['Site Manager Signature',''],['Date','']] },
-          ]
-        },
-        'db-schedule': {
-          title: 'DB Schedule',
-          docType: 'Distribution Board Schedule',
-          custom: true
-        },
-      };
-
-      const tmpl = templates[key];
-      if (!tmpl) return res.status(404).json({ error: 'Template not found' });
-
-      // ── Custom DB Schedule template ──
-      if (tmpl.custom && key === 'db-schedule') {
-        const colWidths = [550, 650, 600, 500, 600, 750, 2200, 800, 650, 650];
-        const colHeads = ['Cct No','Cct Phase','BS (EN)','Type','Rating (A)','Short-circuit capacity (kA)','Supply/ng','Cable Type','Cable Size','CPC Size'];
-        const headerRow = new TableRow({ children: colHeads.map((head, i) =>
-          new TableCell({ borders: h.bds, width: { size: colWidths[i], type: WidthType.DXA },
-            shading: { fill: "8B1A1A", type: ShadingType.CLEAR }, margins: h.cm,
-            children: [new Paragraph({ children: [new TextRun({ text: head, bold: true, font: "Arial", size: 16, color: "FFFFFF" })] })] })
-        ) });
-        const dataRows = Array(30).fill(null).map((_, idx) =>
-          new TableRow({ children: colWidths.map((w) =>
-            new TableCell({ borders: h.bds, width: { size: w, type: WidthType.DXA }, margins: h.cm,
-              children: [new Paragraph({ children: [new TextRun({ text: ' ', font: "Arial", size: 16 })] })] })
-          ) })
-        );
-
-        const blankLogoRuns = [];
-        if (h.logoData) blankLogoRuns.push(new ImageRun({ data: h.logoData, transformation: { width: 260, height: 100 }, type: 'png' }));
-        if (h.logoData && h.niceicData) blankLogoRuns.push(new TextRun({ text: "      ", font: "Arial", size: 22 }));
-        if (h.niceicData) blankLogoRuns.push(new ImageRun({ data: h.niceicData, transformation: { width: 150, height: 70 }, type: 'png' }));
-
-        const children = [
-          ...(blankLogoRuns.length ? [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 100, after: 80 }, children: blankLogoRuns })] : []),
-          new Paragraph({ spacing: { before: 20, after: 20 }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: h.maroon, space: 0 } }, children: [] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 180, after: 200 },
-            children: [new TextRun({ text: "DISTRIBUTION BOARD SCHEDULE", bold: true, font: "Arial", size: 30, color: "333333" })] }),
-
-          h.sh("BOARD DETAILS"),
-          new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
-            new TableRow({ children: [h.lbl("DB-Ref", 2340), h.val('', 2340), h.lbl("Location", 2340), h.val('', 2340)] }),
-            new TableRow({ children: [h.lbl("Board Size & Rating", 2340), h.val('', 2340), h.lbl("Manufacturer", 2340), h.val('', 2340)] }),
-            new TableRow({ children: [h.lbl("Supply Cable Ref", 2340), h.val('', 2340), h.lbl("PFC (kA)", 2340), h.val('', 2340)] }),
-            new TableRow({ children: [h.lbl("Project / Site", 2340), h.val('', 2340), h.lbl("Date", 2340), h.val('', 2340)] }),
-            new TableRow({ children: [h.lbl("Fed From", 2340), h.val('', 2340), h.lbl("ZDB ID", 2340), h.val('', 2340)] }),
-          ] }),
-
-          h.sh("CIRCUIT SCHEDULE"),
-          new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...dataRows] }),
-
-          h.sh("NOTES"),
-          ...Array(4).fill(null).map(() => new Paragraph({
-            spacing: { after: 80 },
-            border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC", space: 6 } },
-            children: [new TextRun({ text: ' ', font: "Arial", size: 20 })]
-          })),
-
-          h.sh("SIGN-OFF"),
-          new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
-            new TableRow({ children: [h.lbl("Completed By", h.pw/2), h.val('', h.pw/2)] }),
-            new TableRow({ children: [h.lbl("Signature", h.pw/2), h.val('', h.pw/2)] }),
-            new TableRow({ children: [h.lbl("Date", h.pw/2), h.val('', h.pw/2)] }),
-            new TableRow({ children: [h.lbl("Checked By", h.pw/2), h.val('', h.pw/2)] }),
-            new TableRow({ children: [h.lbl("Date", h.pw/2), h.val('', h.pw/2)] }),
-          ] }),
-        ];
-
-        const doc = new Document({
-          styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
-          sections: [{
-            properties: { ...h.pageProps, page: { ...h.pageProps.page, size: { width: 16838, height: 11906 }, margin: { top: 1000, right: 1000, bottom: 1000, left: 1000 } } },
-            headers: h.mkHeader('DB Schedule'),
-            footers: h.mkFooter('Distribution Board Schedule'),
-            children
-          }]
-        });
-        const buf = await Packer.toBuffer(doc);
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-        res.setHeader('Content-Disposition', 'attachment; filename="ManProjects-DB-Schedule.docx"');
-        return res.send(buf);
-      }
-
-      // ── Branded title block with logos ──
-      const titleChildren = [];
-      const logoRuns = [];
-      if (h.logoData) logoRuns.push(new ImageRun({ data: h.logoData, transformation: { width: 180, height: 70 }, type: 'png' }));
-      if (h.logoData && h.niceicData) logoRuns.push(new TextRun({ text: "      ", font: "Arial", size: 22 }));
-      if (h.niceicData) logoRuns.push(new ImageRun({ data: h.niceicData, transformation: { width: 110, height: 52 }, type: 'png' }));
-      if (logoRuns.length) titleChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 100, after: 80 }, children: logoRuns }));
-      titleChildren.push(
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: logoRuns.length ? 40 : 200, after: 0 },
-          children: [new TextRun({ text: "MANPROJECTS LTD", bold: true, font: "Arial", size: 34, color: h.maroon })] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 40, after: 20 },
-          children: [new TextRun({ text: "Electrical & Mechanical Building Services", font: "Arial", size: 20, color: "999999", italics: true })] }),
-        new Paragraph({ spacing: { before: 20, after: 20 }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: h.maroon, space: 0 } }, children: [] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 180, after: 200 },
-          children: [new TextRun({ text: tmpl.title.toUpperCase(), bold: true, font: "Arial", size: 30, color: "333333" })] })
-      );
-
-      const children = [...titleChildren];
-
-      for (const sec of tmpl.sections) {
-        // Maroon bar section header
-        children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
-          new TableRow({ children: [
-            new TableCell({ borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-              shading: { fill: h.maroon, type: ShadingType.CLEAR },
-              margins: { top: 60, bottom: 60, left: 140, right: 140 },
-              children: [new Paragraph({ children: [new TextRun({ text: sec.header, bold: true, font: "Arial", size: 22, color: "FFFFFF" })] })] })
-          ] })
-        ] }));
-        children.push(new Paragraph({ spacing: { after: 80 }, children: [] }));
-
-        if (sec.rows) {
-          const halfW = h.pw / 2;
-          const tableRows = sec.rows.map(([label, value], idx) =>
-            new TableRow({ children: [
-              new TableCell({ borders: h.bds, width: { size: halfW, type: WidthType.DXA },
-                shading: { fill: "F3E8E8", type: ShadingType.CLEAR }, margins: h.cm,
-                children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, font: "Arial", size: 20, color: h.maroon })] })] }),
-              new TableCell({ borders: h.bds, width: { size: halfW, type: WidthType.DXA },
-                shading: idx % 2 === 0 ? { fill: "FAFAFA", type: ShadingType.CLEAR } : undefined, margins: h.cm,
-                children: [new Paragraph({ children: [new TextRun({ text: value || ' ', font: "Arial", size: 20 })] })] })
-            ] })
-          );
-          children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: tableRows }));
-        }
-
-        if (sec.table) {
-          const colW = Math.floor(h.pw / sec.table.heads.length);
-          const headerRow = new TableRow({ children: sec.table.heads.map(head =>
-            new TableCell({ borders: h.bds, width: { size: colW, type: WidthType.DXA },
-              shading: { fill: "8B1A1A", type: ShadingType.CLEAR }, margins: h.cm,
-              children: [new Paragraph({ children: [new TextRun({ text: head, bold: true, font: "Arial", size: 18, color: "FFFFFF" })] })] })
-          ) });
-          const dataRows = sec.table.rows.map((row, idx) =>
-            new TableRow({ children: row.map(cell =>
-              new TableCell({ borders: h.bds, width: { size: colW, type: WidthType.DXA },
-                shading: idx % 2 === 1 ? { fill: "F9F5F5", type: ShadingType.CLEAR } : undefined, margins: h.cm,
-                children: [new Paragraph({ children: [new TextRun({ text: cell || ' ', font: "Arial", size: 18 })] })] })
-            ) })
-          );
-          children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...dataRows] }));
-        }
-
-        if (sec.freeText) {
-          for (let i = 0; i < (sec.lines || 4); i++) {
-            children.push(new Paragraph({
-              spacing: { after: 100 },
-              border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: "D5C5C5", space: 8 } },
-              children: [new TextRun({ text: ' ', font: "Arial", size: 22 })]
-            }));
-          }
-        }
-
-        children.push(new Paragraph({ spacing: { after: 100 }, children: [] }));
-      }
-
-      const doc = new Document({
-        styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
-        sections: [{
-          properties: h.pageProps,
-          headers: h.mkHeader(tmpl.title),
-          footers: h.mkFooter(tmpl.docType),
-          children
-        }]
-      });
-
-      const buf = await Packer.toBuffer(doc);
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      res.setHeader('Content-Disposition', `attachment; filename="ManProjects-${tmpl.title.replace(/\s+/g, '-')}.docx"`);
-      res.send(buf);
-    } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
-  });
-
-  // ═══════ DB SCHEDULE — FILLED DOCX ═══════
-  app.post('/api/db-schedule/docx', authenticate, async (req, res) => {
-    try {
-      const { board, circuits } = req.body;
-      const h = docxHelpers();
-      const colWidths = [550, 650, 600, 500, 600, 750, 2200, 800, 650, 650];
-      const colHeads = ['Cct No','Cct Phase','BS (EN)','Type','Rating (A)','Short-circuit capacity (kA)','Supply/ng','Cable Type','Cable Size','CPC Size'];
-      const softBdr = { style: BorderStyle.SINGLE, size: 1, color: "D6D6D6" };
-      const softBds = { top: softBdr, bottom: softBdr, left: softBdr, right: softBdr };
-      const cellMg = { top: 70, bottom: 70, left: 110, right: 110 };
-
-      const titleChildren = [];
-      const logoRuns = [];
-      if (h.logoData) logoRuns.push(new ImageRun({ data: h.logoData, transformation: { width: 260, height: 100 }, type: 'png' }));
-      if (h.logoData && h.niceicData) logoRuns.push(new TextRun({ text: "      ", font: "Arial", size: 22 }));
-      if (h.niceicData) logoRuns.push(new ImageRun({ data: h.niceicData, transformation: { width: 150, height: 70 }, type: 'png' }));
-      if (logoRuns.length) titleChildren.push(new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 100, after: 100 }, children: logoRuns }));
-      titleChildren.push(
-        new Paragraph({ spacing: { before: 40, after: 40 }, border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: h.maroon, space: 0 } }, children: [] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 60 },
-          children: [new TextRun({ text: "DISTRIBUTION BOARD SCHEDULE", bold: true, font: "Arial", size: 28, color: "333333" })] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 240 },
-          children: [new TextRun({ text: "ManProjects Ltd — Electrical & Mechanical Building Services", font: "Arial", size: 16, color: "AAAAAA", italics: true })] })
-      );
-
-      // Rounded-feel section bar with softer colour
-      const secBar = (text) => new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
-        new TableRow({ children: [
-          new TableCell({ borders: { top:{style:BorderStyle.SINGLE,size:1,color:"7A1818"},bottom:{style:BorderStyle.SINGLE,size:1,color:"7A1818"},left:{style:BorderStyle.SINGLE,size:1,color:"7A1818"},right:{style:BorderStyle.SINGLE,size:1,color:"7A1818"} },
-            shading: { fill: "9B2C2C", type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 180, right: 180 },
-            children: [new Paragraph({ children: [new TextRun({ text, bold: true, font: "Arial", size: 20, color: "FFFFFF" })] })] })
-        ] })
-      ] });
-
-      // Softer label/value cells
-      const dLbl = (text, w) => new TableCell({ borders: softBds, width: { size: w, type: WidthType.DXA },
-        shading: { fill: "F5EDED", type: ShadingType.CLEAR }, margins: cellMg,
-        children: [new Paragraph({ children: [new TextRun({ text, bold: true, font: "Arial", size: 18, color: "6B2020" })] })] });
-      const dVal = (text, w) => new TableCell({ borders: softBds, width: { size: w, type: WidthType.DXA },
-        shading: { fill: "FCFCFC", type: ShadingType.CLEAR }, margins: cellMg,
-        children: [new Paragraph({ children: [new TextRun({ text: text || '\u2014', font: "Arial", size: 18, color: "444444" })] })] });
-
-      const b = board || {};
-      const boardTable = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
-        new TableRow({ children: [dLbl("DB-Ref", 2340), dVal(b.dbRef, 2340), dLbl("Location", 2340), dVal(b.location, 2340)] }),
-        new TableRow({ children: [dLbl("Board Size & Rating", 2340), dVal(b.boardSize, 2340), dLbl("Manufacturer", 2340), dVal(b.manufacturer, 2340)] }),
-        new TableRow({ children: [dLbl("Supply Cable Ref", 2340), dVal(b.supplyCableRef, 2340), dLbl("PFC (kA)", 2340), dVal(b.pfc, 2340)] }),
-        new TableRow({ children: [dLbl("Project / Site", 2340), dVal(b.project, 2340), dLbl("Date", 2340), dVal(b.date, 2340)] }),
-        new TableRow({ children: [dLbl("Fed From", 2340), dVal(b.podRoom, 2340), dLbl("ZDB ID", 2340), dVal(b.zdbId, 2340)] }),
-      ] });
-
-      // Circuit table header — slightly softer maroon with more padding
-      const headerRow = new TableRow({ children: colHeads.map((head, i) =>
-        new TableCell({ borders: softBds, width: { size: colWidths[i], type: WidthType.DXA },
-          shading: { fill: "9B2C2C", type: ShadingType.CLEAR }, margins: cellMg,
-          children: [new Paragraph({ children: [new TextRun({ text: head, bold: true, font: "Arial", size: 15, color: "FFFFFF" })] })] })
-      ) });
-      const rows = (circuits || []).map((row, idx) =>
-        new TableRow({ children: [row.cctNo,row.cctPhase,row.bsEn,row.type,row.ratingA,row.scCapacity,row.supplying,row.cableType,row.cableSize,row.cpcSize].map((cell, i) =>
-          new TableCell({ borders: softBds, width: { size: colWidths[i], type: WidthType.DXA },
-            shading: { fill: idx % 2 === 0 ? "FFFFFF" : "FAF6F6", type: ShadingType.CLEAR }, margins: cellMg,
-            children: [new Paragraph({ children: [new TextRun({ text: (cell||'').toString() || ' ', font: "Arial", size: 15, color: "333333" })] })] })
-        ) })
-      );
-
-      const spc = () => new Paragraph({ spacing: { after: 120 }, children: [] });
-
-      const children = [
-        ...titleChildren,
-        secBar("BOARD DETAILS"), spc(), boardTable, spc(),
-        secBar("CIRCUIT SCHEDULE"), spc(),
-        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...rows] }), spc(),
-        secBar("SIGN-OFF"), spc(),
-        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
-          new TableRow({ children: [dLbl("Completed By", h.pw/2), dVal(b.completedBy, h.pw/2)] }),
-          new TableRow({ children: [dLbl("Checked By", h.pw/2), dVal(b.checkedBy, h.pw/2)] }),
-          new TableRow({ children: [dLbl("Date", h.pw/2), dVal(b.signoffDate, h.pw/2)] }),
-        ] }),
-      ];
-
-      const doc = new Document({
-        styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
-        sections: [{ properties: { ...h.pageProps, page: { ...h.pageProps.page, size: { width: 16838, height: 11906 }, margin: { top: 900, right: 900, bottom: 900, left: 900 } } },
-          headers: h.mkHeader('DB Schedule'), footers: h.mkFooter('Distribution Board Schedule'), children }]
-      });
-      const buf = await Packer.toBuffer(doc);
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      res.setHeader('Content-Disposition', 'attachment; filename="ManProjects-DB-Schedule.docx"');
-      res.send(buf);
-    } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
-  });
-
-  // ═══════ DB SCHEDULE — PDF ═══════
-  app.post('/api/db-schedule/pdf', authenticate, async (req, res) => {
-    try {
-      const { board, circuits } = req.body;
-      const b = board || {};
-      const colHeads = ['Cct No','Cct Phase','BS (EN)','Type','Rating (A)','SC (kA)','Supply/ng','Cable Type','Cable Size','CPC Size'];
-      const colW = [38, 44, 44, 38, 46, 42, 178, 52, 44, 44];
-      const tableX = 50;
-      const maroon = [155, 44, 44];
-      const pw = 842 - 100; // A4 landscape width minus margins
-
-      const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margins: { top: 50, bottom: 50, left: 50, right: 50 } });
-      const chunks = [];
-      doc.on('data', c => chunks.push(c));
-      doc.on('end', () => {
-        const buf = Buffer.concat(chunks);
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="ManProjects-DB-Schedule.pdf"');
-        res.send(buf);
-      });
-
-      // Logos
-      const logoPath = path.join(__dirname, 'public', 'logo.png');
-      const niceicPath = path.join(__dirname, 'public', 'niceic-logo.png');
-      const hasLogo = fs.existsSync(logoPath);
-      const hasNiceic = fs.existsSync(niceicPath);
-      if (hasLogo && hasNiceic) {
-        doc.image(logoPath, 50, 30, { width: 170 });
-        doc.image(niceicPath, 235, 38, { width: 100 });
-        doc.moveDown(3.5);
-      } else if (hasLogo) {
-        doc.image(logoPath, 50, 30, { width: 170 });
-        doc.moveDown(3.5);
-      }
-
-      // Title divider and heading
-      doc.strokeColor(...maroon).lineWidth(3).moveTo(50, doc.y).lineTo(doc.page.width - 50, doc.y).stroke();
-      doc.moveDown(0.6);
-      doc.fillColor(50,50,50).fontSize(15).font('Helvetica-Bold').text('DISTRIBUTION BOARD SCHEDULE', { align: 'center' });
-      doc.fillColor(170,170,170).fontSize(8).font('Helvetica-Oblique').text('ManProjects Ltd — Electrical & Mechanical Building Services', { align: 'center' });
-      doc.moveDown(0.8);
-
-      // Rounded section bar
-      const drawSectionBar = (text) => {
-        const y = doc.y;
-        doc.roundedRect(50, y, doc.page.width - 100, 22, 4).fill(...maroon);
-        doc.fillColor(255,255,255).fontSize(9.5).font('Helvetica-Bold').text(text, 60, y + 5.5, { width: doc.page.width - 130 });
-        doc.y = y + 28;
-      };
-
-      // Rounded detail rows
-      const drawDetailRow = (pairs) => {
-        const y = doc.y;
-        const cellH = 20;
-        const totalW = doc.page.width - 100;
-        const pairW = totalW / pairs.length;
-        pairs.forEach(([label, value], i) => {
-          const x = 50 + i * pairW;
-          const lblW = pairW * 0.38;
-          const valW = pairW * 0.62;
-          // Label cell - rounded left
-          if (i === 0) doc.roundedRect(x, y, lblW, cellH, 3).fill(245, 237, 237);
-          else doc.rect(x, y, lblW, cellH).fill(245, 237, 237);
-          doc.fillColor(107, 32, 32).fontSize(7.5).font('Helvetica-Bold').text(label, x + 6, y + 5.5, { width: lblW - 12 });
-          // Value cell
-          doc.rect(x + lblW, y, valW, cellH).fill(252,252,252);
-          doc.rect(x + lblW, y, valW, cellH).strokeColor(220,220,220).lineWidth(0.5).stroke();
-          doc.fillColor(50,50,50).fontSize(7.5).font('Helvetica').text(value || '—', x + lblW + 6, y + 5.5, { width: valW - 12 });
-        });
-        doc.y = y + cellH + 1;
-      };
-
-      drawSectionBar('BOARD DETAILS');
-      drawDetailRow([['DB-Ref', b.dbRef], ['Location', b.location]]);
-      drawDetailRow([['Board Size & Rating', b.boardSize], ['Manufacturer', b.manufacturer]]);
-      drawDetailRow([['Supply Cable Ref', b.supplyCableRef], ['PFC (kA)', b.pfc]]);
-      drawDetailRow([['Project / Site', b.project], ['Date', b.date]]);
-      drawDetailRow([['Fed From', b.podRoom], ['ZDB ID', b.zdbId]]);
-      doc.moveDown(0.5);
-
-      // Circuit table with rounded header
-      drawSectionBar('CIRCUIT SCHEDULE');
-      const totalTableW = colW.reduce((a,b) => a+b, 0);
-      const drawTableHeader = () => {
-        let x = tableX;
-        const y = doc.y;
-        // Full rounded header background
-        doc.roundedRect(tableX, y, totalTableW, 18, 3).fill(...maroon);
-        colHeads.forEach((head, i) => {
-          doc.fillColor(255,255,255).fontSize(6.5).font('Helvetica-Bold').text(head, x + 3, y + 5, { width: colW[i] - 6 });
-          x += colW[i];
-        });
-        doc.y = y + 19;
-      };
-      drawTableHeader();
-
-      (circuits || []).forEach((row, idx) => {
-        if (doc.y > doc.page.height - 60) { doc.addPage(); drawTableHeader(); }
-        let x = tableX;
-        const y = doc.y;
-        const rowH = 16;
-        // Alternating row background
-        if (idx % 2 === 1) doc.rect(tableX, y, totalTableW, rowH).fill(250, 246, 246);
-        else doc.rect(tableX, y, totalTableW, rowH).fill(255, 255, 255);
-        // Subtle bottom border
-        doc.strokeColor(230,230,230).lineWidth(0.3).moveTo(tableX, y + rowH).lineTo(tableX + totalTableW, y + rowH).stroke();
-        const vals = [row.cctNo, row.cctPhase, row.bsEn, row.type, row.ratingA, row.scCapacity, row.supplying, row.cableType, row.cableSize, row.cpcSize];
-        vals.forEach((cell, i) => {
-          doc.fillColor(50,50,50).fontSize(6.5).font('Helvetica').text((cell||'').toString(), x + 3, y + 4.5, { width: colW[i] - 6 });
-          x += colW[i];
-        });
-        doc.y = y + rowH;
-      });
-
-      doc.moveDown(0.6);
-      drawSectionBar('SIGN-OFF');
-      drawDetailRow([['Completed By', b.completedBy], ['Checked By', b.checkedBy]]);
-      drawDetailRow([['Date', b.signoffDate], ['', '']]);
-
-      // Footer with subtle line
-      const footY = doc.page.height - 35;
-      doc.strokeColor(200,200,200).lineWidth(0.5).moveTo(50, footY).lineTo(doc.page.width - 50, footY).stroke();
-      doc.fillColor(170,170,170).fontSize(7).font('Helvetica').text('ManProjects Ltd — Distribution Board Schedule', 50, footY + 5, { align: 'center', width: doc.page.width - 100 });
-
-      doc.end();
-    } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
-  });
-
-  // ═══════ POINT-TO-POINT CABLE TEST — DOCX ═══════
-  app.post('/api/p2p-test/docx', authenticate, async (req, res) => {
-    try {
-      const { project, cables } = req.body;
-      const h = docxHelpers();
-      const p = project || {};
-      const colWidths = [500, 1200, 900, 900, 800, 800, 800, 900, 900, 900, 900];
-      const colHeads = ['No.','Cable Ref / Tag','From','To','Cable Type','Cores','Size (mm²)','Continuity (Ω)','Insulation (MΩ)','Result','Tested By'];
-      const softBdr = { style: BorderStyle.SINGLE, size: 1, color: "D6D6D6" };
-      const softBds = { top: softBdr, bottom: softBdr, left: softBdr, right: softBdr };
-      const cellMg = { top: 70, bottom: 70, left: 110, right: 110 };
-
-      const titleChildren = [];
-      const logoRuns = [];
-      if (h.logoData) logoRuns.push(new ImageRun({ data: h.logoData, transformation: { width: 260, height: 100 }, type: 'png' }));
-      if (h.logoData && h.niceicData) logoRuns.push(new TextRun({ text: "      ", font: "Arial", size: 22 }));
-      if (h.niceicData) logoRuns.push(new ImageRun({ data: h.niceicData, transformation: { width: 150, height: 70 }, type: 'png' }));
-      if (logoRuns.length) titleChildren.push(new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 100, after: 100 }, children: logoRuns }));
-      titleChildren.push(
-        new Paragraph({ spacing: { before: 40, after: 40 }, border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: h.maroon, space: 0 } }, children: [] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 60 },
-          children: [new TextRun({ text: "POINT TO POINT CABLE TEST", bold: true, font: "Arial", size: 28, color: "333333" })] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 240 },
-          children: [new TextRun({ text: "ManProjects Ltd — Electrical & Mechanical Building Services", font: "Arial", size: 16, color: "AAAAAA", italics: true })] })
-      );
-
-      const secBar = (text) => new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
-        new TableRow({ children: [
-          new TableCell({ borders: { top:{style:BorderStyle.SINGLE,size:1,color:"7A1818"},bottom:{style:BorderStyle.SINGLE,size:1,color:"7A1818"},left:{style:BorderStyle.SINGLE,size:1,color:"7A1818"},right:{style:BorderStyle.SINGLE,size:1,color:"7A1818"} },
-            shading: { fill: "9B2C2C", type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 180, right: 180 },
-            children: [new Paragraph({ children: [new TextRun({ text, bold: true, font: "Arial", size: 20, color: "FFFFFF" })] })] })
-        ] })
-      ] });
-
-      const dLbl = (text, w) => new TableCell({ borders: softBds, width: { size: w, type: WidthType.DXA },
-        shading: { fill: "F5EDED", type: ShadingType.CLEAR }, margins: cellMg,
-        children: [new Paragraph({ children: [new TextRun({ text, bold: true, font: "Arial", size: 18, color: "6B2020" })] })] });
-      const dVal = (text, w) => new TableCell({ borders: softBds, width: { size: w, type: WidthType.DXA },
-        shading: { fill: "FCFCFC", type: ShadingType.CLEAR }, margins: cellMg,
-        children: [new Paragraph({ children: [new TextRun({ text: text || '\u2014', font: "Arial", size: 18, color: "444444" })] })] });
-
-      const projTable = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
-        new TableRow({ children: [dLbl("Project / Site", 2340), dVal(p.project, 2340), dLbl("Location", 2340), dVal(p.location, 2340)] }),
-        new TableRow({ children: [dLbl("Client", 2340), dVal(p.client, 2340), dLbl("Date", 2340), dVal(p.date, 2340)] }),
-        new TableRow({ children: [dLbl("Engineer", 2340), dVal(p.engineer, 2340), dLbl("Test Instrument", 2340), dVal(p.instrument, 2340)] }),
-        new TableRow({ children: [dLbl("Instrument Serial No.", 2340), dVal(p.serialNo, 2340), dLbl("Calibration Due", 2340), dVal(p.calibrationDue, 2340)] }),
-      ] });
-
-      const headerRow = new TableRow({ children: colHeads.map((head, i) =>
-        new TableCell({ borders: softBds, width: { size: colWidths[i], type: WidthType.DXA },
-          shading: { fill: "9B2C2C", type: ShadingType.CLEAR }, margins: cellMg,
-          children: [new Paragraph({ children: [new TextRun({ text: head, bold: true, font: "Arial", size: 15, color: "FFFFFF" })] })] })
-      ) });
-      const rows = (cables || []).map((row, idx) => {
-        const isPass = (row.result||'').toLowerCase() === 'pass';
-        const isFail = (row.result||'').toLowerCase() === 'fail';
-        return new TableRow({ children: [row.no,row.cableRef,row.from||'',row.to||'',row.cableType,row.cores,row.size,row.continuity,row.insulation,row.result,row.testedBy].map((cell, i) =>
-          new TableCell({ borders: softBds, width: { size: colWidths[i], type: WidthType.DXA },
-            shading: { fill: i === 9 && isPass ? "E6F4EA" : i === 9 && isFail ? "FCE8E6" : idx % 2 === 0 ? "FFFFFF" : "FAF6F6", type: ShadingType.CLEAR }, margins: cellMg,
-            children: [new Paragraph({ children: [new TextRun({ text: (cell||'').toString() || ' ', font: "Arial", size: 15, color: i === 9 && isFail ? "C0392B" : "333333", bold: i === 9 })] })] })
-        ) });
-      });
-
-      const spc = () => new Paragraph({ spacing: { after: 120 }, children: [] });
-      const children = [
-        ...titleChildren,
-        secBar("PROJECT DETAILS"), spc(), projTable, spc(),
-        secBar("CABLE TEST RESULTS"), spc(),
-        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...rows] }), spc(),
-        secBar("SIGN-OFF"), spc(),
-        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
-          new TableRow({ children: [dLbl("Tested By", h.pw/2), dVal(p.testedBy, h.pw/2)] }),
-          new TableRow({ children: [dLbl("Checked By", h.pw/2), dVal(p.checkedBy, h.pw/2)] }),
-          new TableRow({ children: [dLbl("Date", h.pw/2), dVal(p.signoffDate, h.pw/2)] }),
-        ] }),
-      ];
-
-      const doc = new Document({
-        styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
-        sections: [{ properties: { ...h.pageProps, page: { ...h.pageProps.page, size: { width: 16838, height: 11906 }, margin: { top: 900, right: 900, bottom: 900, left: 900 } } },
-          headers: h.mkHeader('Point to Point Cable Test'), footers: h.mkFooter('Point to Point Cable Test'), children }]
-      });
-      const buf = await Packer.toBuffer(doc);
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      res.setHeader('Content-Disposition', 'attachment; filename="ManProjects-P2P-Cable-Test.docx"');
-      res.send(buf);
-    } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
-  });
-
-  // ═══════ POINT-TO-POINT CABLE TEST — PDF ═══════
-  app.post('/api/p2p-test/pdf', authenticate, async (req, res) => {
-    try {
-      const { project, cables } = req.body;
-      const p = project || {};
-      const colHeads = ['No.','Cable Ref','From','To','Type','Cores','Size','Cont. (Ω)','Ins. (MΩ)','Result','Tested By'];
-      const colW = [26, 64, 52, 52, 48, 30, 34, 50, 50, 42, 52];
-      const tableX = 50;
-      const maroon = [155, 44, 44];
-      const totalTableW = colW.reduce((a,b) => a+b, 0);
-
-      const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margins: { top: 50, bottom: 50, left: 50, right: 50 } });
-      const chunks = [];
-      doc.on('data', c => chunks.push(c));
-      doc.on('end', () => {
-        const buf = Buffer.concat(chunks);
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="ManProjects-P2P-Cable-Test.pdf"');
-        res.send(buf);
-      });
-
-      const logoPath = path.join(__dirname, 'public', 'logo.png');
-      const niceicPath = path.join(__dirname, 'public', 'niceic-logo.png');
-      if (fs.existsSync(logoPath) && fs.existsSync(niceicPath)) {
-        doc.image(logoPath, 50, 30, { width: 170 }); doc.image(niceicPath, 235, 38, { width: 100 }); doc.moveDown(3.5);
-      } else if (fs.existsSync(logoPath)) { doc.image(logoPath, 50, 30, { width: 170 }); doc.moveDown(3.5); }
-
-      doc.strokeColor(...maroon).lineWidth(3).moveTo(50, doc.y).lineTo(doc.page.width - 50, doc.y).stroke();
-      doc.moveDown(0.6);
-      doc.fillColor(50,50,50).fontSize(15).font('Helvetica-Bold').text('POINT TO POINT CABLE TEST', { align: 'center' });
-      doc.fillColor(170,170,170).fontSize(8).font('Helvetica-Oblique').text('ManProjects Ltd — Electrical & Mechanical Building Services', { align: 'center' });
-      doc.moveDown(0.8);
-
-      const drawSectionBar = (text) => {
-        const y = doc.y;
-        doc.roundedRect(50, y, doc.page.width - 100, 22, 4).fill(...maroon);
-        doc.fillColor(255,255,255).fontSize(9.5).font('Helvetica-Bold').text(text, 60, y + 5.5, { width: doc.page.width - 130 });
-        doc.y = y + 28;
-      };
-      const drawDetailRow = (pairs) => {
-        const y = doc.y; const cellH = 20; const totalW = doc.page.width - 100; const pairW = totalW / pairs.length;
-        pairs.forEach(([label, value], i) => {
-          const x = 50 + i * pairW; const lblW = pairW * 0.38; const valW = pairW * 0.62;
-          doc.rect(x, y, lblW, cellH).fill(245, 237, 237);
-          doc.fillColor(107, 32, 32).fontSize(7.5).font('Helvetica-Bold').text(label, x + 6, y + 5.5, { width: lblW - 12 });
-          doc.rect(x + lblW, y, valW, cellH).fill(252,252,252); doc.rect(x + lblW, y, valW, cellH).strokeColor(220,220,220).lineWidth(0.5).stroke();
-          doc.fillColor(50,50,50).fontSize(7.5).font('Helvetica').text(value || '—', x + lblW + 6, y + 5.5, { width: valW - 12 });
-        });
-        doc.y = y + cellH + 1;
-      };
-
-      drawSectionBar('PROJECT DETAILS');
-      drawDetailRow([['Project / Site', p.project], ['Location', p.location]]);
-      drawDetailRow([['Client', p.client], ['Date', p.date]]);
-      drawDetailRow([['Engineer', p.engineer], ['Test Instrument', p.instrument]]);
-      drawDetailRow([['Instrument Serial No.', p.serialNo], ['Calibration Due', p.calibrationDue]]);
-      doc.moveDown(0.5);
-
-      drawSectionBar('CABLE TEST RESULTS');
-      const drawTableHeader = () => {
-        let x = tableX; const y = doc.y;
-        doc.roundedRect(tableX, y, totalTableW, 18, 3).fill(...maroon);
-        colHeads.forEach((head, i) => { doc.fillColor(255,255,255).fontSize(6.5).font('Helvetica-Bold').text(head, x + 3, y + 5, { width: colW[i] - 6 }); x += colW[i]; });
-        doc.y = y + 19;
-      };
-      drawTableHeader();
-
-      (cables || []).forEach((row, idx) => {
-        if (doc.y > doc.page.height - 60) { doc.addPage(); drawTableHeader(); }
-        let x = tableX; const y = doc.y; const rowH = 16;
-        const isPass = (row.result||'').toLowerCase() === 'pass';
-        const isFail = (row.result||'').toLowerCase() === 'fail';
-        if (idx % 2 === 1) doc.rect(tableX, y, totalTableW, rowH).fill(250, 246, 246);
-        else doc.rect(tableX, y, totalTableW, rowH).fill(255, 255, 255);
-        doc.strokeColor(230,230,230).lineWidth(0.3).moveTo(tableX, y + rowH).lineTo(tableX + totalTableW, y + rowH).stroke();
-        const vals = [row.no, row.cableRef, row.from||'', row.to||'', row.cableType, row.cores, row.size, row.continuity, row.insulation, row.result, row.testedBy];
-        vals.forEach((cell, i) => {
-          if (i === 9 && isPass) { doc.rect(x, y, colW[i], rowH).fill(230, 244, 234); }
-          if (i === 9 && isFail) { doc.rect(x, y, colW[i], rowH).fill(252, 232, 230); }
-          doc.fillColor(i === 9 && isFail ? 192 : 50, i === 9 && isFail ? 57 : 50, i === 9 && isFail ? 43 : 50).fontSize(6.5).font(i === 9 ? 'Helvetica-Bold' : 'Helvetica').text((cell||'').toString(), x + 3, y + 4.5, { width: colW[i] - 6 });
-          x += colW[i];
-        });
-        doc.y = y + rowH;
-      });
-
-      doc.moveDown(0.6);
-      drawSectionBar('SIGN-OFF');
-      drawDetailRow([['Tested By', p.testedBy], ['Checked By', p.checkedBy]]);
-      drawDetailRow([['Date', p.signoffDate], ['', '']]);
-
-      const footY = doc.page.height - 35;
-      doc.strokeColor(200,200,200).lineWidth(0.5).moveTo(50, footY).lineTo(doc.page.width - 50, footY).stroke();
-      doc.fillColor(170,170,170).fontSize(7).font('Helvetica').text('ManProjects Ltd — Point to Point Cable Test', 50, footY + 5, { align: 'center', width: doc.page.width - 100 });
-
-      doc.end();
-    } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
-  });
-
-  // ═══════ PROJECTS ═══════
-  // List all projects (admin)
-  app.get('/api/projects', authenticate, adminOnly, async (req, res) => {
-    try {
-      const { rows } = await pool.query('SELECT p.*, u.full_name as created_by_name FROM projects p LEFT JOIN users u ON p.created_by = u.id ORDER BY p.created_at DESC');
-      res.json(rows);
-    } catch(e) { res.status(500).json({ error: e.message }); }
-  });
-
-  // Get single project
-  app.get('/api/projects/:id', authenticate, adminOnly, async (req, res) => {
-    try {
-      const { rows } = await pool.query('SELECT p.*, u.full_name as created_by_name FROM projects p LEFT JOIN users u ON p.created_by = u.id WHERE p.id = $1', [req.params.id]);
-      if (rows.length === 0) return res.status(404).json({ error: 'Project not found' });
-      res.json(rows[0]);
-    } catch(e) { res.status(500).json({ error: e.message }); }
-  });
-
-  // Create project
-  app.post('/api/projects', authenticate, adminOnly, async (req, res) => {
-    try {
-      const d = req.body;
-      const { rows } = await pool.query(
-        'INSERT INTO projects (name, client_name, site_address, status, start_date, end_date, description, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
-        [d.name, d.client_name, d.site_address || null, d.status || 'active', d.start_date || null, d.end_date || null, d.description || null, req.user.id]
-      );
-      res.json(rows[0]);
-    } catch(e) { res.status(500).json({ error: e.message }); }
-  });
-
-  // Update project
-  app.put('/api/projects/:id', authenticate, adminOnly, async (req, res) => {
-    try {
-      const d = req.body;
-      const { rows } = await pool.query(
-        'UPDATE projects SET name=$1, client_name=$2, site_address=$3, status=$4, start_date=$5, end_date=$6, description=$7, updated_at=CURRENT_TIMESTAMP WHERE id=$8 RETURNING *',
-        [d.name, d.client_name, d.site_address || null, d.status || 'active', d.start_date || null, d.end_date || null, d.description || null, req.params.id]
-      );
-      if (rows.length === 0) return res.status(404).json({ error: 'Project not found' });
-      res.json(rows[0]);
-    } catch(e) { res.status(500).json({ error: e.message }); }
-  });
-
-  // Delete project
-  app.delete('/api/projects/:id', authenticate, adminOnly, async (req, res) => {
-    try {
-      await pool.query('DELETE FROM projects WHERE id = $1', [req.params.id]);
-      res.json({ message: 'Project deleted' });
     } catch(e) { res.status(500).json({ error: e.message }); }
   });
 
