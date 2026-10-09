@@ -1572,7 +1572,8 @@ async function startApp() {
         // Duplicate portal records for the same person, course and expiry are covered by
         // this certificate too — don't report them as missing from SharePoint.
         records.forEach(r => {
-          if (r.id !== rec.id && sameName(r.operative_name, c.person) && sameCourse(r.course_name, c.course)
+          if (r.id !== rec.id && (sameName(r.operative_name, rec.operative_name) || sameName(r.operative_name, c.person))
+              && sameCourse(r.course_name, c.course)
               && (r.expiry_date || '') === (rec.expiry_date || '')) touched.add(r.id);
         });
         const newer = c.expiry && (!rec.expiry_date || c.expiry > rec.expiry_date);
