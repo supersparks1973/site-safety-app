@@ -365,6 +365,8 @@ async function startApp() {
     if (req.path === '/' || req.path === '/index.html' || req.path === '/sw.js') res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     next();
   });
+  // BOQ Costing Tool lives at /boq/ — send the slash-less address there too
+  app.get('/boq', (req, res) => res.redirect(301, '/boq/'));
   app.use(express.static(path.join(__dirname, 'public')));
 
   const storage = multer.diskStorage({
