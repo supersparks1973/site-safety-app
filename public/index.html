@@ -279,6 +279,9 @@ body.read-only-mode .hide-readonly{display:none!important}
 .tm-exp{background:var(--danger-soft);color:#9A1C14}
 .tm-urg{background:#FFE4CC;color:#8A3B00}
 .tm-wrn{background:var(--warning-soft);color:#7A4A00}
+.tm-link{display:inline-block;text-decoration:none;border-bottom:2px solid currentColor;padding-bottom:1px;border-radius:2px;color:inherit}
+.tm-link:hover{opacity:.75}
+.tm-link .tm-ok{color:var(--success)}
 .tm-na{display:inline-block;width:5px;height:5px;border-radius:50%;background:#DADDE3;padding:0;min-width:0}
 .tm-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px}
 .tm-toolbar .tab-bar{margin-bottom:0;padding-bottom:0;flex:1 1 auto}
@@ -2887,9 +2890,24 @@ function renderTrainingMatrix(el, records) {
   const groupStart = new Set(groups.map(g => g.courses[0]));
 
   // Status cell helper (adds a divider at the start of each category group)
-  const cellHtml = (rec, course) => groupStart.has(course) && course !== allCourses[0]
-    ? cellInner(rec).replace('<td class="tm-cell', '<td class="tm-cell tm-group-start')
-    : cellInner(rec);
+  // SharePoint folder for each operative/course, taken from any record that has been
+  // matched to a certificate (a hand-typed duplicate may sit alongside the linked one).
+  const spFolder = {};
+  records.forEach(r => {
+    if (!r.sp_web_url) return;
+    const key = (r.operative_name || 'Unknown') + '\u0000' + r.course_name;
+    if (!spFolder[key]) spFolder[key] = r.sp_web_url.replace(/\/[^\/]*$/, '');
+  });
+  const cellHtml = (rec, course, op) => {
+    let html = cellInner(rec);
+    if (groupStart.has(course) && course !== allCourses[0]) html = html.replace('<td class="tm-cell', '<td class="tm-cell tm-group-start');
+    const folder = rec && spFolder[op + '\u0000' + course];
+    if (folder && /^https:\/\//.test(folder)) {
+      html = html.replace(/(<span class="tm-badge[\s\S]*<\/span>)(<\/td>)$/,
+        `<a class="tm-link" href="${esc(folder)}" target="_blank" rel="noopener" title="Open ${esc(op)}'s certificates on SharePoint">$1</a>$2`);
+    }
+    return html;
+  };
   const cellInner = (rec) => {
     if (!rec) return '<td class="tm-cell tm-none"><span class="tm-na"></span></td>';
     const exp = rec.expiry_date ? new Date(rec.expiry_date) : null;
@@ -2934,13 +2952,13 @@ function renderTrainingMatrix(el, records) {
           ${operatives.map(op => `
             <tr>
               <td class="tm-name-cell">${esc(op)}</td>
-              ${allCourses.map(c => cellHtml(operativeMap[op][c], c)).join('')}
+              ${allCourses.map(c => cellHtml(operativeMap[op][c], c, op)).join('')}
             </tr>
           `).join('')}
         </tbody>
       </table>
     </div>
-    <p style="font-size:12px;color:var(--ink-3);margin-top:8px">Hover or tap a cell for the expiry date and card number.</p>
+    <p style="font-size:12px;color:var(--ink-3);margin-top:8px">Hover a cell for the expiry date and card number. Underlined badges open that operative\u2019s certificates on SharePoint.</p>
   `;
 }
 
