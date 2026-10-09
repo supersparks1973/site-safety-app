@@ -366,7 +366,7 @@ async function startApp() {
     next();
   });
   // BOQ Costing Tool lives at /boq/ — send the slash-less address there too
-  app.get('/boq', (req, res) => res.redirect(301, '/boq/'));
+  app.use((req, res, next) => { if (req.originalUrl.split('?')[0] === '/boq') return res.redirect(302, '/boq/index.html'); next(); });
   app.use(express.static(path.join(__dirname, 'public')));
 
   const storage = multer.diskStorage({
