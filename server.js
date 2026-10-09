@@ -1529,7 +1529,7 @@ async function startApp() {
     ['asbestos', /asbestos|ukata|\basb\b/], ['ecs-hs', /\becs\b.*(assessment|health|h s)/], ['ecs', /\becs\b/], ['cscs', /\bcscs\b/], ['ipaf', /\bipaf\b/], ['pasma', /\bpasma\b/],
     ['smsts', /\bsmsts\b/], ['sssts', /\bsssts\b/], ['first-aid', /first aid|\befaw\b|\bfaw\b|emergency first/],
     ['18th', /18th|7671|\b2382\b/], ['2391', /\b2391\b/], ['hs-awareness', /health (and|&) safety awareness|\bhsa\b/],
-    ['insurance', /insurance|liability/], ['confined', /confined/], ['manual-handling', /manual handling/], ['fire', /\bfire\b/],
+    ['insurance', /insurance|liability/], ['security', /security clearance|\bbpss\b/], ['confined', /confined/], ['manual-handling', /manual handling/], ['fire', /\bfire\b/],
     ['harness', /harness/], ['abrasive', /abrasive/], ['coshh', /coshh/]
   ];
   const courseKey = v => { const n = normName(v); for (const [k, re] of COURSE_KEYS) if (re.test(n)) return k; return n; };
@@ -1569,6 +1569,12 @@ async function startApp() {
       const completion = c.issued || null;
       if (rec) {
         touched.add(rec.id);
+        // Duplicate portal records for the same person, course and expiry are covered by
+        // this certificate too — don't report them as missing from SharePoint.
+        records.forEach(r => {
+          if (r.id !== rec.id && sameName(r.operative_name, c.person) && sameCourse(r.course_name, c.course)
+              && (r.expiry_date || '') === (rec.expiry_date || '')) touched.add(r.id);
+        });
         const newer = c.expiry && (!rec.expiry_date || c.expiry > rec.expiry_date);
         const older = c.expiry && rec.expiry_date && c.expiry < rec.expiry_date;
         if (older) { result.superseded.push(`${c.person} — ${c.course} (${c.expiry}) — portal already has ${rec.expiry_date}`); continue; }
