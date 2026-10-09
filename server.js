@@ -117,7 +117,7 @@ async function listTrainingCertificateFiles() {
 
 // "Gary Rouvas - IPAF PAL Card 3a 3b (Front) - Exp 2029-04-30.jpg" → structured record.
 function parseCertificateFilename(name, folder) {
-  const stem = name.replace(/\.[A-Za-z0-9]{2,5}$/, '').trim();
+  const stem = name.replace(/\.[A-Za-z0-9]{2,5}$/, '').replace(/[.\s]+$/, '').trim();
   const parts = stem.split(/\s+-\s+/);
   if (parts.length < 2) return null;
   const last = parts[parts.length - 1];
@@ -125,7 +125,7 @@ function parseCertificateFilename(name, folder) {
   let m;
   if ((m = last.match(/^(?:Exp(?:iry|ires)?|Expires)\.?\s+(\d{4}-\d{2}-\d{2})$/i))) expiry = m[1];
   else if ((m = last.match(/^(?:Exp(?:iry|ires)?)\.?\s+(\d{2})[-\/.](\d{2})[-\/.](\d{4})$/i))) expiry = `${m[3]}-${m[2]}-${m[1]}`;
-  else if ((m = last.match(/^(?:Issued|Dated|Completed)\s+(\d{4}(?:-\d{2}(?:-\d{2})?)?)$/i))) issued = m[1];
+  else if ((m = last.match(/^(?:Issued|Dated|Completed|From)\s+(\d{4}(?:-\d{2}(?:-\d{2})?)?)$/i))) issued = m[1];
   else return null;
   const dateIdx = parts.length - 1;
   // "<Person> - <Course> - <Date>" when there are 3+ parts; "<Course> - <Date>" inside a person's folder when only 2.
@@ -134,7 +134,7 @@ function parseCertificateFilename(name, folder) {
   if (parts.length >= 3) { person = parts[0].trim(); courseParts = parts.slice(1, dateIdx); }
   else { person = folderPerson; courseParts = parts.slice(0, dateIdx); }
   if (!person) return null;
-  let course = courseParts.join(' - ').replace(/\s*\((front|back|side \d|page \d)\)\s*/ig, ' ').replace(/\s{2,}/g, ' ').trim();
+  let course = courseParts.join(' - ').replace(/\s*\((front|back|side \d|page \d)\)\s*/ig, ' ').replace(/\s*\bpage \d+\b\s*/ig, ' ').replace(/\s{2,}/g, ' ').trim();
   if (!course) return null;
   return { person, course, expiry, issued };
 }
