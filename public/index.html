@@ -266,7 +266,11 @@ body.read-only-mode .hide-readonly{display:none!important}
 .training-matrix tr:last-child td{border-bottom:none}
 .training-matrix tbody tr:hover td{background:#FAFBFC}
 .tm-name-col{background:#F7F8FA;color:var(--ink-2);font-weight:600;font-size:11px;letter-spacing:.02em;text-transform:uppercase;position:sticky;left:0;z-index:2;min-width:140px;text-align:left!important;border-bottom:1px solid var(--line)!important}
-.tm-course-col{background:#F7F8FA;color:var(--ink-2);font-weight:600;font-size:11px;min-width:64px;max-width:96px;white-space:normal;line-height:1.25;border-bottom:1px solid var(--line)!important}
+.tm-course-col{background:#F7F8FA;color:var(--ink-2);font-weight:600;font-size:11px;min-width:34px;line-height:1.2;vertical-align:bottom;padding:8px 4px!important;border-bottom:1px solid var(--line)!important}
+.tm-course-label{display:inline-block;writing-mode:vertical-rl;transform:rotate(180deg);white-space:normal;max-height:170px;text-align:left;overflow-wrap:anywhere}
+.tm-group-col{text-align:left!important;background:#EEF0F4;color:var(--ink-2);font-weight:700;font-size:10px;letter-spacing:.04em;text-transform:uppercase;white-space:normal;line-height:1.25;padding:6px 6px!important;border-bottom:1px solid var(--line)!important}
+.training-matrix .tm-group-start{border-left:2px solid var(--line)}
+.training-matrix thead .tm-name-col{vertical-align:bottom;z-index:3}
 .tm-name-cell{font-weight:600;font-size:13px;color:var(--ink);background:var(--card);position:sticky;left:0;z-index:1;text-align:left!important;white-space:nowrap;padding-left:12px!important}
 .training-matrix tbody tr:hover .tm-name-cell{background:#FAFBFC}
 .tm-cell{padding:6px 4px;vertical-align:middle}
@@ -2704,7 +2708,7 @@ async function renderAdminTraining(c) {
         <div class="form-group"><label>Operative</label>
           <select id="trainUser">
             <option value="external">— Type name below (not on system) —</option>
-            ${users.filter(u=>u.role==='operative').map(u=>`<option value="${u.id}">${u.full_name}</option>`).join('')}
+            ${trainingPeople(users).map(u=>`<option value="${u.id}">${trainingPersonLabel(u)}</option>`).join('')}
           </select>
         </div>
         <div class="form-group" id="externalNameGroup"><label>Operative Name (if not on system)</label><input type="text" id="trainExternalName" placeholder="e.g. John Smith (subcontractor)"><div id="externalNameWarning" style="display:none;margin-top:8px;padding:10px 12px;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;border-radius:6px;font-size:13px"></div></div>
@@ -2743,12 +2747,26 @@ async function renderAdminTraining(c) {
   } catch { c.innerHTML = '<p>Failed to load training matrix</p>'; }
 }
 
+// People a training record can be linked to: operatives, project managers and admins
+// (not clients or the shared "admin" login). Non-operatives are labelled with their role
+// so two accounts with the same name can be told apart.
+const TRAINING_ROLE_LABEL = { operative: '', project_manager: 'Project Manager', admin: 'Admin' };
+window.trainingPeople = function(users) {
+  return (users || [])
+    .filter(u => u.role in TRAINING_ROLE_LABEL && u.username !== 'admin')
+    .sort((a, b) => (a.role === 'operative' ? 0 : 1) - (b.role === 'operative' ? 0 : 1) || (a.full_name || '').localeCompare(b.full_name || ''));
+};
+window.trainingPersonLabel = function(u) {
+  const role = TRAINING_ROLE_LABEL[u.role];
+  return esc(u.full_name) + (role ? ' (' + role + ')' : '');
+};
+
 function wireTrainingNameWarning() {
   const nameInput = document.getElementById('trainExternalName');
   const userSelect = document.getElementById('trainUser');
   const warn = document.getElementById('externalNameWarning');
   if (!nameInput || !userSelect || !warn) return;
-  const operatives = (window._trainingUsers || []).filter(u => u.role === 'operative');
+  const operatives = trainingPeople(window._trainingUsers);
   const norm = s => (s || '').trim().toLowerCase();
   nameInput.addEventListener('input', () => {
     const typed = norm(nameInput.value);
@@ -2842,10 +2860,37 @@ function renderTrainingMatrix(el, records) {
   });
 
   const operatives = Object.keys(operativeMap).sort();
-  const allCourses = [...new Set(records.map(r => r.course_name))].sort();
 
-  // Status cell helper
-  const cellHtml = (rec) => {
+  // Group courses under their category (most common category used for that course),
+  // so the header reads as a few labelled bands instead of one long run of columns.
+  const CATEGORY_ORDER = ['Competency Card','Safety Training','First Aid','Working at Height','Confined Space','Equipment Training','Electrical','Mechanical','Other'];
+  const catVotes = {};
+  records.forEach(r => {
+    const c = r.course_name;
+    const cat = r.category || 'Other';
+    catVotes[c] = catVotes[c] || {};
+    catVotes[c][cat] = (catVotes[c][cat] || 0) + 1;
+  });
+  const courseCat = {};
+  Object.keys(catVotes).forEach(c => {
+    courseCat[c] = Object.entries(catVotes[c]).sort((a, b) => b[1] - a[1])[0][0];
+  });
+  const catRank = cat => { const i = CATEGORY_ORDER.indexOf(cat); return i === -1 ? CATEGORY_ORDER.length : i; };
+  const allCourses = Object.keys(courseCat).sort((a, b) =>
+    catRank(courseCat[a]) - catRank(courseCat[b]) || courseCat[a].localeCompare(courseCat[b]) || a.localeCompare(b));
+  const groups = [];
+  allCourses.forEach(c => {
+    const cat = courseCat[c];
+    if (groups.length && groups[groups.length - 1].cat === cat) groups[groups.length - 1].courses.push(c);
+    else groups.push({ cat, courses: [c] });
+  });
+  const groupStart = new Set(groups.map(g => g.courses[0]));
+
+  // Status cell helper (adds a divider at the start of each category group)
+  const cellHtml = (rec, course) => groupStart.has(course) && course !== allCourses[0]
+    ? cellInner(rec).replace('<td class="tm-cell', '<td class="tm-cell tm-group-start')
+    : cellInner(rec);
+  const cellInner = (rec) => {
     if (!rec) return '<td class="tm-cell tm-none"><span class="tm-na"></span></td>';
     const exp = rec.expiry_date ? new Date(rec.expiry_date) : null;
     const daysLeft = exp ? Math.ceil((exp - now) / (1000*60*60*24)) : null;
@@ -2863,23 +2908,6 @@ function renderTrainingMatrix(el, records) {
     }
   };
 
-  // Abbreviate long course names for column headers
-  const abbrev = (name) => {
-    const map = {
-      'CSCS Blue Card': 'CSCS',
-      'CSCS Green Card': 'CSCS-G',
-      'IPAF Operator': 'IPAF',
-      'PASMA Tower': 'PASMA',
-      'First Aid at Work': 'FA',
-      'Fire Safety': 'Fire',
-      'Manual Handling': 'MH',
-      'Working at Height': 'WAH',
-      'Confined Space': 'CS',
-      'Asbestos Awareness': 'Asb',
-      'ECS Card': 'ECS',
-    };
-    return map[name] || (name.length > 8 ? name.substring(0, 7) + '\u2026' : name);
-  };
 
   el.innerHTML = `
     <div class="tm-legend-row">
@@ -2894,16 +2922,19 @@ function renderTrainingMatrix(el, records) {
     <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;border:1px solid var(--line);background:var(--card)">
       <table class="training-matrix">
         <thead>
+          <tr class="tm-group-row">
+            <th class="tm-name-col" rowspan="2">Operative</th>
+            ${groups.map((g, i) => `<th class="tm-group-col${i ? ' tm-group-start' : ''}" colspan="${g.courses.length}" title="${esc(g.cat)}">${esc(g.cat)}</th>`).join('')}
+          </tr>
           <tr>
-            <th class="tm-name-col">Operative</th>
-            ${allCourses.map(c => `<th class="tm-course-col" title="${c}">${abbrev(c)}</th>`).join('')}
+            ${allCourses.map(c => `<th class="tm-course-col${groupStart.has(c) && c !== allCourses[0] ? ' tm-group-start' : ''}" title="${esc(c)}"><span class="tm-course-label">${esc(c)}</span></th>`).join('')}
           </tr>
         </thead>
         <tbody>
           ${operatives.map(op => `
             <tr>
-              <td class="tm-name-cell">${op}</td>
-              ${allCourses.map(c => cellHtml(operativeMap[op][c])).join('')}
+              <td class="tm-name-cell">${esc(op)}</td>
+              ${allCourses.map(c => cellHtml(operativeMap[op][c], c)).join('')}
             </tr>
           `).join('')}
         </tbody>
@@ -2960,7 +2991,7 @@ window.editTrainingRecord = function(id) {
   const r = records.find(x => x.id === id);
   if (!r) { showToast('Record not found', 'error'); return; }
 
-  const operatives = users.filter(u => u.role === 'operative');
+  const operatives = trainingPeople(users);
   const isLinked = r.user_id != null;
   // Uses the shared modal-overlay pattern.
   document.body.insertAdjacentHTML('beforeend', `
@@ -2970,7 +3001,7 @@ window.editTrainingRecord = function(id) {
         <div class="form-group"><label>Operative</label>
           <select id="editTrainUser">
             <option value="external" ${!isLinked ? 'selected' : ''}>— Type name below (not on system) —</option>
-            ${operatives.map(u => `<option value="${u.id}" ${String(u.id) === String(r.user_id) ? 'selected' : ''}>${esc(u.full_name)}</option>`).join('')}
+            ${operatives.map(u => `<option value="${u.id}" ${String(u.id) === String(r.user_id) ? 'selected' : ''}>${trainingPersonLabel(u)}</option>`).join('')}
           </select>
         </div>
         <div class="form-group"><label>Operative Name (if not on system)</label>
